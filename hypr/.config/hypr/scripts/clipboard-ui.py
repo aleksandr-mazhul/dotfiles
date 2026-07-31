@@ -168,6 +168,9 @@ def cliphist_list() -> list[ClipItem]:
         if not raw.strip() or "\t" not in raw:
             continue
         item_id, preview = raw.split("\t", 1)
+        # Hide internal paste helper artifacts from history UI
+        if "hypr-clipboard-paste" in preview or preview.startswith("file:///tmp/hypr-clipboard"):
+            continue
         binary = BINARY_RE.search(preview)
         mime = None
         is_image = False
@@ -190,6 +193,8 @@ def cliphist_list() -> list[ClipItem]:
                 mime=mime,
             )
         )
+    # Newest first (cliphist ids grow monotonically)
+    items.sort(key=lambda it: int(it.item_id) if it.item_id.isdigit() else 0, reverse=True)
     return items
 
 
@@ -366,12 +371,38 @@ class ClipboardWindow(Gtk.ApplicationWindow):
 
         self.connect("close-request", self.on_close_request)
         self.reload()
+        # Keep newest copies on top while the popup is open
+        GLib.timeout_add(1000, self._soft_refresh)
 
     def on_close_request(self, *_args) -> bool:
         app = self.get_application()
         if app is not None:
             GLib.idle_add(app.quit)
         return False
+
+    def _soft_refresh(self) -> bool:
+        if not self.get_mapped():
+            return False
+        fresh = cliphist_list()
+        old_ids = [i.item_id for i in self._items]
+        new_ids = [i.item_id for i in fresh]
+        if old_ids != new_ids:
+            # New copy arrived — rebuild list, newest stays first
+            keep_sel = self.focused_item().item_id if self.focused_item() else None
+            self.reload()
+            if keep_sel and keep_sel in {i.item_id for i in self._items}:
+                for idx, item in enumerate(self._items):
+                    if item.item_id == keep_sel:
+                        row = self.list_box.get_row_at_index(idx)
+                        if row is not None:
+                            self.list_box.select_row(row)
+                        break
+            else:
+                # Prefer jumping to the newest item after a fresh copy
+                first = self.list_box.get_row_at_index(0)
+                if first is not None:
+                    self.list_box.select_row(first)
+        return True
 
     def show_ui(self) -> None:
         self.set_visible(True)
