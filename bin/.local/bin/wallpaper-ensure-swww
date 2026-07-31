@@ -1,0 +1,6 @@
+#!/usr/bin/env bash
+# Only one wallpaper engine: swww
+killall -q hyprpaper 2>/dev/null || true
+export PATH="$HOME/.local/bin:/usr/bin:$PATH"
+pgrep -x swww-daemon >/dev/null || swww-daemon &
+sleep 0.2
