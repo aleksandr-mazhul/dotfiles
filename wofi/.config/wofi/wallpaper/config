@@ -1,0 +1,11 @@
+width=480
+height=620
+location=center
+prompt=Search
+allow_images=true
+image_size=96
+insensitive=true
+hide_scroll=true
+gtk-dark=true
+orientation=vertical
+matching=contains

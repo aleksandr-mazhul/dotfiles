@@ -1,0 +1,11 @@
+width=420
+height=520
+location=center
+prompt=Search wallpapers...
+allow_images=true
+image_size=64
+insensitive=true
+hide_scroll=true
+normal_window=true
+gtk-dark=true
+orientation=vertical

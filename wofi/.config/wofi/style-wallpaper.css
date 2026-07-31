@@ -1,0 +1,13 @@
+window {
+  background-color: rgba(28, 22, 18, 0.94);
+  border-radius: 18px;
+  border: 1px solid rgba(255, 230, 200, 0.12);
+  font-family: "Adwaita Sans", sans-serif;
+}
+* { color: #f3e9dc; }
+#input {
+  margin: 12px; padding: 12px 16px; border-radius: 999px; border: none;
+  background-color: rgba(60, 45, 35, 0.95); color: #f3e9dc;
+}
+#entry { padding: 10px 14px; margin: 3px 6px; border-radius: 12px; }
+#entry:selected { background-color: rgba(120, 90, 65, 0.9); }
