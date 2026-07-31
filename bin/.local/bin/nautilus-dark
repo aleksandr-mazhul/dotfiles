@@ -1,0 +1,6 @@
+#!/usr/bin/env bash
+# System uses Graphite, but Graphite GTK4 breaks Nautilus sidebar — run stock libadwaita dark
+unset GTK_THEME
+export GTK_THEME=
+export ADW_DISABLE_PORTAL=1
+exec /usr/bin/nautilus "$@"

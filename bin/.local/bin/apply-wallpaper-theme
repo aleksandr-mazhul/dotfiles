@@ -1,0 +1,24 @@
+#!/usr/bin/env bash
+# Apply wallpaper theme colors via matugen after Waypaper changes wallpaper
+set -euo pipefail
+
+wallpaper="${1:-}"
+# Waypaper may pass escaped paths — unquote
+wallpaper="${wallpaper//\\/}"
+
+if [[ -z "$wallpaper" || ! -f "$wallpaper" ]]; then
+  echo "apply-wallpaper-theme: missing wallpaper: ${wallpaper:-<empty>}" >&2
+  exit 0
+fi
+
+matugen image "$wallpaper" --mode dark --type scheme-tonal-spot --prefer saturation
+
+# Reload Hyprland colors without full restart of apps
+hyprctl reload >/dev/null 2>&1 || true
+
+# Reload kitty colors in live instances
+if command -v kitten >/dev/null 2>&1; then
+  kitten @ set-colors --all --configured ~/.config/kitty/colors-matugen.conf 2>/dev/null || true
+fi
+
+notify-send -a Waypaper "Theme updated" "$(basename "$wallpaper")" 2>/dev/null || true

@@ -1,0 +1,67 @@
+#!/usr/bin/env bash
+# Simple Windscribe location picker (GUI via wofi)
+# Official Windscribe window often fails to show on Hyprland/Wayland.
+set -euo pipefail
+
+CLI="${WINDSCRIBE_CLI:-windscribe-cli}"
+WOFI_OPTS=(--dmenu --prompt "Windscribe" --width 50% --height 60% --insensitive)
+
+notify() {
+  command -v notify-send >/dev/null && notify-send -a Windscribe "$1" "${2:-}" || true
+}
+
+status_line() {
+  local st conn loc
+  st="$("$CLI" status 2>/dev/null || true)"
+  conn="$(printf '%s\n' "$st" | awk -F': ' '/Connect state:/{print $2; exit}')"
+  loc="$(printf '%s\n' "$st" | awk -F': ' '/Location:/{print $2; exit}')"
+  if [[ "${conn,,}" == *connected* && -n "${loc:-}" ]]; then
+    echo "● Connected: $loc"
+  else
+    echo "○ Disconnected"
+  fi
+}
+
+pick() {
+  local header choice
+  header="$(status_line)"
+  choice="$(
+    {
+      echo "$header"
+      echo "—— Disconnect ——"
+      echo "—— Best location ——"
+      "$CLI" locations 2>/dev/null | sed 's/ (Disabled).*//; s/ ([0-9].*//'
+    } | wofi "${WOFI_OPTS[@]}"
+  )" || exit 0
+
+  [[ -z "${choice:-}" ]] && exit 0
+  [[ "$choice" == "$header" ]] && exit 0
+
+  case "$choice" in
+    "—— Disconnect ——")
+      notify "Disconnecting…"
+      "$CLI" disconnect
+      notify "Disconnected"
+      ;;
+    "—— Best location ——")
+      notify "Connecting…" "Best location"
+      "$CLI" connect best
+      notify "Connected" "$(status_line)"
+      ;;
+    *)
+      # Strip trailing speed labels if any remain
+      choice="${choice%% (*}"
+      choice="$(echo "$choice" | sed 's/[[:space:]]*$//')"
+      notify "Connecting…" "$choice"
+      if "$CLI" connect "$choice"; then
+        notify "Connected" "$choice"
+      else
+        # Try city-only (last segment after " - ")
+        city="${choice##* - }"
+        "$CLI" connect "$city" && notify "Connected" "$city" || notify "Failed" "$choice"
+      fi
+      ;;
+  esac
+}
+
+pick
