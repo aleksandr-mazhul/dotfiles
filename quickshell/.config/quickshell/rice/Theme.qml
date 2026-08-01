@@ -50,4 +50,13 @@ QtObject {
     readonly property int fontSize: 14
     readonly property int fontSizeSm: 12
     readonly property int fontSizeLg: 16
+
+    // Top bar islands
+    readonly property int barHeight: 36
+    readonly property int barMargin: 8
+    readonly property int barIslandRadius: 20
+    readonly property int barIslandPadH: 12
+    readonly property int barIslandPadV: 6
+    readonly property int barGap: 8
+    readonly property int qsPanelWidth: 380
 }

@@ -10,6 +10,22 @@ ShellRoot {
     Wallpaper { id: wallpaper }
     Vpn { id: vpn }
 
+    QuickSettings { id: quickSettings }
+    Calendar { id: calendar }
+    Notifications { id: notifications }
+    Osd {}
+
+    Variants {
+        model: Quickshell.screens
+
+        Bar {
+            required property var modelData
+            quickSettings: quickSettings
+            calendar: calendar
+            notifCenter: notifications
+        }
+    }
+
     Component.onCompleted: {
         OverlayHub.clipboard = clipboard
         OverlayHub.launcher = launcher
@@ -54,6 +70,43 @@ ShellRoot {
         function toggle(): void { vpn.toggle() }
         function open(): void { vpn.show() }
         function close(): void { vpn.close() }
+    }
+
+    IpcHandler {
+        target: "bar"
+        function toggleQuickSettings(): void {
+            calendar.close()
+            notifications.close()
+            quickSettings.toggle()
+        }
+        function openQuickSettings(): void {
+            calendar.close()
+            notifications.close()
+            quickSettings.show()
+        }
+        function closeQuickSettings(): void { quickSettings.close() }
+        function toggleCalendar(): void {
+            quickSettings.close()
+            notifications.close()
+            calendar.toggle()
+        }
+        function openCalendar(): void {
+            quickSettings.close()
+            notifications.close()
+            calendar.show()
+        }
+        function closeCalendar(): void { calendar.close() }
+        function toggleNotifications(): void {
+            quickSettings.close()
+            calendar.close()
+            notifications.toggle()
+        }
+        function openNotifications(): void {
+            quickSettings.close()
+            calendar.close()
+            notifications.show()
+        }
+        function closeNotifications(): void { notifications.close() }
     }
 
     IpcHandler {

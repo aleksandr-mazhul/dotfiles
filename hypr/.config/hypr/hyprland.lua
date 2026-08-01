@@ -132,7 +132,6 @@ hl.device({
 })
 
 hl.on("hyprland.start", function()
-    hl.exec_cmd("vibepanel")
     hl.exec_cmd("qs -c rice -n -d")
     hl.exec_cmd("hyprpolkitagent")
     hl.exec_cmd("swww-daemon")

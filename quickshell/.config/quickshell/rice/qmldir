@@ -7,3 +7,15 @@ Clipboard 1.0 Clipboard.qml
 Launcher 1.0 Launcher.qml
 Wallpaper 1.0 Wallpaper.qml
 Vpn 1.0 Vpn.qml
+Bar 1.0 Bar.qml
+BarIsland 1.0 BarIsland.qml
+BarWorkspaces 1.0 BarWorkspaces.qml
+BarActiveWindow 1.0 BarActiveWindow.qml
+BarTray 1.0 BarTray.qml
+BarQsButton 1.0 BarQsButton.qml
+BarClockButton 1.0 BarClockButton.qml
+BarNotifButton 1.0 BarNotifButton.qml
+QuickSettings 1.0 QuickSettings.qml
+Calendar 1.0 Calendar.qml
+Notifications 1.0 Notifications.qml
+Osd 1.0 Osd.qml
