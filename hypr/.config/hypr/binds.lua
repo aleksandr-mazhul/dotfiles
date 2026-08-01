@@ -10,7 +10,7 @@ hl.bind(mainMod .. " + SHIFT + F", hl.dsp.exec_cmd("vibepanel bar toggle"))
 hl.bind("CTRL + Q", hl.dsp.exec_cmd("~/.config/hypr/scripts/clipboard-open.sh"))
 hl.bind(mainMod .. " + O", hl.dsp.exec_cmd(p.menu))
 hl.bind(mainMod .. " + P", hl.dsp.window.pseudo())
-hl.bind(mainMod .. " + J", hl.dsp.layout("togglesplit"))
+-- Alt+J is movefocus down only (legacy togglesplit conflicted with the same key)
 
 hl.bind(secondMod .. " + L", hl.dsp.exec_cmd("pidof hyprlock || hyprlock"))
 hl.bind(secondMod .. " + W", hl.dsp.exec_cmd("~/.local/bin/wallpaper-menu"))
