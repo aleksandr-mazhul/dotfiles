@@ -1,0 +1,14 @@
+#!/usr/bin/env bash
+# Prefer distro package; fall back to user-local extract used for experiment/quickshell.
+if [[ -x /usr/bin/quickshell ]]; then
+  exec /usr/bin/quickshell "$@"
+fi
+PREFIX="${HOME}/.local/quickshell-prefix"
+if [[ -x "${PREFIX}/bin/quickshell" ]]; then
+  export LD_LIBRARY_PATH="${PREFIX}/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+  export QML2_IMPORT_PATH="${PREFIX}/lib/qt6/qml${QML2_IMPORT_PATH:+:$QML2_IMPORT_PATH}"
+  export QML_IMPORT_PATH="${PREFIX}/lib/qt6/qml${QML_IMPORT_PATH:+:$QML_IMPORT_PATH}"
+  exec "${PREFIX}/bin/quickshell" "$@"
+fi
+echo "qs: quickshell not found. Install with: sudo pacman -S quickshell" >&2
+exit 127
