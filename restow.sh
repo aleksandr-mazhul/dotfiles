@@ -13,6 +13,7 @@ packages=(
   fish
   gtk
   hypr
+  kanata
   kitty
   matugen
   misc
@@ -100,6 +101,7 @@ for p in \
   .config/fastfetch \
   .config/gtk-3.0 \
   .config/gtk-4.0 \
+  .config/kanata \
   .Xresources
 do
   ok_link "$p"

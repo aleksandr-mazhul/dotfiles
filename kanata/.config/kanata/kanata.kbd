@@ -1,0 +1,48 @@
+;; Home row mods (Ctrl Alt Super Shift) + Caps as Esc/Ctrl
+;;
+;; Left:  A=Ctrl  S=Alt  D=Super  F=Shift
+;; Right: J=Shift  K=Super  L=Alt  ;=Ctrl
+;; Caps:  tap=Esc, hold=Ctrl
+;;
+;; tap-hold-release: action decided on release — better for typing rolls.
+;; Tune $tap-time / $hold-time if letters accidentally become mods (raise hold)
+;; or mods feel laggy (lower hold).
+
+(defcfg
+  process-unmapped-keys yes
+  concurrent-tap-hold yes
+  ;; Optional: only the Ergohaven
+  ;; linux-dev /dev/input/by-id/usb-Ergohaven_K:03_v3_v4_vial:f64c2b3c-event-kbd
+)
+
+(defvar
+  tap-time  200
+  hold-time 200
+)
+
+(defsrc
+  caps
+  a s d f
+  j k l scln
+)
+
+(defalias
+  caps (tap-hold $tap-time $hold-time esc lctl)
+
+  ;; home row mods: Ctrl Alt Super Shift
+  ctl  (tap-hold-release $tap-time $hold-time a lctl)
+  alt  (tap-hold-release $tap-time $hold-time s lalt)
+  met  (tap-hold-release $tap-time $hold-time d lmet)
+  sft  (tap-hold-release $tap-time $hold-time f lsft)
+
+  rsft (tap-hold-release $tap-time $hold-time j rsft)
+  rmet (tap-hold-release $tap-time $hold-time k rmet)
+  ralt (tap-hold-release $tap-time $hold-time l ralt)
+  rctl (tap-hold-release $tap-time $hold-time scln rctl)
+)
+
+(deflayer base
+  @caps
+  @ctl @alt @met @sft
+  @rsft @rmet @ralt @rctl
+)

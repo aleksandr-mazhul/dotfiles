@@ -1,0 +1,14 @@
+[Unit]
+Description=Kanata keyboard remapper (user unit; needs input group in session)
+Documentation=https://github.com/jtroo/kanata
+After=graphical-session.target
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/kanata --cfg %h/.config/kanata/kanata.kbd
+Restart=on-failure
+RestartSec=2
+Environment=RUST_LOG=info
+
+[Install]
+WantedBy=default.target
