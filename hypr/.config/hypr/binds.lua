@@ -15,6 +15,7 @@ hl.bind(mainMod .. " + P", hl.dsp.window.pseudo())
 
 hl.bind(secondMod .. " + L", hl.dsp.exec_cmd("pidof hyprlock || hyprlock"))
 hl.bind(secondMod .. " + W", hl.dsp.exec_cmd("qs -c rice ipc call wallpaper toggle"))
+hl.bind(secondMod .. " + P", hl.dsp.exec_cmd("qs -c rice ipc call overlay filter"))
 hl.bind(secondMod .. " + SHIFT + W", hl.dsp.exec_cmd("~/.local/bin/wallpaper-random"))
 hl.bind(secondMod .. " + CTRL + W", hl.dsp.exec_cmd("~/.local/bin/waypaper"))
 hl.bind(secondMod .. " + V", hl.dsp.exec_cmd("qs -c rice ipc call vpn toggle"))
