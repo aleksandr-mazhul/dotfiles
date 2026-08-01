@@ -4,7 +4,19 @@ export WAYLAND_DISPLAY="${WAYLAND_DISPLAY:-wayland-1}"
 export XDG_RUNTIME_DIR="${XDG_RUNTIME_DIR:-/run/user/$(id -u)}"
 killall -q hyprpaper 2>/dev/null || true
 WALL_DIR="${WALLPAPER_DIR:-$HOME/Pictures/Wallpapers}"
-mapfile -t files < <(find -L "$WALL_DIR" -type f \( -iname '*.jpg' -o -iname '*.png' -o -iname '*.webp' \) 2>/dev/null)
+BATCH="${XDG_CACHE_HOME:-$HOME/.cache}/qs-wallpaper-batch"
+
+mapfile -t files < <(
+  if [[ -f "$BATCH" ]]; then
+    # Prefer multi-select pool from QS wallpaper panel
+    while IFS= read -r line; do
+      [[ -n "$line" && -f "$line" ]] && printf '%s\n' "$line"
+    done <"$BATCH"
+  fi
+)
+if ((${#files[@]} == 0)); then
+  mapfile -t files < <(find -L "$WALL_DIR" -type f \( -iname '*.jpg' -o -iname '*.jpeg' -o -iname '*.png' -o -iname '*.webp' \) 2>/dev/null)
+fi
 ((${#files[@]})) || { hyprctl notify 1 3000 "rgb(ff5555)" "Нет обоев"; exit 1; }
 pgrep -x swww-daemon >/dev/null || { swww-daemon & sleep 0.4; }
 img="${files[RANDOM % ${#files[@]}]}"
