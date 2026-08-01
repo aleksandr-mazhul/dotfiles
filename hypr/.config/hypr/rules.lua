@@ -39,6 +39,16 @@ hl.window_rule({
     workspace = "3 silent",
 })
 
+-- Media viewer shares Telegram's class; keep it on the current workspace
+hl.window_rule({
+    name = "telegram-media-stay",
+    match = {
+        class = "org.telegram.desktop",
+        title = "^Media viewer$",
+    },
+    workspace = "unset",
+})
+
 hl.window_rule({
     name = "cursor-to-C",
     match = { class = "^(cursor|Cursor)$" },
