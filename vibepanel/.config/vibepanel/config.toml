@@ -28,9 +28,13 @@ label_type = "name"
 [theme]
 mode = "dark"
 
+# GTK/Papirus icons so notification app icons resolve (Telegram, browsers, …)
 [theme.icons]
-theme = "material"
+theme = "gtk"
 weight = 400
+
+[widgets.notifications]
+toast_position = "top-right"
 
 [osd]
 enabled = true
