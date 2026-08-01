@@ -15,6 +15,16 @@ command = ""
 input_path = "~/.config/matugen/templates/hyprland-colors.conf"
 output_path = "~/.config/hypr/colors-matugen.conf"
 
+# Hyprlock adaptive lock colors
+[templates.hyprlock]
+input_path = "~/.config/matugen/templates/hyprlock-colors.conf"
+output_path = "~/.config/hypr/hyprlock-colors.conf"
+
+# SDDM login theme colors (copied into theme dir by apply-wallpaper-theme)
+[templates.sddm]
+input_path = "~/.config/matugen/templates/sddm-colors.conf"
+output_path = "~/.config/sddm-adaptive/colors.conf"
+
 # Kitty terminal colors
 [templates.kitty]
 input_path = "~/.config/matugen/templates/kitty-colors.conf"
