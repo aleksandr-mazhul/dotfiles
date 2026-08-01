@@ -7,7 +7,7 @@ require("workspaces")
 
 local terminal = "kitty"
 local fileManager = "/home/stranger/.local/bin/nautilus-dark --new-window"
-local menu = "wofi --show drun"
+local menu = "qs -c rice ipc call launcher toggle"
 local browser = "firefox"
 
 -- Expose for binds.lua
@@ -133,6 +133,7 @@ hl.device({
 
 hl.on("hyprland.start", function()
     hl.exec_cmd("vibepanel")
+    hl.exec_cmd("qs -c rice -n -d")
     hl.exec_cmd("hyprpolkitagent")
     hl.exec_cmd("swww-daemon")
     hl.exec_cmd("waypaper --restore")
