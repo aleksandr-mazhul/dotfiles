@@ -19,10 +19,11 @@ ShellRoot {
         model: Quickshell.screens
 
         Bar {
-            required property var modelData
+            // Variants injects modelData into the root component
             quickSettings: quickSettings
             calendar: calendar
             notifCenter: notifications
+            pinned: OverlayHub.barPinned
         }
     }
 
@@ -31,6 +32,9 @@ ShellRoot {
         OverlayHub.launcher = launcher
         OverlayHub.wallpaper = wallpaper
         OverlayHub.vpn = vpn
+        OverlayHub.quickSettings = quickSettings
+        OverlayHub.calendar = calendar
+        OverlayHub.notifications = notifications
     }
 
     IpcHandler {
@@ -74,6 +78,27 @@ ShellRoot {
 
     IpcHandler {
         target: "bar"
+        function toggle(): void {
+            // Pin / unpin: pinned = always visible; unpinned = autohide at top edge.
+            OverlayHub.barPinned = !OverlayHub.barPinned
+            OverlayHub.barVisible = true
+            if (!OverlayHub.barPinned) {
+                quickSettings.close()
+                calendar.close()
+                notifications.close()
+            }
+        }
+        function showBar(): void {
+            OverlayHub.barPinned = true
+            OverlayHub.barVisible = true
+        }
+        function hideBar(): void {
+            OverlayHub.barPinned = false
+            OverlayHub.barVisible = true
+            quickSettings.close()
+            calendar.close()
+            notifications.close()
+        }
         function toggleQuickSettings(): void {
             calendar.close()
             notifications.close()

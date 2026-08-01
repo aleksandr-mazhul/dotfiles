@@ -15,20 +15,21 @@ BarIsland {
         return cut.length > 28 ? cut.slice(0, 27) + "…" : cut
     }
 
-    Rectangle {
-        Layout.preferredWidth: 8
-        Layout.preferredHeight: 8
-        radius: 4
-        color: Theme.primary
-    }
-
-    Text {
-        Layout.fillWidth: true
-        text: root.titleText
-        color: Theme.text
-        font.family: Theme.fontFamily
-        font.pixelSize: Theme.fontSizeSm
-        elide: Text.ElideRight
-        maximumLineCount: 1
-    }
+    content: [
+        Rectangle {
+            Layout.preferredWidth: 8
+            Layout.preferredHeight: 8
+            radius: 4
+            color: Theme.primary
+        },
+        Text {
+            Layout.fillWidth: true
+            text: root.titleText
+            color: Theme.text
+            font.family: Theme.fontFamily
+            font.pixelSize: Theme.fontSizeSm
+            elide: Text.ElideRight
+            maximumLineCount: 1
+        }
+    ]
 }

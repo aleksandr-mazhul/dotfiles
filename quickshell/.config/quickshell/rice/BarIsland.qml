@@ -1,20 +1,23 @@
 import QtQuick
 import QtQuick.Layouts
 
-Rectangle {
+Item {
     id: root
-    property alias content: contentHost.data
+
     property bool clickable: false
-    signal clicked()
+    property alias content: contentHost.data
+    signal activated()
 
-    color: Theme.surface
-    radius: Theme.barIslandRadius
     implicitHeight: Theme.barHeight
-    implicitWidth: contentHost.implicitWidth + Theme.barIslandPadH * 2
-    border.width: 1
-    border.color: Theme.borderSubtle
+    implicitWidth: Math.max(Theme.barHeight, contentHost.implicitWidth + Theme.barIslandPadH * 2)
 
-    default property alias children: contentHost.data
+    Rectangle {
+        anchors.fill: parent
+        color: Theme.surface
+        radius: Theme.barIslandRadius
+        border.width: 1
+        border.color: Theme.borderSubtle
+    }
 
     RowLayout {
         id: contentHost
@@ -26,10 +29,20 @@ Rectangle {
         spacing: 8
     }
 
+    // Separate top catcher so tray icons / IconImage never steal presses.
     MouseArea {
         anchors.fill: parent
         enabled: root.clickable
-        cursorShape: enabled ? Qt.PointingHandCursor : Qt.ArrowCursor
-        onClicked: root.clicked()
+        hoverEnabled: true
+        preventStealing: true
+        propagateComposedEvents: false
+        acceptedButtons: Qt.LeftButton
+        cursorShape: root.clickable ? Qt.PointingHandCursor : Qt.ArrowCursor
+        z: 100
+
+        onPressed: event => {
+            root.activated()
+            event.accepted = true
+        }
     }
 }

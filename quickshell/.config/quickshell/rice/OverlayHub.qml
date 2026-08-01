@@ -9,7 +9,56 @@ QtObject {
     property var launcher: null
     property var wallpaper: null
     property var vpn: null
+    property var quickSettings: null
+    property var calendar: null
+    property var notifications: null
+    property bool barVisible: true
+    // When false, bar autohides and reveals on top-edge hover hold.
+    property bool barPinned: false
 
+    function toggleBar() {
+        barPinned = !barPinned
+        barVisible = true
+    }
+
+    function toggleQuickSettings() {
+        if (calendar)
+            calendar.open = false
+        if (notifications)
+            notifications.open = false
+        if (!quickSettings)
+            return
+        if (quickSettings.open)
+            quickSettings.close()
+        else
+            quickSettings.show()
+    }
+
+    function toggleCalendar() {
+        if (quickSettings)
+            quickSettings.open = false
+        if (notifications)
+            notifications.open = false
+        if (!calendar)
+            return
+        if (calendar.open)
+            calendar.close()
+        else
+            calendar.show()
+    }
+
+    function toggleNotifications() {
+        if (quickSettings)
+            quickSettings.open = false
+        if (calendar)
+            calendar.open = false
+        if (!notifications)
+            return
+        if (notifications.open)
+            notifications.close()
+        else
+            notifications.show()
+    }
     function register(panel) {
         if (!panel)
             return

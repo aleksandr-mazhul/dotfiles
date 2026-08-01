@@ -132,6 +132,8 @@ hl.device({
 })
 
 hl.on("hyprland.start", function()
+    -- Rice owns notifications; stop swaync if it grabbed the bus.
+    hl.exec_cmd("systemctl --user stop swaync.service")
     hl.exec_cmd("qs -c rice -n -d")
     hl.exec_cmd("hyprpolkitagent")
     hl.exec_cmd("swww-daemon")

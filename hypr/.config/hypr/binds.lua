@@ -6,7 +6,7 @@ hl.bind(secondMod .. " + Q", hl.dsp.window.kill())
 
 hl.bind(mainMod .. " + V", hl.dsp.window.float({ action = "toggle" }))
 hl.bind(mainMod .. " + F", hl.dsp.window.fullscreen())
-hl.bind(mainMod .. " + SHIFT + F", hl.dsp.exec_cmd("qs -c rice ipc call bar toggleQuickSettings"))
+hl.bind(mainMod .. " + SHIFT + F", hl.dsp.exec_cmd("qs -c rice ipc call bar toggle"))
 -- Quickshell rice overlays (shared RicePanel design)
 hl.bind("CTRL + Q", hl.dsp.exec_cmd("qs -c rice ipc call clipboard toggle"))
 hl.bind(mainMod .. " + O", hl.dsp.exec_cmd(p.menu))

@@ -7,12 +7,14 @@ BarIsland {
 
     property string timeText: ""
 
-    Text {
-        text: root.timeText
-        color: Theme.text
-        font.family: Theme.fontFamily
-        font.pixelSize: Theme.fontSizeSm
-    }
+    content: [
+        Text {
+            text: root.timeText
+            color: Theme.text
+            font.family: Theme.fontFamily
+            font.pixelSize: Theme.fontSizeSm
+        }
+    ]
 
     Timer {
         interval: 1000

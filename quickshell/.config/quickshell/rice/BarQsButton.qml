@@ -7,10 +7,13 @@ BarIsland {
 
     property bool active: false
 
-    Text {
-        text: root.active ? "󰒓" : "󰕾"
-        color: Theme.primary
-        font.pixelSize: 16
-        font.family: "JetBrainsMono Nerd Font, JetBrains Mono, sans-serif"
-    }
+    content: [
+        RiceIcon {
+            name: root.active ? "preferences-other" : "view-grid"
+            fallback: "open-menu"
+            implicitSize: 16
+            Layout.preferredWidth: 16
+            Layout.preferredHeight: 16
+        }
+    ]
 }
