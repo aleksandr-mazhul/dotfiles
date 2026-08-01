@@ -5,7 +5,7 @@ include "/home/stranger/.gtkrc-2.0.mine"
 gtk-theme-name="Graphite-Dark"
 gtk-icon-theme-name="Papirus-Dark"
 gtk-font-name="Adwaita Sans 11"
-gtk-cursor-theme-name="LHackneyed-24px"
+gtk-cursor-theme-name="macOS"
 gtk-cursor-theme-size=24
 gtk-toolbar-style=GTK_TOOLBAR_ICONS
 gtk-toolbar-icon-size=GTK_ICON_SIZE_LARGE_TOOLBAR
