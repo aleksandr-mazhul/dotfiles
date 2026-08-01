@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+  <!-- Clear-all: tray + lid -->
+  <path fill="#ffffff" d="
+    M9.2 4.2h5.6v1.5H9.2z
+    M6.4 6.4h11.2v1.6H6.4z
+    M7.6 9h8.8v9.2
+    c0 .9-.7 1.6-1.6 1.6H9.2
+    c-.9 0-1.6-.7-1.6-1.6
+    V9z
+    M10.1 10.6h1.3v6.2h-1.3z
+    M12.7 10.6h1.3v6.2h-1.3z
+  "/>
+</svg>
