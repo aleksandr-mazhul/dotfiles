@@ -264,6 +264,7 @@ PanelWindow {
             refreshColors()
             syncAndRefresh()
             watchProc.running = true
+            openAnim.play()
             Qt.callLater(() => panel.forceActiveFocus())
         } else {
             closeForm()
@@ -306,6 +307,9 @@ PanelWindow {
         border.width: 1
         border.color: Theme.borderSubtle
         focus: root.open
+        transformOrigin: Item.TopRight
+        opacity: 1
+        scale: 1
         Keys.onPressed: event => {
             if (event.key === Qt.Key_Escape) {
                 if (root.formOpen)
@@ -314,6 +318,12 @@ PanelWindow {
                     root.close()
                 event.accepted = true
             }
+        }
+
+        RiceOpenAnim {
+            id: openAnim
+            target: panel
+            fromScale: 0.96
         }
 
         ColumnLayout {
@@ -641,7 +651,6 @@ PanelWindow {
                                     anchors.verticalCenter: parent.verticalCenter
                                     x: root.draftAllDay ? parent.width - width - 3 : 3
                                     color: Theme.text
-                                    Behavior on x { NumberAnimation { duration: 120 } }
                                 }
 
                                 MouseArea {
@@ -863,8 +872,6 @@ PanelWindow {
                     border.width: 1
                     border.color: Theme.borderSubtle
                     opacity: past ? 0.42 : 1.0
-
-                    Behavior on opacity { NumberAnimation { duration: 180 } }
 
                     Rectangle {
                         anchors.left: parent.left

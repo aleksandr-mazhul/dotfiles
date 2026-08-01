@@ -3,6 +3,7 @@ singleton Colors 1.0 Colors.qml
 singleton Theme 1.0 Theme.qml
 singleton OverlayHub 1.0 OverlayHub.qml
 RicePanel 1.0 RicePanel.qml
+RiceOpenAnim 1.0 RiceOpenAnim.qml
 Clipboard 1.0 Clipboard.qml
 Launcher 1.0 Launcher.qml
 Wallpaper 1.0 Wallpaper.qml

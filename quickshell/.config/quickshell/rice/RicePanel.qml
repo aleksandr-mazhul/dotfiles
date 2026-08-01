@@ -1,6 +1,7 @@
 import QtQuick
 import QtQuick.Layouts
 import Quickshell
+import Quickshell.Wayland
 
 PanelWindow {
     id: root
@@ -48,6 +49,7 @@ PanelWindow {
     exclusiveZone: 0
     exclusionMode: ExclusionMode.Ignore
     focusable: true
+    WlrLayershell.namespace: "rice-panel"
     anchors {
         left: true
         right: true
@@ -74,6 +76,10 @@ PanelWindow {
         searchField.text = ""
         filterMenuOpen = false
         panelOpened()
+        openAnim.play()
+        dimAnim.from = 0
+        dimAnim.to = 1
+        dimAnim.restart()
         Qt.callLater(() => {
             if (pendingOpenFilter && hasFilter) {
                 pendingOpenFilter = false
@@ -274,13 +280,23 @@ PanelWindow {
     }
 
     Rectangle {
+        id: dim
         anchors.fill: parent
         color: Theme.backdrop
         z: -1
+        opacity: 1
         MouseArea {
             anchors.fill: parent
             onClicked: root.close()
         }
+    }
+
+    NumberAnimation {
+        id: dimAnim
+        target: dim
+        property: "opacity"
+        duration: Theme.menuAnimMs
+        easing.type: Easing.OutCubic
     }
 
     Rectangle {
@@ -292,6 +308,15 @@ PanelWindow {
         color: Theme.surface
         border.color: Theme.border
         border.width: 1
+        transformOrigin: Item.Center
+        opacity: 1
+        scale: 1
+
+        RiceOpenAnim {
+            id: openAnim
+            target: panel
+            fromScale: 0.97
+        }
 
         Rectangle {
             anchors.fill: parent

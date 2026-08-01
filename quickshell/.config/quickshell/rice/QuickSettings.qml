@@ -38,6 +38,7 @@ PanelWindow {
         if (open) {
             OverlayHub.closeAll()
             refreshStatus()
+            openAnim.play()
             Qt.callLater(() => panel.forceActiveFocus())
         } else {
             expanded = ""
@@ -159,9 +160,9 @@ PanelWindow {
     exclusiveZone: 0
     exclusionMode: ExclusionMode.Ignore
     focusable: true
-    // Compact window — fullscreen overlays ate bar clicks (open then instantly dead).
+    // Compact window — fixed size so open/expand never resizes the layer (jerky on 165Hz).
     implicitWidth: Theme.qsPanelWidth
-    implicitHeight: Math.max(280, panelCol.implicitHeight + 24)
+    implicitHeight: Theme.qsPanelHeight
     WlrLayershell.layer: WlrLayer.Overlay
     WlrLayershell.namespace: "rice-quicksettings"
     WlrLayershell.keyboardFocus: open ? WlrKeyboardFocus.OnDemand : WlrKeyboardFocus.None
@@ -220,6 +221,9 @@ PanelWindow {
         border.width: 1
         border.color: Theme.borderSubtle
         focus: root.open
+        transformOrigin: Item.TopRight
+        opacity: 1
+        scale: 1
         Keys.onPressed: event => {
             if (event.key === Qt.Key_Escape) {
                 root.close()
@@ -227,13 +231,26 @@ PanelWindow {
             }
         }
 
-        ColumnLayout {
-            id: panelCol
-            anchors.left: parent.left
-            anchors.right: parent.right
-            anchors.top: parent.top
+        RiceOpenAnim {
+            id: openAnim
+            target: panel
+            fromScale: 0.96
+        }
+
+        Flickable {
+            id: flick
+            anchors.fill: parent
             anchors.margins: 12
-            spacing: 10
+            clip: true
+            contentWidth: width
+            contentHeight: panelCol.implicitHeight
+            boundsBehavior: Flickable.StopAtBounds
+            flickableDirection: Flickable.VerticalFlick
+
+            ColumnLayout {
+                id: panelCol
+                width: flick.width
+                spacing: 10
 
             GridLayout {
                 columns: 2
@@ -431,7 +448,6 @@ PanelWindow {
                         color: vpnRow.containsMouse ? Theme.rowHover : Theme.surface
                         border.width: 1
                         border.color: "transparent"
-                        Behavior on color { ColorAnimation { duration: 100 } }
                         Text {
                             anchors.left: parent.left
                             anchors.right: parent.right
@@ -673,6 +689,7 @@ PanelWindow {
                     }
                 }
             }
+        }
         }
     }
 
@@ -938,9 +955,6 @@ PanelWindow {
             ? Qt.rgba(Theme.primary.r, Theme.primary.g, Theme.primary.b, 0.65)
             : (tile.hovered ? Theme.border : Theme.borderSubtle)
 
-        Behavior on color { ColorAnimation { duration: 120 } }
-        Behavior on border.color { ColorAnimation { duration: 120 } }
-
         RowLayout {
             anchors.fill: parent
             anchors.margins: 8
@@ -1000,7 +1014,6 @@ PanelWindow {
                 Layout.preferredHeight: 28
                 radius: 8
                 color: chevMouse.containsMouse ? Theme.rowHover : "transparent"
-                Behavior on color { ColorAnimation { duration: 100 } }
                 RiceIcon {
                     anchors.centerIn: parent
                     name: tile.expanded ? "go-up" : "go-down"
@@ -1032,7 +1045,6 @@ PanelWindow {
         color: prow.hovered ? Theme.rowHover : Theme.surface
         border.width: 1
         border.color: prow.hovered ? Theme.border : "transparent"
-        Behavior on color { ColorAnimation { duration: 120 } }
         RowLayout {
             anchors.fill: parent
             anchors.margins: 10
@@ -1092,7 +1104,6 @@ PanelWindow {
             Layout.preferredHeight: 28
             radius: 8
             color: iconMouse.containsMouse ? Theme.rowHover : "transparent"
-            Behavior on color { ColorAnimation { duration: 100 } }
             RiceIcon {
                 anchors.centerIn: parent
                 name: srow.iconName
@@ -1140,7 +1151,6 @@ PanelWindow {
                 radius: 8
                 color: Theme.primary
                 scale: slider.hovered || slider.pressed ? 1.15 : 1
-                Behavior on scale { NumberAnimation { duration: 100 } }
             }
         }
         Rectangle {
@@ -1148,7 +1158,6 @@ PanelWindow {
             Layout.preferredHeight: 28
             radius: 8
             color: chevMouse.containsMouse ? Theme.rowHover : "transparent"
-            Behavior on color { ColorAnimation { duration: 100 } }
             RiceIcon {
                 anchors.centerIn: parent
                 name: srow.expanded ? "go-up" : "go-down"
@@ -1179,7 +1188,6 @@ PanelWindow {
             : (drow.hovered ? Theme.rowHover : Theme.surface)
         border.width: 1
         border.color: drow.checked ? Qt.rgba(Theme.primary.r, Theme.primary.g, Theme.primary.b, 0.55) : "transparent"
-        Behavior on color { ColorAnimation { duration: 120 } }
         RowLayout {
             anchors.fill: parent
             anchors.margins: 8
@@ -1223,8 +1231,6 @@ PanelWindow {
         property string buttonLabel: "Connect"
         signal activated(var item)
         spacing: 6
-        opacity: visible ? 1 : 0
-        Behavior on opacity { NumberAnimation { duration: 160 } }
 
         Text {
             text: title
@@ -1250,7 +1256,6 @@ PanelWindow {
                 border.color: modelData.connected
                     ? Qt.rgba(Theme.primary.r, Theme.primary.g, Theme.primary.b, 0.55)
                     : "transparent"
-                Behavior on color { ColorAnimation { duration: 120 } }
                 RowLayout {
                     anchors.fill: parent
                     anchors.margins: 8

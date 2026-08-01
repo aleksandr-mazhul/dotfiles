@@ -4,6 +4,13 @@ hl.window_rule({
     suppress_event = "maximize",
 })
 
+-- Rice quickshell panels: Hyprland layer fade + size tween looks jerky on open/expand.
+hl.layer_rule({
+    name = "rice-no-anim",
+    match = { namespace = "^rice-" },
+    no_anim = true,
+})
+
 hl.window_rule({
     name = "fix-xwayland-drags",
     match = {

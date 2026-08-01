@@ -2,6 +2,7 @@ import QtQuick
 import QtQuick.Layouts
 import Quickshell
 import Quickshell.Io
+import Quickshell.Wayland
 
 // Raycast-inspired clipboard history: fixed size, list + preview/info, type filter.
 PanelWindow {
@@ -37,6 +38,7 @@ PanelWindow {
     exclusiveZone: 0
     exclusionMode: ExclusionMode.Ignore
     focusable: true
+    WlrLayershell.namespace: "rice-clipboard"
     anchors {
         left: true
         right: true
@@ -62,6 +64,10 @@ PanelWindow {
         filterMenuOpen = false
         markedLines = []
         refreshList()
+        openAnim.play()
+        dimAnim.from = 0
+        dimAnim.to = 1
+        dimAnim.restart()
         Qt.callLater(() => {
             if (pendingOpenFilter) {
                 pendingOpenFilter = false
@@ -388,13 +394,23 @@ PanelWindow {
     Process { id: pasteProc }
 
     Rectangle {
+        id: dim
         anchors.fill: parent
         color: Theme.backdrop
         z: -1
+        opacity: 1
         MouseArea {
             anchors.fill: parent
             onClicked: root.close()
         }
+    }
+
+    NumberAnimation {
+        id: dimAnim
+        target: dim
+        property: "opacity"
+        duration: Theme.menuAnimMs
+        easing.type: Easing.OutCubic
     }
 
     Rectangle {
@@ -407,6 +423,15 @@ PanelWindow {
         border.color: Theme.border
         border.width: 1
         clip: true
+        transformOrigin: Item.Center
+        opacity: 1
+        scale: 1
+
+        RiceOpenAnim {
+            id: openAnim
+            target: panel
+            fromScale: 0.97
+        }
 
         Rectangle {
             anchors.fill: parent

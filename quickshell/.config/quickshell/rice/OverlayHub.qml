@@ -1,5 +1,7 @@
 pragma Singleton
 import QtQuick
+import Quickshell
+import Quickshell.Io
 
 QtObject {
     id: hub
@@ -14,7 +16,60 @@ QtObject {
     property var notifications: null
     property bool barVisible: true
     // When false, bar autohides and reveals on top-edge hover hold.
+    // Persisted across reboots via stateFile below.
     property bool barPinned: false
+    // Notifications mute / DND — also persisted.
+    property bool notifDnd: false
+
+    // Avoid writing defaults before the first disk load finishes.
+    property bool _stateReady: false
+
+    // QtObject has no default property — keep FileView as an explicit property.
+    property FileView stateFile: FileView {
+        path: `${Quickshell.stateDir}/rice.json`
+        blockLoading: true
+        printErrors: false
+        watchChanges: true
+        onFileChanged: reload()
+        onAdapterUpdated: writeAdapter()
+
+        adapter: JsonAdapter {
+            id: stateAdapter
+            property bool barPinned: false
+            property bool notifDnd: false
+
+            // Disk → hub (initial load + external file edits).
+            onBarPinnedChanged: {
+                if (hub.barPinned !== barPinned)
+                    hub.barPinned = barPinned
+            }
+            onNotifDndChanged: {
+                if (hub.notifDnd !== notifDnd)
+                    hub.notifDnd = notifDnd
+            }
+        }
+    }
+
+    Component.onCompleted: {
+        hub.barPinned = stateAdapter.barPinned
+        hub.notifDnd = stateAdapter.notifDnd
+        hub._stateReady = true
+    }
+
+    // Hub → disk.
+    onBarPinnedChanged: {
+        if (!hub._stateReady)
+            return
+        if (stateAdapter.barPinned !== hub.barPinned)
+            stateAdapter.barPinned = hub.barPinned
+    }
+
+    onNotifDndChanged: {
+        if (!hub._stateReady)
+            return
+        if (stateAdapter.notifDnd !== hub.notifDnd)
+            stateAdapter.notifDnd = hub.notifDnd
+    }
 
     function toggleBar() {
         barPinned = !barPinned

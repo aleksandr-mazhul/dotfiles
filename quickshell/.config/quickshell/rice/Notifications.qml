@@ -9,7 +9,8 @@ PanelWindow {
     id: root
 
     property bool open: false
-    property bool dnd: false
+    // Bound to OverlayHub so mute survives reboot / qs reload.
+    property bool dnd: OverlayHub.notifDnd
     property int unread: 0
 
     NotificationServer {
@@ -56,6 +57,7 @@ PanelWindow {
     onOpenChanged: {
         if (open) {
             OverlayHub.closeAll()
+            openAnim.play()
             Qt.callLater(() => panel.forceActiveFocus())
         }
     }
@@ -89,11 +91,20 @@ PanelWindow {
         border.width: 1
         border.color: Theme.borderSubtle
         focus: root.open
+        transformOrigin: Item.TopRight
+        opacity: 1
+        scale: 1
         Keys.onPressed: event => {
             if (event.key === Qt.Key_Escape) {
                 root.close()
                 event.accepted = true
             }
+        }
+
+        RiceOpenAnim {
+            id: openAnim
+            target: panel
+            fromScale: 0.96
         }
 
         ColumnLayout {
@@ -124,8 +135,6 @@ PanelWindow {
                             return Qt.rgba(Theme.primary.r, Theme.primary.g, Theme.primary.b, dndMouse.containsMouse ? 0.32 : 0.22)
                         return dndMouse.containsMouse ? Theme.rowHover : "transparent"
                     }
-                    Behavior on color { ColorAnimation { duration: 120 } }
-
                     RiceIcon {
                         anchors.centerIn: parent
                         customSource: Qt.resolvedUrl(root.dnd ? "assets/notif-bell-off.svg" : "assets/notif-bell.svg")
@@ -137,7 +146,7 @@ PanelWindow {
                         anchors.fill: parent
                         hoverEnabled: true
                         cursorShape: Qt.PointingHandCursor
-                        onClicked: root.dnd = !root.dnd
+                        onClicked: OverlayHub.notifDnd = !OverlayHub.notifDnd
                     }
                 }
 
@@ -147,8 +156,6 @@ PanelWindow {
                     Layout.preferredHeight: 28
                     radius: 8
                     color: clearMouse.containsMouse ? Theme.rowHover : "transparent"
-                    Behavior on color { ColorAnimation { duration: 120 } }
-
                     RiceIcon {
                         anchors.centerIn: parent
                         customSource: Qt.resolvedUrl("assets/notif-clear.svg")
@@ -170,8 +177,6 @@ PanelWindow {
                     Layout.preferredHeight: 28
                     radius: 8
                     color: closeMouse.containsMouse ? Theme.rowHover : "transparent"
-                    Behavior on color { ColorAnimation { duration: 120 } }
-
                     RiceIcon {
                         anchors.centerIn: parent
                         name: "window-close"

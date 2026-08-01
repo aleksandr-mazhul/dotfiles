@@ -59,4 +59,7 @@ QtObject {
     readonly property int barIslandPadV: 6
     readonly property int barGap: 8
     readonly property int qsPanelWidth: 380
+    readonly property int qsPanelHeight: 560
+    // ~16 frames @ 165Hz — present, not sluggish
+    readonly property int menuAnimMs: 100
 }

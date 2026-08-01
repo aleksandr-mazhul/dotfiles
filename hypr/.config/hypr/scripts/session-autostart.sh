@@ -1,16 +1,6 @@
 #!/usr/bin/env bash
-# Session startup: Windscribe best location + daily apps.
+# Session startup: daily apps (VPN is handled by vpn-autostart.sh — starts earlier).
 set -uo pipefail
-
-CLI="${WINDSCRIBE_CLI:-windscribe-cli}"
-
-(
-  # Helper/network may still be coming up right after login
-  sleep 2
-  if "$CLI" connect best; then
-    command -v notify-send >/dev/null && notify-send -a Windscribe "VPN" "Connected (best location)"
-  fi
-) &
 
 # Let the compositor settle before spawning windows
 sleep 0.5

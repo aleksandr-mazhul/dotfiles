@@ -114,11 +114,12 @@ hl.animation({ leaf = "windowsOut", enabled = true, speed = 1.49, bezier = "line
 hl.animation({ leaf = "fadeIn", enabled = true, speed = 1.73, bezier = "almostLinear" })
 hl.animation({ leaf = "fadeOut", enabled = true, speed = 1.46, bezier = "almostLinear" })
 hl.animation({ leaf = "fade", enabled = true, speed = 3.03, bezier = "quick" })
-hl.animation({ leaf = "layers", enabled = true, speed = 3.81, bezier = "easeOutQuint" })
-hl.animation({ leaf = "layersIn", enabled = true, speed = 4, bezier = "easeOutQuint", style = "fade" })
-hl.animation({ leaf = "layersOut", enabled = true, speed = 1.5, bezier = "linear", style = "fade" })
-hl.animation({ leaf = "fadeLayersIn", enabled = true, speed = 1.79, bezier = "almostLinear" })
-hl.animation({ leaf = "fadeLayersOut", enabled = true, speed = 1.39, bezier = "almostLinear" })
+-- Layer shells (quickshell rice menus/bar): no compositor tween — it stutters on 165Hz.
+hl.animation({ leaf = "layers", enabled = false })
+hl.animation({ leaf = "layersIn", enabled = false })
+hl.animation({ leaf = "layersOut", enabled = false })
+hl.animation({ leaf = "fadeLayersIn", enabled = false })
+hl.animation({ leaf = "fadeLayersOut", enabled = false })
 hl.animation({ leaf = "workspaces", enabled = true, speed = 4.2, bezier = "easeOutQuint", style = "slide" })
 hl.animation({ leaf = "workspacesIn", enabled = true, speed = 4.2, bezier = "easeOutQuint", style = "slide" })
 hl.animation({ leaf = "workspacesOut", enabled = true, speed = 4.2, bezier = "easeOutQuint", style = "slide" })
@@ -132,6 +133,8 @@ hl.device({
 })
 
 hl.on("hyprland.start", function()
+    -- VPN first — no delay; script retries until helper is ready.
+    hl.exec_cmd("~/.config/hypr/scripts/vpn-autostart.sh")
     -- Rice owns notifications; stop swaync if it grabbed the bus.
     hl.exec_cmd("systemctl --user stop swaync.service")
     hl.exec_cmd("qs -c rice -n -d")
@@ -145,6 +148,8 @@ hl.on("hyprland.start", function()
     hl.exec_cmd("xrdb -merge ~/.Xresources")
     hl.exec_cmd("~/.config/hypr/scripts/session-autostart.sh")
     hl.exec_cmd("hyprctl dispatch renameworkspace 1 W & hyprctl dispatch renameworkspace 2 E & hyprctl dispatch renameworkspace 3 T & hyprctl dispatch renameworkspace 4 D & hyprctl dispatch renameworkspace 5 Z & hyprctl dispatch renameworkspace 6 X & hyprctl dispatch renameworkspace 7 C & hyprctl dispatch renameworkspace 8 Q & hyprctl dispatch renameworkspace 9 B & hyprctl dispatch renameworkspace 10 U")
+    -- Restore last workspace and keep saving focus changes across reboots.
+    hl.exec_cmd("~/.config/hypr/scripts/workspace-persist.sh watch")
 end)
 
 require("colors-matugen")

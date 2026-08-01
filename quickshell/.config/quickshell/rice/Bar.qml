@@ -38,12 +38,15 @@ PanelWindow {
 
     readonly property int fullHeight: Theme.barHeight + Theme.barMargin * 2
     readonly property int triggerHeight: 3
+    // Only pinned bar reserves space. Autohide overlays content — no exclusiveZone flicker.
+    readonly property bool reserveSpace: root.pinned && !root.fullscreenActive
 
     screen: modelData
     color: "transparent"
     visible: true
-    implicitHeight: root.showContent ? root.fullHeight : root.triggerHeight
-    exclusiveZone: root.showContent ? (Theme.barHeight + Theme.barMargin) : 0
+    // Keep layer size CONSTANT. Resizing 3↔full on every menu open is the jerk.
+    implicitHeight: root.fullHeight
+    exclusiveZone: root.reserveSpace ? (Theme.barHeight + Theme.barMargin) : 0
 
     anchors {
         top: true
@@ -52,15 +55,14 @@ PanelWindow {
     }
 
     margins {
-        top: root.showContent ? Theme.barMargin : 0
+        top: Theme.barMargin
         left: Theme.barMargin
         right: Theme.barMargin
     }
 
-    exclusionMode: ExclusionMode.Auto
+    exclusionMode: root.reserveSpace ? ExclusionMode.Auto : ExclusionMode.Ignore
     focusable: false
-    // Ensure the whole bar surface receives pointer input (transparent windows
-    // can otherwise end up with an empty / partial click mask).
+    // Input region: full bar when shown, thin top strip when autohidden.
     mask: Region { item: barHitbox }
     WlrLayershell.layer: root.fullscreenActive ? WlrLayer.Overlay : WlrLayer.Top
     WlrLayershell.namespace: "rice-bar"
@@ -225,24 +227,23 @@ PanelWindow {
         }
     }
 
-    // Opaque-enough hit surface so the Wayland input region covers the bar.
-    Rectangle {
+    // Hit region only — size of the layer stays fixed.
+    Item {
         id: barHitbox
-        anchors.fill: parent
-        visible: root.showContent
-        color: Qt.rgba(0, 0, 0, 0.01)
-        z: -1
+        anchors.left: parent.left
+        anchors.right: parent.right
+        anchors.top: parent.top
+        height: root.showContent ? parent.height : root.triggerHeight
     }
 
     RowLayout {
         id: barRow
         anchors.fill: parent
         spacing: Theme.barGap
-        visible: root.showContent
+        // Instant show/hide without resizing the Wayland layer.
         opacity: root.showContent ? 1 : 0
+        visible: root.showContent
         z: 1
-
-        Behavior on opacity { NumberAnimation { duration: 120 } }
 
         RowLayout {
             spacing: Theme.barGap
