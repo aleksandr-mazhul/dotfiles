@@ -10,7 +10,8 @@ Scope {
     id: root
 
     property real osdValue: 0
-    property string osdIcon: "󰕾"
+    property string osdIconName: "audio-volume-high"
+    property bool osdStruck: false
     property bool osdVisible: false
     property int brightLast: -1
     property int brightMax: 0
@@ -19,28 +20,46 @@ Scope {
         objects: [Pipewire.defaultAudioSink]
     }
 
+    function sinkLooksLikeHeadphones(sink) {
+        if (!sink)
+            return false
+        const blob = [sink.name, sink.nickname, sink.description].filter(Boolean).join(" ").toLowerCase()
+        // Same as Quick Settings: Logitech USB dongle / JBL Flip is a speaker, not cans.
+        if (/jbl|flip\s*\d|logitech.*usb.?headset|usb headset/.test(blob))
+            return false
+        return /headphone|earphone|earbuds|airpods|(^|[^a-z])headset([^a-z]|$)/.test(blob)
+    }
+
+    function volumeIconName(vol, headphones, muted) {
+        if (muted && !headphones)
+            return "audio-volume-muted"
+        if (headphones)
+            return "audio-headphones"
+        if (vol < 0.34)
+            return "audio-volume-low"
+        if (vol < 0.67)
+            return "audio-volume-medium"
+        return "audio-volume-high"
+    }
+
     function showVolume() {
         const sink = Pipewire.defaultAudioSink
         if (!sink || !sink.audio)
             return
-        const muted = sink.audio.muted
+        const muted = !!sink.audio.muted
         const vol = sink.audio.volume
+        const headphones = sinkLooksLikeHeadphones(sink)
         osdValue = muted ? 0 : vol
-        if (muted)
-            osdIcon = "󰝟"
-        else if (vol < 0.34)
-            osdIcon = "󰕿"
-        else if (vol < 0.67)
-            osdIcon = "󰖀"
-        else
-            osdIcon = "󰕾"
+        osdIconName = volumeIconName(vol, headphones, muted)
+        osdStruck = muted && headphones
         osdVisible = true
         hideTimer.restart()
     }
 
     function showBrightness(value) {
         osdValue = Math.max(0, Math.min(1, value))
-        osdIcon = "󰃠"
+        osdIconName = "brightnesssettings"
+        osdStruck = false
         osdVisible = true
         hideTimer.restart()
     }
@@ -93,7 +112,7 @@ Scope {
             exclusiveZone: 0
             exclusionMode: ExclusionMode.Ignore
             aboveWindows: true
-            implicitWidth: 220
+            implicitWidth: 240
             implicitHeight: 56
             WlrLayershell.layer: WlrLayer.Overlay
             WlrLayershell.namespace: "rice-osd"
@@ -118,11 +137,13 @@ Scope {
                     anchors.margins: 12
                     spacing: 10
 
-                    Text {
-                        text: root.osdIcon
-                        color: Theme.text
-                        font.pixelSize: 20
-                        font.family: "JetBrainsMono Nerd Font, JetBrains Mono, sans-serif"
+                    RiceIcon {
+                        name: root.osdIconName
+                        fallback: "audio-volume-high"
+                        struck: root.osdStruck
+                        implicitSize: 22
+                        Layout.preferredWidth: 22
+                        Layout.preferredHeight: 22
                     }
 
                     Rectangle {

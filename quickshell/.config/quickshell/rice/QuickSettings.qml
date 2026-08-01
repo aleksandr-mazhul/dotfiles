@@ -13,12 +13,22 @@ PanelWindow {
     property bool open: false
     property string expanded: ""
     property int updateCount: 0
+    property int updatePacCount: 0
+    property int updateAurCount: 0
     property string netStatus: "…"
     property string btStatus: "…"
     property string vpnStatus: "…"
+    property bool vpnConnected: false
+    property bool vpnBusy: false
+    property bool btScanning: false
+    property bool vpnLoading: false
+    property bool updatesLoading: false
     property var wifiList: []
     property var btList: []
+    property var vpnList: []
+    property var updateList: []
     property var sinkList: []
+    property var sourceList: []
 
     function toggle() { open = !open }
     function show() { open = true }
@@ -28,6 +38,7 @@ PanelWindow {
         if (open) {
             OverlayHub.closeAll()
             refreshStatus()
+            Qt.callLater(() => panel.forceActiveFocus())
         } else {
             expanded = ""
         }
@@ -44,26 +55,122 @@ PanelWindow {
         expanded = (expanded === id) ? "" : id
         if (expanded === "network")
             wifiProc.running = true
-        if (expanded === "bluetooth")
+        if (expanded === "bluetooth") {
+            root.btScanning = true
+            root.btList = []
             btListProc.running = true
-        if (expanded === "soundOut" || expanded === "soundIn")
+        }
+        if (expanded === "vpn") {
+            root.vpnLoading = true
+            root.vpnList = []
+            vpnListProc.running = true
+            vpnProc.running = true
+        }
+        if (expanded === "updates") {
+            root.updatesLoading = true
+            root.updateList = []
+            updatesProc.running = true
+            updatesListProc.running = true
+        }
+        if (expanded === "soundOut")
             sinkListProc.running = true
+        if (expanded === "soundIn")
+            sourceListProc.running = true
+    }
+
+    function runNetworkQuick() {
+        // Join the strongest Wi‑Fi (ethernet stays as-is).
+        Quickshell.execDetached([
+            "bash", "-lc",
+            "nmcli radio wifi on; " +
+            "ssid=$(nmcli -t -f SSID,SIGNAL,IN-USE device wifi list 2>/dev/null | awk -F: '$1!=\"\" && $3!=\"*\"{print $2\"\\t\"$1}' | sort -nr | head -1 | cut -f2-); " +
+            "if [ -n \"$ssid\" ]; then nmcli device wifi connect \"$ssid\"; fi; " +
+            "true"
+        ])
+        netProc.running = true
+        Qt.callLater(() => { wifiProc.running = true })
+    }
+
+    function runBluetoothQuick() {
+        const enable = root.btStatus !== "Enabled"
+        Quickshell.execDetached([
+            "bash", "-lc",
+            enable ? "bluetoothctl power on" : "bluetoothctl power off"
+        ])
+        root.btStatus = enable ? "Enabled" : "Disabled"
+        Qt.callLater(() => { btProc.running = true })
+    }
+
+    function runVpnQuick() {
+        if (root.vpnConnected)
+            root.runVpn("disconnect")
+        else
+            root.runVpn("best")
+    }
+
+    function runVpn(action, loc) {
+        if (root.vpnBusy)
+            return
+        root.vpnBusy = true
+        if (action === "disconnect") {
+            root.vpnStatus = "○ Disconnecting…"
+            root.vpnConnected = false
+            Quickshell.execDetached(["bash", "-lc", "~/.config/hypr/scripts/qs-vpn.sh disconnect"])
+        } else if (action === "best" || loc === "best") {
+            root.vpnStatus = "● Connecting…"
+            root.vpnConnected = true
+            Quickshell.execDetached(["bash", "-lc", "~/.config/hypr/scripts/qs-vpn.sh best"])
+        } else {
+            root.vpnStatus = "● Connecting…"
+            root.vpnConnected = true
+            const safe = String(loc || "").replace(/'/g, "")
+            Quickshell.execDetached([
+                "bash", "-lc",
+                "~/.config/hypr/scripts/qs-vpn.sh connect '" + safe + "'"
+            ])
+        }
+        vpnRefresh.restart()
+        vpnSettle.restart()
+    }
+
+    function runUpdate(kind) {
+        // Keep panel open; launch a terminal so sudo/yay can ask for input.
+        const ask = "export SUDO_ASKPASS=\"$HOME/.local/bin/sudo-askpass-gtk.py\"; "
+        let cmd = ""
+        if (kind === "pac")
+            cmd = ask + "sudo -A pacman -Syu; echo; read -n1 -rsp 'Done — press any key…'"
+        else if (kind === "aur")
+            cmd = "yay -Syu; echo; read -n1 -rsp 'Done — press any key…'"
+        else if (kind === "all")
+            cmd = ask + "sudo -A pacman -Syu && yay -Syu; echo; read -n1 -rsp 'Done — press any key…'"
+        else if (kind === "check") {
+            root.updatesLoading = true
+            updatesProc.running = true
+            updatesListProc.running = true
+            return
+        }
+        if (!cmd)
+            return
+        Quickshell.execDetached(["kitty", "--title", "Updates", "-e", "bash", "-lc", cmd])
     }
 
     visible: open
     color: "transparent"
     exclusiveZone: 0
     exclusionMode: ExclusionMode.Ignore
+    focusable: true
+    // Compact window — fullscreen overlays ate bar clicks (open then instantly dead).
     implicitWidth: Theme.qsPanelWidth
-    implicitHeight: panelCol.implicitHeight + 24
+    implicitHeight: Math.max(280, panelCol.implicitHeight + 24)
     WlrLayershell.layer: WlrLayer.Overlay
     WlrLayershell.namespace: "rice-quicksettings"
-    WlrLayershell.keyboardFocus: WlrKeyboardFocus.OnDemand
+    WlrLayershell.keyboardFocus: open ? WlrKeyboardFocus.OnDemand : WlrKeyboardFocus.None
 
     anchors {
         top: true
         right: true
     }
+
     margins {
         top: Theme.barHeight + Theme.barMargin * 2 + 6
         right: Theme.barMargin
@@ -79,13 +186,46 @@ PanelWindow {
     readonly property real sourceVol: source && source.audio ? source.audio.volume : 0
     readonly property bool sinkMuted: sink && sink.audio ? sink.audio.muted : false
     readonly property bool sourceMuted: source && source.audio ? source.audio.muted : false
+    readonly property string sinkBlob: {
+        if (!sink)
+            return ""
+        return [sink.name, sink.nickname, sink.description].filter(Boolean).join(" ").toLowerCase()
+    }
+    readonly property bool sinkIsHeadphones: {
+        if (!sink)
+            return false
+        const blob = sinkBlob
+        // Don't treat the Logitech USB dongle (JBL Flip) as headphones
+        if (/jbl|flip\s*\d|logitech.*usb.?headset|usb headset/.test(blob))
+            return false
+        return /headphone|earphone|earbuds|airpods|(^|[^a-z])headset([^a-z]|$)/.test(blob)
+    }
+    readonly property string sinkOutIcon: {
+        if (sinkMuted)
+            return sinkIsHeadphones ? "audio-headphones" : "audio-volume-muted"
+        if (sinkIsHeadphones)
+            return "audio-headphones"
+        if (sinkVol < 0.34)
+            return "audio-volume-low"
+        if (sinkVol < 0.67)
+            return "audio-volume-medium"
+        return "audio-volume-high"
+    }
 
     Rectangle {
+        id: panel
         anchors.fill: parent
         color: Theme.background
         radius: Theme.radiusLg
         border.width: 1
         border.color: Theme.borderSubtle
+        focus: root.open
+        Keys.onPressed: event => {
+            if (event.key === Qt.Key_Escape) {
+                root.close()
+                event.accepted = true
+            }
+        }
 
         ColumnLayout {
             id: panelCol
@@ -101,47 +241,86 @@ PanelWindow {
                 rowSpacing: 8
                 Layout.fillWidth: true
 
+                RowLayout {
+                    Layout.columnSpan: 2
+                    Layout.fillWidth: true
+                    Text {
+                        text: "Quick Settings"
+                        color: Theme.text
+                        font.family: Theme.fontFamily
+                        font.pixelSize: Theme.fontSizeLg
+                        font.bold: true
+                        Layout.fillWidth: true
+                    }
+                    RiceIcon {
+                        name: "window-close"
+                        implicitSize: 16
+                        Layout.preferredWidth: 16
+                        Layout.preferredHeight: 16
+                        MouseArea {
+                            anchors.fill: parent
+                            anchors.margins: -6
+                            cursorShape: Qt.PointingHandCursor
+                            onClicked: root.close()
+                        }
+                    }
+                }
+
                 QSTile {
                     title: "Network"
                     subtitle: root.netStatus
-                    iconText: "󰈀"
+                    iconName: "network-wired"
+                    active: root.netStatus !== "…" && root.netStatus !== "Disconnected"
                     expanded: root.expanded === "network"
-                    onClicked: root.setExpanded("network")
+                    splitActions: true
+                    onActivated: root.runNetworkQuick()
+                    onExpandClicked: root.setExpanded("network")
                 }
                 QSTile {
                     title: "Bluetooth"
-                    subtitle: root.btStatus
-                    iconText: "󰂯"
+                    subtitle: root.btScanning && root.expanded === "bluetooth"
+                        ? "Scanning…"
+                        : root.btStatus
+                    iconName: "bluetooth"
+                    active: root.btStatus === "Enabled"
                     expanded: root.expanded === "bluetooth"
-                    onClicked: root.setExpanded("bluetooth")
+                    splitActions: true
+                    onActivated: root.runBluetoothQuick()
+                    onExpandClicked: root.setExpanded("bluetooth")
                 }
                 QSTile {
                     title: "VPN"
-                    subtitle: root.vpnStatus
-                    iconText: "󰌾"
-                    showChevron: false
-                    onClicked: {
-                        root.close()
-                        OverlayHub.open("vpn")
-                    }
+                    subtitle: root.vpnBusy
+                        ? (root.vpnConnected ? "Disconnecting…" : "Connecting…")
+                        : (root.vpnLoading && root.expanded === "vpn" ? "Loading regions…" : root.vpnStatus)
+                    iconName: "network-vpn"
+                    active: root.vpnConnected || root.vpnBusy
+                    expanded: root.expanded === "vpn"
+                    splitActions: true
+                    onActivated: root.runVpnQuick()
+                    onExpandClicked: root.setExpanded("vpn")
                 }
                 QSTile {
                     title: "Updates"
-                    subtitle: root.updateCount > 0 ? (root.updateCount + " available") : "Up to date"
-                    iconText: "󰚰"
-                    showChevron: false
-                    onClicked: {
-                        root.close()
-                        Quickshell.execDetached(["kitty", "-e", "bash", "-lc", "sudo pacman -Syu; echo; read -n1 -p 'Press any key…'"])
-                    }
+                    subtitle: root.updatesLoading && root.expanded === "updates"
+                        ? "Checking…"
+                        : (root.updateCount > 0
+                            ? (root.updateCount + " available")
+                            : "Up to date")
+                    iconName: "view-refresh"
+                    active: root.updateCount > 0
+                    expanded: root.expanded === "updates"
+                    onActivated: root.setExpanded("updates")
+                    onExpandClicked: root.setExpanded("updates")
                 }
                 QSTile {
                     title: "Power"
-                    subtitle: root.expanded === "power" ? "Hold to confirm" : "Hold to shut down"
-                    iconText: "󰐥"
+                    subtitle: root.expanded === "power" ? "Choose action" : "Shut down / lock / sleep…"
+                    iconName: "system-shutdown"
                     expanded: root.expanded === "power"
                     Layout.columnSpan: 2
-                    onClicked: root.setExpanded("power")
+                    onActivated: root.setExpanded("power")
+                    onExpandClicked: root.setExpanded("power")
                 }
             }
 
@@ -157,14 +336,203 @@ PanelWindow {
             }
 
             ExpandSection {
-                visible: root.expanded === "bluetooth"
+                visible: root.expanded === "bluetooth" && root.btList.length > 0
                 Layout.fillWidth: true
                 title: "Devices"
                 model: root.btList
                 buttonLabel: "Connect"
                 onActivated: item => {
                     if (item && item.mac)
-                        Quickshell.execDetached(["bluetoothctl", "connect", item.mac])
+                        Quickshell.execDetached([
+                            "bash", "-lc",
+                            "bluetoothctl pair '" + item.mac + "' 2>/dev/null; bluetoothctl connect '" + item.mac + "'"
+                        ])
+                }
+            }
+
+            ColumnLayout {
+                visible: root.expanded === "bluetooth" && root.btList.length === 0
+                Layout.fillWidth: true
+                spacing: 6
+                Text {
+                    text: root.btScanning ? "Scanning for devices…" : "No devices found nearby"
+                    color: Theme.textMuted
+                    font.family: Theme.fontFamily
+                    font.pixelSize: Theme.fontSizeSm
+                }
+                PowerRow {
+                    label: root.btScanning ? "Scanning…" : "Scan again"
+                    iconName: "view-refresh"
+                    onActivated: {
+                        if (root.btScanning)
+                            return
+                        root.btScanning = true
+                        root.btList = []
+                        btListProc.running = true
+                    }
+                }
+                PowerRow {
+                    label: "Open Bluetooth settings"
+                    iconName: "bluetooth"
+                    onActivated: {
+                        root.close()
+                        Quickshell.execDetached(["bash", "-lc", "command -v blueman-manager >/dev/null && blueman-manager || gnome-control-center bluetooth || true"])
+                    }
+                }
+            }
+
+            ColumnLayout {
+                visible: root.expanded === "vpn"
+                Layout.fillWidth: true
+                spacing: 6
+                Text {
+                    text: "Icon toggles Best / Disconnect · arrow opens list"
+                    color: Theme.textMuted
+                    font.family: Theme.fontFamily
+                    font.pixelSize: 10
+                    Layout.fillWidth: true
+                    wrapMode: Text.Wrap
+                }
+                PowerRow {
+                    label: "Search regions…"
+                    detail: "Raycast picker with type-to-filter"
+                    iconName: "edit-find"
+                    fallbackIcon: "system-search"
+                    onActivated: {
+                        root.close()
+                        Qt.callLater(() => OverlayHub.open("vpn"))
+                    }
+                }
+                Text {
+                    text: root.vpnLoading ? "Loading regions…" : "Regions"
+                    color: Theme.text
+                    font.family: Theme.fontFamily
+                    font.pixelSize: Theme.fontSizeSm
+                }
+                Text {
+                    visible: !root.vpnLoading && root.vpnList.length === 0
+                    text: "No regions available"
+                    color: Theme.textMuted
+                    font.family: Theme.fontFamily
+                    font.pixelSize: Theme.fontSizeSm
+                }
+                ListView {
+                    visible: root.vpnList.length > 0
+                    Layout.fillWidth: true
+                    Layout.preferredHeight: Math.min(220, root.vpnList.length * 40)
+                    clip: true
+                    spacing: 4
+                    model: root.vpnList
+                    delegate: Rectangle {
+                        required property var modelData
+                        width: ListView.view.width
+                        height: 36
+                        radius: Theme.radiusSm
+                        color: vpnRow.containsMouse ? Theme.rowHover : Theme.surface
+                        border.width: 1
+                        border.color: "transparent"
+                        Behavior on color { ColorAnimation { duration: 100 } }
+                        Text {
+                            anchors.left: parent.left
+                            anchors.right: parent.right
+                            anchors.verticalCenter: parent.verticalCenter
+                            anchors.margins: 10
+                            text: modelData.label || modelData.key || ""
+                            color: Theme.text
+                            font.family: Theme.fontFamily
+                            font.pixelSize: Theme.fontSizeSm
+                            elide: Text.ElideRight
+                        }
+                        MouseArea {
+                            id: vpnRow
+                            anchors.fill: parent
+                            hoverEnabled: true
+                            cursorShape: Qt.PointingHandCursor
+                            onClicked: root.runVpn("connect", modelData.key)
+                        }
+                    }
+                }
+            }
+
+            ColumnLayout {
+                visible: root.expanded === "updates"
+                Layout.fillWidth: true
+                spacing: 6
+                Text {
+                    text: root.updatePacCount + " system · " + root.updateAurCount + " AUR"
+                    color: Theme.textMuted
+                    font.family: Theme.fontFamily
+                    font.pixelSize: Theme.fontSizeSm
+                }
+                PowerRow {
+                    label: "Update all"
+                    detail: "pacman + yay in a terminal"
+                    iconName: "view-refresh"
+                    onActivated: root.runUpdate("all")
+                }
+                PowerRow {
+                    label: root.updatesLoading ? "Checking…" : "Refresh list"
+                    detail: "Re-check pending packages"
+                    iconName: "view-refresh"
+                    onActivated: root.runUpdate("check")
+                }
+                Text {
+                    visible: root.updateList.length > 0
+                    text: "Pending packages"
+                    color: Theme.text
+                    font.family: Theme.fontFamily
+                    font.pixelSize: Theme.fontSizeSm
+                }
+                Text {
+                    visible: !root.updatesLoading && root.updateList.length === 0
+                    text: "Nothing to update"
+                    color: Theme.textMuted
+                    font.family: Theme.fontFamily
+                    font.pixelSize: Theme.fontSizeSm
+                }
+                ListView {
+                    visible: root.updateList.length > 0
+                    Layout.fillWidth: true
+                    Layout.preferredHeight: Math.min(160, root.updateList.length * 36)
+                    clip: true
+                    spacing: 4
+                    model: root.updateList
+                    delegate: Rectangle {
+                        required property var modelData
+                        width: ListView.view.width
+                        height: 34
+                        radius: Theme.radiusSm
+                        color: Theme.surface
+                        RowLayout {
+                            anchors.fill: parent
+                            anchors.margins: 8
+                            spacing: 8
+                            Text {
+                                text: modelData.kind === "aur" ? "AUR" : "SYS"
+                                color: Theme.primary
+                                font.family: Theme.fontFamily
+                                font.pixelSize: 10
+                                font.bold: true
+                                Layout.preferredWidth: 28
+                            }
+                            Text {
+                                text: modelData.label || ""
+                                color: Theme.text
+                                font.family: Theme.fontFamily
+                                font.pixelSize: Theme.fontSizeSm
+                                elide: Text.ElideRight
+                                Layout.fillWidth: true
+                            }
+                            Text {
+                                text: modelData.detail || ""
+                                color: Theme.textMuted
+                                font.family: Theme.fontFamily
+                                font.pixelSize: 10
+                                elide: Text.ElideLeft
+                                Layout.preferredWidth: 110
+                            }
+                        }
+                    }
                 }
             }
 
@@ -172,20 +540,43 @@ PanelWindow {
                 visible: root.expanded === "power"
                 Layout.fillWidth: true
                 spacing: 6
-                PowerRow { label: "Shut Down"; iconText: "󰐥"; onActivated: Quickshell.execDetached(["systemctl", "poweroff"]) }
-                PowerRow { label: "Reboot"; iconText: "󰜉"; onActivated: Quickshell.execDetached(["systemctl", "reboot"]) }
-                PowerRow { label: "Suspend"; iconText: "󰤄"; onActivated: Quickshell.execDetached(["systemctl", "suspend"]) }
-                PowerRow { label: "Lock"; iconText: "󰌾"; onActivated: Quickshell.execDetached(["hyprlock"]) }
+                PowerRow {
+                    label: "Shut Down"
+                    detail: "Power off the PC"
+                    iconName: "system-shutdown"
+                    onActivated: Quickshell.execDetached(["systemctl", "poweroff"])
+                }
+                PowerRow {
+                    label: "Reboot"
+                    detail: "Restart the system"
+                    iconName: "system-reboot"
+                    onActivated: Quickshell.execDetached(["systemctl", "reboot"])
+                }
+                PowerRow {
+                    label: "Suspend"
+                    detail: "Sleep — keep apps in RAM"
+                    iconName: "system-suspend"
+                    onActivated: Quickshell.execDetached(["systemctl", "suspend"])
+                }
+                PowerRow {
+                    label: "Lock"
+                    detail: "Lock screen (hyprlock)"
+                    iconName: "system-lock-screen"
+                    onActivated: Quickshell.execDetached(["hyprlock"])
+                }
                 PowerRow {
                     label: "Log Out"
-                    iconText: "󰍃"
+                    detail: "End Hyprland session"
+                    iconName: "system-log-out"
                     onActivated: Quickshell.execDetached(["hyprctl", "dispatch", "exit"])
                 }
             }
 
             SoundRow {
                 Layout.fillWidth: true
-                iconText: root.sinkMuted ? "󰝟" : "󰕾"
+                iconName: root.sinkOutIcon
+                fallbackIcon: "audio-volume-high"
+                struck: root.sinkMuted && root.sinkIsHeadphones
                 value: root.sinkMuted ? 0 : root.sinkVol
                 expanded: root.expanded === "soundOut"
                 onIconClicked: {
@@ -206,8 +597,15 @@ PanelWindow {
                 Layout.fillWidth: true
                 spacing: 4
                 Text {
-                    text: "Sound"
+                    text: "Output"
                     color: Theme.text
+                    font.family: Theme.fontFamily
+                    font.pixelSize: Theme.fontSizeSm
+                }
+                Text {
+                    visible: root.sinkList.length === 0
+                    text: "No output devices"
+                    color: Theme.textMuted
                     font.family: Theme.fontFamily
                     font.pixelSize: Theme.fontSizeSm
                 }
@@ -218,8 +616,7 @@ PanelWindow {
                         label: modelData.label
                         checked: modelData.default
                         onActivated: {
-                            if (modelData.name)
-                                Quickshell.execDetached(["wpctl", "set-default", String(modelData.id)])
+                            Quickshell.execDetached(["wpctl", "set-default", String(modelData.id)])
                             sinkListProc.running = true
                         }
                     }
@@ -228,7 +625,9 @@ PanelWindow {
 
             SoundRow {
                 Layout.fillWidth: true
-                iconText: root.sourceMuted ? "󰍭" : "󰍬"
+                iconName: root.sourceMuted ? "audio-input-microphone-muted" : "audio-input-microphone-high"
+                fallbackIcon: "audio-input-microphone"
+                struck: root.sourceMuted
                 value: root.sourceMuted ? 0 : root.sourceVol
                 expanded: root.expanded === "soundIn"
                 onIconClicked: {
@@ -242,6 +641,37 @@ PanelWindow {
                     }
                 }
                 onToggleExpand: root.setExpanded("soundIn")
+            }
+
+            ColumnLayout {
+                visible: root.expanded === "soundIn"
+                Layout.fillWidth: true
+                spacing: 4
+                Text {
+                    text: "Input"
+                    color: Theme.text
+                    font.family: Theme.fontFamily
+                    font.pixelSize: Theme.fontSizeSm
+                }
+                Text {
+                    visible: root.sourceList.length === 0
+                    text: "No input devices"
+                    color: Theme.textMuted
+                    font.family: Theme.fontFamily
+                    font.pixelSize: Theme.fontSizeSm
+                }
+                Repeater {
+                    model: root.sourceList
+                    delegate: DeviceRow {
+                        required property var modelData
+                        label: modelData.label
+                        checked: modelData.default
+                        onActivated: {
+                            Quickshell.execDetached(["wpctl", "set-default", String(modelData.id)])
+                            sourceListProc.running = true
+                        }
+                    }
+                }
             }
         }
     }
@@ -272,14 +702,99 @@ PanelWindow {
         id: vpnProc
         command: ["bash", "-lc", "~/.config/hypr/scripts/qs-vpn.sh status 2>/dev/null | head -1"]
         stdout: StdioCollector {
-            onStreamFinished: root.vpnStatus = text.trim() || "Disconnected"
+            onStreamFinished: {
+                const t = text.trim() || "○ Disconnected"
+                root.vpnStatus = t
+                root.vpnConnected = t.indexOf("Connected") >= 0
+            }
+        }
+    }
+    Timer {
+        id: vpnRefresh
+        interval: 1200
+        repeat: true
+        onTriggered: {
+            vpnProc.running = true
+            if (!root.vpnBusy)
+                stop()
+        }
+    }
+    Timer {
+        id: vpnSettle
+        interval: 8000
+        onTriggered: {
+            root.vpnBusy = false
+            vpnRefresh.stop()
+            vpnProc.running = true
         }
     }
     Process {
         id: updatesProc
-        command: ["bash", "-lc", "checkupdates 2>/dev/null | wc -l"]
+        command: ["bash", "-lc", "~/.config/hypr/scripts/qs-updates.sh count"]
         stdout: StdioCollector {
-            onStreamFinished: root.updateCount = parseInt(text.trim() || "0", 10) || 0
+            onStreamFinished: {
+                const lines = text.trim().split("\n")
+                root.updateCount = parseInt(lines[0] || "0", 10) || 0
+                let pac = 0, aur = 0
+                for (let i = 1; i < lines.length; i++) {
+                    if (lines[i].indexOf("pac=") === 0)
+                        pac = parseInt(lines[i].slice(4), 10) || 0
+                    if (lines[i].indexOf("aur=") === 0)
+                        aur = parseInt(lines[i].slice(4), 10) || 0
+                }
+                root.updatePacCount = pac
+                root.updateAurCount = aur
+            }
+        }
+    }
+    Process {
+        id: updatesListProc
+        command: ["bash", "-lc", "~/.config/hypr/scripts/qs-updates.sh list"]
+        stdout: StdioCollector {
+            onStreamFinished: {
+                const rows = []
+                text.trim().split("\n").forEach(line => {
+                    if (!line)
+                        return
+                    const p = line.split("|")
+                    if (p.length < 2)
+                        return
+                    rows.push({
+                        kind: p[0],
+                        label: p[1],
+                        detail: p[2] || ""
+                    })
+                })
+                root.updateList = rows
+                root.updatesLoading = false
+            }
+        }
+    }
+    Process {
+        id: vpnListProc
+        command: ["bash", "-lc", "~/.config/hypr/scripts/qs-vpn.sh locations"]
+        stdout: StdioCollector {
+            onStreamFinished: {
+                const rows = []
+                text.trim().split("\n").forEach(line => {
+                    if (!line)
+                        return
+                    // Only accept "City|Label" rows — drop CLI chatter like
+                    // "Windscribe CLI is already running"
+                    const p = line.split("|")
+                    if (p.length < 2 || !p[0] || !p[1])
+                        return
+                    const key = p[0].trim()
+                    const label = p[1].trim()
+                    if (!key || key === "best")
+                        return
+                    if (/already running|aborting|error/i.test(key + " " + label))
+                        return
+                    rows.push({ key: key, label: label })
+                })
+                root.vpnList = rows
+                root.vpnLoading = false
+            }
         }
     }
     Process {
@@ -307,38 +822,90 @@ PanelWindow {
     }
     Process {
         id: btListProc
-        command: ["bash", "-lc", "bluetoothctl devices 2>/dev/null | head -12"]
+        command: ["bash", "-lc", "~/.config/hypr/scripts/qs-bt-devices.sh"]
         stdout: StdioCollector {
             onStreamFinished: {
                 const rows = []
                 text.trim().split("\n").forEach(line => {
-                    const m = line.match(/^Device\s+([0-9A-Fa-f:]+)\s+(.*)$/)
-                    if (!m)
+                    if (!line)
                         return
-                    rows.push({ label: m[2], detail: m[1], mac: m[1] })
+                    const p = line.split("|")
+                    if (p.length < 2)
+                        return
+                    const paired = p[2] === "1"
+                    const connected = p[3] === "1"
+                    let detail = p[0]
+                    if (connected)
+                        detail = "Connected · " + detail
+                    else if (paired)
+                        detail = "Paired · " + detail
+                    else
+                        detail = "Nearby · " + detail
+                    rows.push({
+                        label: p[1],
+                        detail: detail,
+                        mac: p[0],
+                        paired: paired,
+                        connected: connected
+                    })
+                })
+                // Named devices first, then MAC-only; connected/paired float up
+                rows.sort((a, b) => {
+                    const score = d => (d.connected ? 4 : 0) + (d.paired ? 2 : 0) + (d.label.indexOf("-") >= 0 && d.label === d.mac.replace(/:/g, "-") ? 0 : 1)
+                    return score(b) - score(a)
                 })
                 root.btList = rows
+                root.btScanning = false
             }
         }
     }
     Process {
         id: sinkListProc
-        command: ["bash", "-lc", "wpctl status 2>/dev/null | awk '/Sinks:/{p=1;next}/Sources:/{p=0} p && /[0-9]+\\./{gsub(/^[\\t *]+/,\"\"); print}'"]
+        command: ["bash", "-lc", "~/.config/hypr/scripts/qs-audio-devices.sh sinks"]
         stdout: StdioCollector {
             onStreamFinished: {
                 const rows = []
                 text.trim().split("\n").forEach(line => {
-                    const m = line.match(/^(\*?\s*)(\d+)\.\s+(.*)$/)
-                    if (!m)
+                    if (!line)
                         return
+                    const p = line.split("|")
+                    if (p.length < 3)
+                        return
+                    let label = p[1]
+                    // Logitech USB dongle → the JBL Flip on this machine
+                    if (/usb headset/i.test(label) || /logitech_logitech_usb_headset/i.test(label))
+                        label = "JBL Flip 4"
                     rows.push({
-                        id: m[2],
-                        label: m[3].replace(/\s*\[.*$/, ""),
-                        default: m[1].indexOf("*") >= 0,
-                        name: m[3]
+                        id: p[0],
+                        label: label,
+                        default: p[2] === "1",
+                        name: p[1]
                     })
                 })
                 root.sinkList = rows
+            }
+        }
+    }
+    Process {
+        id: sourceListProc
+        command: ["bash", "-lc", "~/.config/hypr/scripts/qs-audio-devices.sh sources"]
+        stdout: StdioCollector {
+            onStreamFinished: {
+                const rows = []
+                text.trim().split("\n").forEach(line => {
+                    if (!line)
+                        return
+                    const p = line.split("|")
+                    if (p.length < 3)
+                        return
+                    rows.push({
+                        id: p[0],
+                        label: p[1],
+                        default: p[2] === "1",
+                        name: p[1]
+                    })
+                })
+                root.sourceList = rows
             }
         }
     }
@@ -347,90 +914,172 @@ PanelWindow {
         id: tile
         property string title
         property string subtitle
-        property string iconText
+        property string iconName
+        property string fallbackIcon: "dialog-information"
         property bool expanded: false
+        property bool active: false
         property bool showChevron: true
-        signal clicked()
+        // Icon/body = quick action; chevron = expand. If false, whole tile expands.
+        property bool splitActions: false
+        property bool hovered: bodyMouse.containsMouse || chevMouse.containsMouse
+        signal activated()
+        signal expandClicked()
 
         Layout.fillWidth: true
         Layout.preferredHeight: 58
         radius: Theme.radiusMd
-        color: Theme.surface
+        color: {
+            if (tile.active)
+                return Qt.rgba(Theme.primary.r, Theme.primary.g, Theme.primary.b, tile.hovered ? 0.28 : 0.20)
+            return tile.hovered ? Theme.rowHover : Theme.surface
+        }
         border.width: 1
-        border.color: Theme.borderSubtle
+        border.color: tile.active
+            ? Qt.rgba(Theme.primary.r, Theme.primary.g, Theme.primary.b, 0.65)
+            : (tile.hovered ? Theme.border : Theme.borderSubtle)
+
+        Behavior on color { ColorAnimation { duration: 120 } }
+        Behavior on border.color { ColorAnimation { duration: 120 } }
 
         RowLayout {
             anchors.fill: parent
-            anchors.margins: 10
-            spacing: 10
-            Text {
-                text: tile.iconText
-                color: Theme.primary
-                font.pixelSize: 18
-                font.family: "JetBrainsMono Nerd Font, JetBrains Mono"
-            }
-            ColumnLayout {
+            anchors.margins: 8
+            spacing: 8
+
+            // Main hit target: icon + text
+            Item {
                 Layout.fillWidth: true
-                spacing: 2
-                Text {
-                    text: tile.title
-                    color: Theme.text
-                    font.family: Theme.fontFamily
-                    font.pixelSize: Theme.fontSizeSm
+                Layout.fillHeight: true
+                RowLayout {
+                    anchors.fill: parent
+                    spacing: 10
+                    RiceIcon {
+                        name: tile.iconName
+                        fallback: tile.fallbackIcon
+                        implicitSize: 18
+                        Layout.preferredWidth: 18
+                        Layout.preferredHeight: 18
+                    }
+                    ColumnLayout {
+                        Layout.fillWidth: true
+                        spacing: 2
+                        Text {
+                            text: tile.title
+                            color: Theme.text
+                            font.family: Theme.fontFamily
+                            font.pixelSize: Theme.fontSizeSm
+                        }
+                        Text {
+                            text: tile.subtitle
+                            color: tile.active ? Theme.primary : Theme.textMuted
+                            font.family: Theme.fontFamily
+                            font.pixelSize: 11
+                            elide: Text.ElideRight
+                            Layout.fillWidth: true
+                        }
+                    }
                 }
-                Text {
-                    text: tile.subtitle
-                    color: Theme.primary
-                    font.family: Theme.fontFamily
-                    font.pixelSize: 11
-                    elide: Text.ElideRight
-                    Layout.fillWidth: true
+                MouseArea {
+                    id: bodyMouse
+                    anchors.fill: parent
+                    hoverEnabled: true
+                    cursorShape: Qt.PointingHandCursor
+                    onClicked: {
+                        if (tile.splitActions)
+                            tile.activated()
+                        else
+                            tile.expandClicked()
+                    }
                 }
             }
-            Text {
+
+            // Chevron only expands
+            Rectangle {
                 visible: tile.showChevron
-                text: tile.expanded ? "󰅃" : "󰅀"
-                color: Theme.textMuted
-                font.pixelSize: 14
+                Layout.preferredWidth: 28
+                Layout.preferredHeight: 28
+                radius: 8
+                color: chevMouse.containsMouse ? Theme.rowHover : "transparent"
+                Behavior on color { ColorAnimation { duration: 100 } }
+                RiceIcon {
+                    anchors.centerIn: parent
+                    name: tile.expanded ? "go-up" : "go-down"
+                    implicitSize: 14
+                }
+                MouseArea {
+                    id: chevMouse
+                    anchors.fill: parent
+                    enabled: tile.showChevron
+                    hoverEnabled: true
+                    cursorShape: Qt.PointingHandCursor
+                    onClicked: tile.expandClicked()
+                }
             }
-        }
-        MouseArea {
-            anchors.fill: parent
-            cursorShape: Qt.PointingHandCursor
-            onClicked: tile.clicked()
         }
     }
 
     component PowerRow: Rectangle {
+        id: prow
         property string label
-        property string iconText
+        property string detail: ""
+        property string iconName
+        property string fallbackIcon: "system-shutdown"
+        property bool hovered: mouse.containsMouse
         signal activated()
         Layout.fillWidth: true
-        Layout.preferredHeight: 42
+        Layout.preferredHeight: prow.detail.length ? 48 : 42
         radius: Theme.radiusSm
-        color: Theme.surface
+        color: prow.hovered ? Theme.rowHover : Theme.surface
+        border.width: 1
+        border.color: prow.hovered ? Theme.border : "transparent"
+        Behavior on color { ColorAnimation { duration: 120 } }
         RowLayout {
             anchors.fill: parent
             anchors.margins: 10
             spacing: 10
-            Text { text: iconText; color: Theme.primary; font.pixelSize: 16 }
-            Text {
-                text: label
-                color: Theme.text
-                font.family: Theme.fontFamily
-                font.pixelSize: Theme.fontSizeSm
+            RiceIcon {
+                name: iconName
+                fallback: fallbackIcon
+                implicitSize: 16
+                Layout.preferredWidth: 16
+                Layout.preferredHeight: 16
+            }
+            ColumnLayout {
                 Layout.fillWidth: true
+                spacing: 1
+                Text {
+                    text: label
+                    color: Theme.text
+                    font.family: Theme.fontFamily
+                    font.pixelSize: Theme.fontSizeSm
+                    Layout.fillWidth: true
+                }
+                Text {
+                    visible: prow.detail.length > 0
+                    text: prow.detail
+                    color: Theme.textMuted
+                    font.family: Theme.fontFamily
+                    font.pixelSize: 10
+                    Layout.fillWidth: true
+                    elide: Text.ElideRight
+                }
             }
         }
         MouseArea {
+            id: mouse
             anchors.fill: parent
+            z: 10
+            hoverEnabled: true
             cursorShape: Qt.PointingHandCursor
             onClicked: activated()
         }
     }
 
     component SoundRow: RowLayout {
-        property string iconText
+        id: srow
+        property string iconName
+        property string fallbackIcon: "audio-volume-high"
+        property bool struck: false
         property real value
         property bool expanded: false
         signal iconClicked()
@@ -438,14 +1087,26 @@ PanelWindow {
         signal toggleExpand()
 
         spacing: 8
-        Text {
-            text: iconText
-            color: Theme.primary
-            font.pixelSize: 18
+        Rectangle {
+            Layout.preferredWidth: 28
+            Layout.preferredHeight: 28
+            radius: 8
+            color: iconMouse.containsMouse ? Theme.rowHover : "transparent"
+            Behavior on color { ColorAnimation { duration: 100 } }
+            RiceIcon {
+                anchors.centerIn: parent
+                name: srow.iconName
+                fallback: srow.fallbackIcon
+                struck: srow.struck
+                implicitSize: 18
+            }
             MouseArea {
+                id: iconMouse
                 anchors.fill: parent
+                z: 10
+                hoverEnabled: true
                 cursorShape: Qt.PointingHandCursor
-                onClicked: iconClicked()
+                onClicked: srow.iconClicked()
             }
         }
         Slider {
@@ -453,8 +1114,8 @@ PanelWindow {
             Layout.fillWidth: true
             from: 0
             to: 1
-            value: parent.value
-            onMoved: parent.moved(value)
+            value: srow.value
+            onMoved: srow.moved(value)
             background: Rectangle {
                 x: slider.leftPadding
                 y: slider.topPadding + slider.availableHeight / 2 - height / 2
@@ -478,28 +1139,47 @@ PanelWindow {
                 height: 16
                 radius: 8
                 color: Theme.primary
+                scale: slider.hovered || slider.pressed ? 1.15 : 1
+                Behavior on scale { NumberAnimation { duration: 100 } }
             }
         }
-        Text {
-            text: expanded ? "󰅃" : "󰅀"
-            color: Theme.textMuted
-            font.pixelSize: 14
+        Rectangle {
+            Layout.preferredWidth: 28
+            Layout.preferredHeight: 28
+            radius: 8
+            color: chevMouse.containsMouse ? Theme.rowHover : "transparent"
+            Behavior on color { ColorAnimation { duration: 100 } }
+            RiceIcon {
+                anchors.centerIn: parent
+                name: srow.expanded ? "go-up" : "go-down"
+                implicitSize: 14
+            }
             MouseArea {
+                id: chevMouse
                 anchors.fill: parent
+                z: 10
+                hoverEnabled: true
                 cursorShape: Qt.PointingHandCursor
-                onClicked: toggleExpand()
+                onClicked: srow.toggleExpand()
             }
         }
     }
 
     component DeviceRow: Rectangle {
+        id: drow
         property string label
         property bool checked: false
+        property bool hovered: mouse.containsMouse
         signal activated()
         Layout.fillWidth: true
         Layout.preferredHeight: 36
         radius: Theme.radiusSm
-        color: Theme.surface
+        color: drow.checked
+            ? Qt.rgba(Theme.primary.r, Theme.primary.g, Theme.primary.b, drow.hovered ? 0.28 : 0.18)
+            : (drow.hovered ? Theme.rowHover : Theme.surface)
+        border.width: 1
+        border.color: drow.checked ? Qt.rgba(Theme.primary.r, Theme.primary.g, Theme.primary.b, 0.55) : "transparent"
+        Behavior on color { ColorAnimation { duration: 120 } }
         RowLayout {
             anchors.fill: parent
             anchors.margins: 8
@@ -528,13 +1208,16 @@ PanelWindow {
             }
         }
         MouseArea {
+            id: mouse
             anchors.fill: parent
+            hoverEnabled: true
             cursorShape: Qt.PointingHandCursor
             onClicked: activated()
         }
     }
 
     component ExpandSection: ColumnLayout {
+        id: section
         property string title
         property var model: []
         property string buttonLabel: "Connect"
@@ -550,13 +1233,24 @@ PanelWindow {
             font.pixelSize: Theme.fontSizeSm
         }
         Repeater {
-            model: parent.model
+            model: section.model
             delegate: Rectangle {
+                id: row
                 required property var modelData
+                property bool hovered: rowMouse.containsMouse
                 Layout.fillWidth: true
                 Layout.preferredHeight: 44
                 radius: Theme.radiusSm
-                color: Theme.surface
+                color: {
+                    if (modelData.connected)
+                        return Qt.rgba(Theme.primary.r, Theme.primary.g, Theme.primary.b, row.hovered ? 0.28 : 0.18)
+                    return row.hovered ? Theme.rowHover : Theme.surface
+                }
+                border.width: 1
+                border.color: modelData.connected
+                    ? Qt.rgba(Theme.primary.r, Theme.primary.g, Theme.primary.b, 0.55)
+                    : "transparent"
+                Behavior on color { ColorAnimation { duration: 120 } }
                 RowLayout {
                     anchors.fill: parent
                     anchors.margins: 8
@@ -582,16 +1276,18 @@ PanelWindow {
                         }
                     }
                     Text {
-                        text: buttonLabel
+                        text: modelData.connected ? "Connected" : section.buttonLabel
                         color: Theme.primary
                         font.family: Theme.fontFamily
                         font.pixelSize: Theme.fontSizeSm
-                        MouseArea {
-                            anchors.fill: parent
-                            cursorShape: Qt.PointingHandCursor
-                            onClicked: activated(modelData)
-                        }
                     }
+                }
+                MouseArea {
+                    id: rowMouse
+                    anchors.fill: parent
+                    hoverEnabled: true
+                    cursorShape: Qt.PointingHandCursor
+                    onClicked: section.activated(modelData)
                 }
             }
         }

@@ -37,16 +37,6 @@ RicePanel {
         rebuild(statusRaw || "○ Disconnected", locationsRaw)
     }
 
-    function applyFilter() {
-        const q = searchText.trim().toLowerCase()
-        if (!q) {
-            filtered = entries.slice()
-        } else {
-            filtered = entries.filter(e => (e.label || "").toLowerCase().includes(q))
-        }
-        clampSelection()
-    }
-
     function rebuild(statusLine, locationsText) {
         const list = []
         list.push({
@@ -56,12 +46,13 @@ RicePanel {
         })
         list.push({
             kind: "action",
-            label: "—— Disconnect ——",
+            label: "Disconnect",
             action: "disconnect"
         })
+        // Best always first among connect options
         list.push({
             kind: "action",
-            label: "—— Best location ——",
+            label: "Best location",
             action: "best"
         })
 
@@ -70,17 +61,44 @@ RicePanel {
             let line = rows[i].trim()
             if (!line)
                 continue
+            if (/already running|aborting|error:|spdlog|cli:/i.test(line))
+                continue
+            let key = line
+            let label = line
+            const pipe = line.indexOf("|")
+            if (pipe < 0)
+                continue
+            key = line.slice(0, pipe).trim()
+            label = line.slice(pipe + 1).trim() || key
+            if (key === "best" || /^best location$/i.test(label))
+                continue
             list.push({
                 kind: "location",
-                label: line,
+                label: label,
+                detail: key,
                 action: "connect",
-                target: line
+                target: key
             })
         }
 
         entries = list
         statusText = statusLine || "○ Disconnected"
         applyFilter()
+    }
+
+    function applyFilter() {
+        const q = searchText.trim().toLowerCase()
+        if (!q) {
+            filtered = entries.slice()
+        } else {
+            filtered = entries.filter(e => {
+                if (e.kind === "status")
+                    return true
+                const blob = [e.label, e.detail, e.target, e.action].filter(Boolean).join(" ").toLowerCase()
+                return blob.includes(q)
+            })
+        }
+        clampSelection()
     }
 
     function runAction(item) {
@@ -160,6 +178,15 @@ RicePanel {
                 font.pixelSize: Theme.fontSize
                 font.bold: modelData.kind === "status" || modelData.kind === "action"
                 elide: Text.ElideRight
+            }
+
+            Text {
+                visible: !!(modelData.detail && modelData.kind === "location")
+                text: modelData.detail || ""
+                color: index === root.selectedIndex ? Theme.textOnAccent : Theme.textMuted
+                font.family: Theme.fontFamily
+                font.pixelSize: Theme.fontSizeSm
+                opacity: 0.85
             }
         }
 
