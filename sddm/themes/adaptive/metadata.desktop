@@ -1,0 +1,16 @@
+[SddmGreeterTheme]
+Name=Adaptive
+Description=Wallpaper + Material You login (matches hyprlock)
+Author=stranger
+Copyright=(c) 2026
+License=MIT
+Type=sddm-theme
+Version=1.0
+Website=
+Screenshot=background.jpg
+MainScript=Main.qml
+ConfigFile=theme.conf
+TranslationsDirectory=translations
+Theme-Id=adaptive
+Theme-API=2.0
+QtVersion=6
