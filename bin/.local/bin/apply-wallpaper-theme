@@ -40,4 +40,10 @@ if command -v kitten >/dev/null 2>&1; then
   kitten @ set-colors --all --configured ~/.config/kitty/colors-matugen.conf 2>/dev/null || true
 fi
 
+# Reload Quickshell rice colors (clipboard / launcher)
+if command -v qs >/dev/null 2>&1; then
+  qs -c rice ipc call theme reload 2>/dev/null \
+    || { qs -c rice kill 2>/dev/null || true; qs -c rice -n -d 2>/dev/null || true; }
+fi
+
 notify-send -a Waypaper "Theme updated" "$(basename "$wallpaper")" 2>/dev/null || true
