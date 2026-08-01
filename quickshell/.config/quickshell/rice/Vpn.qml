@@ -20,8 +20,7 @@ RicePanel {
     countText: statusText
     itemHeight: Theme.rowHeight
     maxVisible: 10
-    panelWidth: 560
-    panelMaxHeight: 560
+    panelHeight: 560
 
     onPanelOpened: {
         statusRaw = ""
@@ -136,7 +135,7 @@ RicePanel {
         color: {
             if (modelData.kind === "status")
                 return Theme.surfaceVariant
-            return index === root.selectedIndex ? Theme.primary : Theme.surfaceContainer
+            return index === root.selectedIndex ? Theme.rowSelected : Theme.row
         }
 
         RowLayout {
@@ -146,7 +145,7 @@ RicePanel {
 
             Text {
                 text: modelData.kind === "status" ? "VPN" : (modelData.kind === "action" ? ">" : "•")
-                color: index === root.selectedIndex && modelData.kind !== "status" ? Theme.onPrimary : Theme.secondary
+                color: index === root.selectedIndex && modelData.kind !== "status" ? Theme.textOnAccent : Theme.secondary
                 font.family: Theme.fontFamily
                 font.pixelSize: Theme.fontSizeSm
                 font.bold: true
@@ -156,7 +155,7 @@ RicePanel {
             Text {
                 Layout.fillWidth: true
                 text: modelData.label
-                color: index === root.selectedIndex && modelData.kind !== "status" ? Theme.onPrimary : Theme.onSurface
+                color: index === root.selectedIndex && modelData.kind !== "status" ? Theme.textOnAccent : Theme.text
                 font.family: Theme.fontFamily
                 font.pixelSize: Theme.fontSize
                 font.bold: modelData.kind === "status" || modelData.kind === "action"

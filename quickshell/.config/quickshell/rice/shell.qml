@@ -10,11 +10,27 @@ ShellRoot {
     Wallpaper { id: wallpaper }
     Vpn { id: vpn }
 
+    Component.onCompleted: {
+        OverlayHub.clipboard = clipboard
+        OverlayHub.launcher = launcher
+        OverlayHub.wallpaper = wallpaper
+        OverlayHub.vpn = vpn
+    }
+
+    IpcHandler {
+        target: "overlay"
+        function filter(): void { OverlayHub.toggleFilter() }
+        function toggleFilter(): void { OverlayHub.toggleFilter() }
+        function open(id: string): void { OverlayHub.open(id) }
+    }
+
     IpcHandler {
         target: "clipboard"
         function toggle(): void { clipboard.toggle() }
         function open(): void { clipboard.show() }
         function close(): void { clipboard.close() }
+        function openFilter(): void { clipboard.showFilter() }
+        function toggleFilter(): void { clipboard.showFilter() }
     }
 
     IpcHandler {
@@ -29,6 +45,8 @@ ShellRoot {
         function toggle(): void { wallpaper.toggle() }
         function open(): void { wallpaper.show() }
         function close(): void { wallpaper.close() }
+        function filter(): void { wallpaper.toggleFilter() }
+        function toggleFilter(): void { wallpaper.toggleFilter() }
     }
 
     IpcHandler {
