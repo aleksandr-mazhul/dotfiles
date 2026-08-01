@@ -4,3 +4,6 @@
 
 # Recreated by apply-wallpaper-theme
 hypr/.config/hypr/lock-wallpaper
+
+# Hyprland may recreate a stub .conf when on Lua; ignore it (use hyprland.lua)
+hypr/.config/hypr/hyprland.conf

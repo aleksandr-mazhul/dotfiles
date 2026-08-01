@@ -12,8 +12,8 @@ command = ""
 
 # Hyprland border colors
 [templates.hyprland]
-input_path = "~/.config/matugen/templates/hyprland-colors.conf"
-output_path = "~/.config/hypr/colors-matugen.conf"
+input_path = "~/.config/matugen/templates/hyprland-colors.lua"
+output_path = "~/.config/hypr/colors-matugen.lua"
 
 # Hyprlock adaptive lock colors
 [templates.hyprlock]

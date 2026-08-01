@@ -434,21 +434,21 @@ windowrule {
     opacity = 1.0 override
 }
 
-# App → workspace (silent: don't steal focus / switch workspace)
+# App → workspace (IDs: T=3, Z=5, C=7). silent = don't switch focus.
 windowrule {
     name = telegram-to-T
     match:class = org.telegram.desktop
-    workspace = T silent
+    workspace = 3 silent
 }
 
 windowrule {
     name = cursor-to-C
     match:class = ^(cursor|Cursor)$
-    workspace = C silent
+    workspace = 7 silent
 }
 
 windowrule {
     name = kitty-to-Z
     match:class = ^(kitty)$
-    workspace = Z silent
+    workspace = 5 silent
 }
