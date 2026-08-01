@@ -59,6 +59,9 @@ PanelWindow {
 
     exclusionMode: ExclusionMode.Auto
     focusable: false
+    // Ensure the whole bar surface receives pointer input (transparent windows
+    // can otherwise end up with an empty / partial click mask).
+    mask: Region { item: barHitbox }
     WlrLayershell.layer: root.fullscreenActive ? WlrLayer.Overlay : WlrLayer.Top
     WlrLayershell.namespace: "rice-bar"
     WlrLayershell.keyboardFocus: WlrKeyboardFocus.None
@@ -83,8 +86,12 @@ PanelWindow {
             calendar.close()
         if (notifCenter)
             notifCenter.close()
-        if (quickSettings)
-            quickSettings.toggle()
+        if (!quickSettings)
+            return
+        if (quickSettings.open)
+            quickSettings.close()
+        else
+            quickSettings.show()
     }
 
     function openCalendar() {
@@ -93,8 +100,12 @@ PanelWindow {
             quickSettings.close()
         if (notifCenter)
             notifCenter.close()
-        if (calendar)
-            calendar.toggle()
+        if (!calendar)
+            return
+        if (calendar.open)
+            calendar.close()
+        else
+            calendar.show()
     }
 
     function openNotifications() {
@@ -103,8 +114,12 @@ PanelWindow {
             quickSettings.close()
         if (calendar)
             calendar.close()
-        if (notifCenter)
-            notifCenter.toggle()
+        if (!notifCenter)
+            return
+        if (notifCenter.open)
+            notifCenter.close()
+        else
+            notifCenter.show()
     }
 
     // Poll active workspace on this monitor for fullscreen (Super+F → mode 2).
@@ -187,32 +202,32 @@ PanelWindow {
         }
     }
 
-    MouseArea {
-        anchors.fill: parent
-        hoverEnabled: true
-        acceptedButtons: Qt.NoButton
-        z: 0
-
-        onEntered: {
-            root.hovering = true
-            hideTimer.stop()
-            if (!root.showContent)
-                showTimer.restart()
-            else
-                root.revealed = true
-        }
-        onExited: {
-            root.hovering = false
-            showTimer.stop()
-            if (root.panelOpen)
-                return
-            if (root.pinned && !root.fullscreenActive)
-                return
-            hideTimer.restart()
+    // Hover only — never steal button clicks from bar islands.
+    HoverHandler {
+        id: barHover
+        onHoveredChanged: {
+            if (barHover.hovered) {
+                root.hovering = true
+                hideTimer.stop()
+                if (!root.showContent)
+                    showTimer.restart()
+                else
+                    root.revealed = true
+            } else {
+                root.hovering = false
+                showTimer.stop()
+                if (root.panelOpen)
+                    return
+                if (root.pinned && !root.fullscreenActive)
+                    return
+                hideTimer.restart()
+            }
         }
     }
 
+    // Opaque-enough hit surface so the Wayland input region covers the bar.
     Rectangle {
+        id: barHitbox
         anchors.fill: parent
         visible: root.showContent
         color: Qt.rgba(0, 0, 0, 0.01)
@@ -220,6 +235,7 @@ PanelWindow {
     }
 
     RowLayout {
+        id: barRow
         anchors.fill: parent
         spacing: Theme.barGap
         visible: root.showContent
@@ -241,28 +257,19 @@ PanelWindow {
         RowLayout {
             spacing: Theme.barGap
             Layout.alignment: Qt.AlignRight | Qt.AlignVCenter
-            z: 2
 
             BarQsButton {
-                z: 3
-                active: !!(quickSettings && quickSettings.open)
                 onActivated: root.openQuickSettings()
             }
 
             BarClockButton {
-                z: 3
                 onActivated: root.openCalendar()
             }
 
             BarNotifButton {
-                z: 3
                 muted: !!(notifCenter && notifCenter.dnd)
                 unread: notifCenter ? notifCenter.unread : 0
                 onActivated: root.openNotifications()
-            }
-
-            BarTray {
-                z: 1
             }
         }
     }

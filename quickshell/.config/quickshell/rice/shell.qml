@@ -10,8 +10,9 @@ ShellRoot {
     Wallpaper { id: wallpaper }
     Vpn { id: vpn }
 
-    QuickSettings { id: quickSettings }
-    Calendar { id: calendar }
+    // Ids must differ from Bar property names — `calendar: calendar` self-binds to null.
+    QuickSettings { id: qsPanel }
+    Calendar { id: calendarPanel }
     Notifications { id: notifications }
     Osd {}
 
@@ -20,8 +21,8 @@ ShellRoot {
 
         Bar {
             // Variants injects modelData into the root component
-            quickSettings: quickSettings
-            calendar: calendar
+            quickSettings: qsPanel
+            calendar: calendarPanel
             notifCenter: notifications
             pinned: OverlayHub.barPinned
         }
@@ -32,8 +33,8 @@ ShellRoot {
         OverlayHub.launcher = launcher
         OverlayHub.wallpaper = wallpaper
         OverlayHub.vpn = vpn
-        OverlayHub.quickSettings = quickSettings
-        OverlayHub.calendar = calendar
+        OverlayHub.quickSettings = qsPanel
+        OverlayHub.calendar = calendarPanel
         OverlayHub.notifications = notifications
     }
 
@@ -83,8 +84,8 @@ ShellRoot {
             OverlayHub.barPinned = !OverlayHub.barPinned
             OverlayHub.barVisible = true
             if (!OverlayHub.barPinned) {
-                quickSettings.close()
-                calendar.close()
+                qsPanel.close()
+                calendarPanel.close()
                 notifications.close()
             }
         }
@@ -95,40 +96,40 @@ ShellRoot {
         function hideBar(): void {
             OverlayHub.barPinned = false
             OverlayHub.barVisible = true
-            quickSettings.close()
-            calendar.close()
+            qsPanel.close()
+            calendarPanel.close()
             notifications.close()
         }
         function toggleQuickSettings(): void {
-            calendar.close()
+            calendarPanel.close()
             notifications.close()
-            quickSettings.toggle()
+            qsPanel.toggle()
         }
         function openQuickSettings(): void {
-            calendar.close()
+            calendarPanel.close()
             notifications.close()
-            quickSettings.show()
+            qsPanel.show()
         }
-        function closeQuickSettings(): void { quickSettings.close() }
+        function closeQuickSettings(): void { qsPanel.close() }
         function toggleCalendar(): void {
-            quickSettings.close()
+            qsPanel.close()
             notifications.close()
-            calendar.toggle()
+            calendarPanel.toggle()
         }
         function openCalendar(): void {
-            quickSettings.close()
+            qsPanel.close()
             notifications.close()
-            calendar.show()
+            calendarPanel.show()
         }
-        function closeCalendar(): void { calendar.close() }
+        function closeCalendar(): void { calendarPanel.close() }
         function toggleNotifications(): void {
-            quickSettings.close()
-            calendar.close()
+            qsPanel.close()
+            calendarPanel.close()
             notifications.toggle()
         }
         function openNotifications(): void {
-            quickSettings.close()
-            calendar.close()
+            qsPanel.close()
+            calendarPanel.close()
             notifications.show()
         }
         function closeNotifications(): void { notifications.close() }
