@@ -1,10 +1,12 @@
+@import url("colors-matugen.css");
+
 window {
-  background-color: #1a1b26;
+  background-color: var(--wofi-bg);
 }
 
 * {
   font-family: "Jetbrains Mono";
-  color: #fff;
+  color: var(--wofi-text);
 }
 
 #scroll {
@@ -12,8 +14,8 @@ window {
 }
 
 #input {
-  background-color: #1a1b26;
-  color: #c0caf5;
+  background-color: var(--wofi-surface);
+  color: var(--wofi-text);
   outline: none;
   box-shadow: none;
   border: 0;
@@ -36,10 +38,10 @@ window {
 }
 
 #entry:selected {
-  background-color: #c0caf5;
+  background-color: var(--wofi-primary);
   outline: none;
 }
 
 #text:selected {
-  color: #1a1b26;
+  color: var(--wofi-on-primary);
 }
