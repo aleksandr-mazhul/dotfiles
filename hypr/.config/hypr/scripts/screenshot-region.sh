@@ -19,4 +19,8 @@ mv -f "$tmp" "$final"
 wl-copy -t image/png <"$final"
 cliphist store <"$final"
 
-notify-send -a hyprshot "Screenshot" "Saved and copied:\n$final" -i "$final" -t 2500 2>/dev/null || true
+# One short replaceable toast (preview = shot, app icon = camera)
+notify-send -a hyprshot -i "$final" -n camera-photo -u low -t 2000 -e \
+  -r 424202 \
+  -h string:desktop-entry:hyprshot \
+  -- "Screenshot" "Saved" 2>/dev/null || true
