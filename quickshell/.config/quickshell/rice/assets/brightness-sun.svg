@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+  <!-- Flat mono sun — same weight as notif bell glyphs -->
+  <circle fill="#ffffff" cx="12" cy="12" r="4"/>
+  <g fill="#ffffff">
+    <rect x="11.15" y="2.4" width="1.7" height="3" rx="0.85"/>
+    <rect x="11.15" y="18.6" width="1.7" height="3" rx="0.85"/>
+    <rect x="2.4" y="11.15" width="3" height="1.7" rx="0.85"/>
+    <rect x="18.6" y="11.15" width="3" height="1.7" rx="0.85"/>
+    <rect x="11.15" y="2.4" width="1.7" height="3" rx="0.85" transform="rotate(45 12 12)"/>
+    <rect x="11.15" y="2.4" width="1.7" height="3" rx="0.85" transform="rotate(135 12 12)"/>
+    <rect x="11.15" y="2.4" width="1.7" height="3" rx="0.85" transform="rotate(225 12 12)"/>
+    <rect x="11.15" y="2.4" width="1.7" height="3" rx="0.85" transform="rotate(315 12 12)"/>
+  </g>
+</svg>

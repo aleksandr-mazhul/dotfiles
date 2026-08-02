@@ -29,6 +29,11 @@ PanelWindow {
     property var updateList: []
     property var sinkList: []
     property var sourceList: []
+    property real brightness: 0.7
+    property var brightMonitors: []
+    property string brightTarget: "all"
+    // True while any QS slider is being dragged — keeps panel open / blocks flick steal.
+    property bool sliderGrabbed: false
 
     function toggle() { open = !open }
     function show() { open = true }
@@ -50,6 +55,27 @@ PanelWindow {
         btProc.running = true
         vpnProc.running = true
         updatesProc.running = true
+        brightGetProc.running = true
+        brightListProc.running = true
+    }
+
+    function setBrightness(v) {
+        const pct = Math.round(Math.max(0, Math.min(1, v)) * 100)
+        root.brightness = pct / 100
+        brightSetProc.command = ["bash", "-lc", "~/.config/hypr/scripts/qs-brightness.sh set " + pct]
+        brightSetProc.running = true
+    }
+
+    function setBrightTarget(id) {
+        root.brightTarget = String(id)
+        brightTargetProc.command = [
+            "bash", "-lc",
+            "~/.config/hypr/scripts/qs-brightness.sh target " + String(id)
+        ]
+        brightTargetProc.running = true
+        // Refresh slider value for the selected scope.
+        Qt.callLater(() => { brightGetProc.running = true })
+        Qt.callLater(() => { brightListProc.running = true })
     }
 
     function setExpanded(id) {
@@ -77,6 +103,8 @@ PanelWindow {
             sinkListProc.running = true
         if (expanded === "soundIn")
             sourceListProc.running = true
+        if (expanded === "brightness")
+            brightListProc.running = true
     }
 
     function runNetworkQuick() {
@@ -226,6 +254,10 @@ PanelWindow {
         scale: 1
         Keys.onPressed: event => {
             if (event.key === Qt.Key_Escape) {
+                if (root.sliderGrabbed) {
+                    event.accepted = true
+                    return
+                }
                 root.close()
                 event.accepted = true
             }
@@ -590,6 +622,53 @@ PanelWindow {
 
             SoundRow {
                 Layout.fillWidth: true
+                iconName: ""
+                fallbackIcon: "weather-clear"
+                customIconSource: Qt.resolvedUrl("assets/brightness-sun.svg")
+                value: root.brightness
+                expanded: root.expanded === "brightness"
+                onIconClicked: root.setBrightness(0.65)
+                onMoved: v => {
+                    root.brightness = v
+                    brightDebounce.restart()
+                }
+                onDragEnded: v => {
+                    brightDebounce.stop()
+                    root.setBrightness(v)
+                }
+                onToggleExpand: root.setExpanded("brightness")
+            }
+
+            ColumnLayout {
+                visible: root.expanded === "brightness"
+                Layout.fillWidth: true
+                spacing: 4
+                Text {
+                    text: "Monitor"
+                    color: Theme.text
+                    font.family: Theme.fontFamily
+                    font.pixelSize: Theme.fontSizeSm
+                }
+                Text {
+                    visible: root.brightMonitors.length < 2
+                    text: "No extra monitors detected"
+                    color: Theme.textMuted
+                    font.family: Theme.fontFamily
+                    font.pixelSize: Theme.fontSizeSm
+                }
+                Repeater {
+                    model: root.brightMonitors
+                    delegate: DeviceRow {
+                        required property var modelData
+                        label: modelData.label
+                        checked: modelData.selected
+                        onActivated: root.setBrightTarget(modelData.id)
+                    }
+                }
+            }
+
+            SoundRow {
+                Layout.fillWidth: true
                 iconName: root.sinkOutIcon
                 fallbackIcon: "audio-volume-high"
                 struck: root.sinkMuted && root.sinkIsHeadphones
@@ -877,6 +956,62 @@ PanelWindow {
         }
     }
     Process {
+        id: brightGetProc
+        command: ["bash", "-lc", "~/.config/hypr/scripts/qs-brightness.sh get"]
+        stdout: StdioCollector {
+            onStreamFinished: {
+                const n = parseInt(text.trim(), 10)
+                if (!isNaN(n) && !root.sliderGrabbed)
+                    root.brightness = Math.max(0, Math.min(100, n)) / 100
+            }
+        }
+    }
+    Process {
+        id: brightSetProc
+        command: ["bash", "-lc", "~/.config/hypr/scripts/qs-brightness.sh get"]
+    }
+    Process {
+        id: brightTargetProc
+        command: ["bash", "-lc", "~/.config/hypr/scripts/qs-brightness.sh target all"]
+    }
+    Process {
+        id: brightListProc
+        command: ["bash", "-lc", "~/.config/hypr/scripts/qs-brightness.sh list"]
+        stdout: StdioCollector {
+            onStreamFinished: {
+                const rows = []
+                let target = "all"
+                text.trim().split("\n").forEach(line => {
+                    if (!line)
+                        return
+                    const p = line.split("|")
+                    if (p.length < 3)
+                        return
+                    const id = p[0]
+                    const selected = p[2] === "1"
+                    if (selected)
+                        target = id
+                    rows.push({
+                        id: id,
+                        label: p[1],
+                        selected: selected
+                    })
+                })
+                root.brightMonitors = rows
+                root.brightTarget = target
+            }
+        }
+    }
+    Timer {
+        id: brightDebounce
+        interval: 120
+        onTriggered: {
+            if (!root.sliderGrabbed)
+                root.setBrightness(root.brightness)
+        }
+    }
+
+    Process {
         id: sinkListProc
         command: ["bash", "-lc", "~/.config/hypr/scripts/qs-audio-devices.sh sinks"]
         stdout: StdioCollector {
@@ -1091,11 +1226,14 @@ PanelWindow {
         id: srow
         property string iconName
         property string fallbackIcon: "audio-volume-high"
+        property url customIconSource: ""
         property bool struck: false
         property real value
         property bool expanded: false
+        property bool expandable: true
         signal iconClicked()
         signal moved(real v)
+        signal dragEnded(real v)
         signal toggleExpand()
 
         spacing: 8
@@ -1108,6 +1246,7 @@ PanelWindow {
                 anchors.centerIn: parent
                 name: srow.iconName
                 fallback: srow.fallbackIcon
+                customSource: srow.customIconSource
                 struck: srow.struck
                 implicitSize: 18
             }
@@ -1123,37 +1262,69 @@ PanelWindow {
         Slider {
             id: slider
             Layout.fillWidth: true
+            // Tall hit-strip so you can grab/drag anywhere on the row, not only the 8px track.
+            Layout.preferredHeight: 32
             from: 0
             to: 1
-            value: srow.value
+            live: true
+            wheelEnabled: true
+            topPadding: 12
+            bottomPadding: 12
+            leftPadding: 0
+            rightPadding: 0
+
+            // Don't fight the binding while the user is dragging.
+            Binding {
+                target: slider
+                property: "value"
+                value: srow.value
+                when: !slider.pressed
+                restoreMode: Binding.RestoreBindingOrValue
+            }
+
+            onPressedChanged: {
+                // Flickable steals vertical/diagonal drags otherwise — menu feels "stuck"
+                // and the panel can lose the gesture / close on release outside.
+                flick.interactive = !pressed
+                root.sliderGrabbed = pressed
+                if (!pressed)
+                    srow.dragEnded(slider.value)
+            }
             onMoved: srow.moved(value)
+
             background: Rectangle {
                 x: slider.leftPadding
                 y: slider.topPadding + slider.availableHeight / 2 - height / 2
                 implicitWidth: 200
-                implicitHeight: 8
+                implicitHeight: 10
                 width: slider.availableWidth
                 height: implicitHeight
-                radius: 4
+                radius: 5
                 color: Theme.surfaceVariant
                 Rectangle {
                     width: slider.visualPosition * parent.width
                     height: parent.height
                     color: Theme.primary
-                    radius: 4
+                    radius: 5
                 }
             }
             handle: Rectangle {
                 x: slider.leftPadding + slider.visualPosition * (slider.availableWidth - width)
                 y: slider.topPadding + slider.availableHeight / 2 - height / 2
-                width: 16
-                height: 16
-                radius: 8
+                width: 20
+                height: 20
+                radius: 10
                 color: Theme.primary
-                scale: slider.hovered || slider.pressed ? 1.15 : 1
+                border.width: 2
+                border.color: Theme.background
+                scale: slider.hovered || slider.pressed ? 1.12 : 1
+                Behavior on scale {
+                    NumberAnimation { duration: 80 }
+                }
             }
         }
         Rectangle {
+            visible: srow.expandable
             Layout.preferredWidth: 28
             Layout.preferredHeight: 28
             radius: 8

@@ -11,6 +11,7 @@ Scope {
 
     property real osdValue: 0
     property string osdIconName: "audio-volume-high"
+    property url osdCustomSource: ""
     property bool osdStruck: false
     property bool osdVisible: false
     property int brightLast: -1
@@ -51,6 +52,7 @@ Scope {
         const headphones = sinkLooksLikeHeadphones(sink)
         osdValue = muted ? 0 : vol
         osdIconName = volumeIconName(vol, headphones, muted)
+        osdCustomSource = ""
         osdStruck = muted && headphones
         osdVisible = true
         hideTimer.restart()
@@ -58,7 +60,8 @@ Scope {
 
     function showBrightness(value) {
         osdValue = Math.max(0, Math.min(1, value))
-        osdIconName = "brightnesssettings"
+        osdIconName = ""
+        osdCustomSource = Qt.resolvedUrl("assets/brightness-sun.svg")
         osdStruck = false
         osdVisible = true
         hideTimer.restart()
@@ -79,16 +82,25 @@ Scope {
     Process {
         id: brightMaxProc
         running: true
-        command: ["bash", "-lc", "brightnessctl -m max 2>/dev/null || echo 255"]
+        command: ["bash", "-lc", "~/.config/hypr/scripts/qs-brightness.sh max"]
         stdout: StdioCollector {
-            onStreamFinished: root.brightMax = parseInt(text.trim() || "255", 10) || 255
+            onStreamFinished: root.brightMax = parseInt(text.trim() || "100", 10) || 100
         }
     }
 
+    // Watch brightness cache written by qs-brightness.sh (never poll ddcutil).
     Process {
         id: brightWatch
         running: true
-        command: ["bash", "-lc", "while true; do brightnessctl -m get 2>/dev/null || echo 0; sleep 0.5; done"]
+        command: [
+            "bash", "-lc",
+            "while true; do "
+                + "for f in \"$XDG_RUNTIME_DIR/rice/brightness.pct\" \"$HOME/.cache/rice/brightness.pct\"; do "
+                + "if [ -f \"$f\" ]; then cat \"$f\"; break; fi; "
+                + "done || echo 0; "
+                + "sleep 0.5; "
+                + "done"
+        ]
         stdout: SplitParser {
             onRead: data => {
                 const v = parseInt(String(data).trim(), 10)
@@ -140,6 +152,7 @@ Scope {
                     RiceIcon {
                         name: root.osdIconName
                         fallback: "audio-volume-high"
+                        customSource: root.osdCustomSource
                         struck: root.osdStruck
                         implicitSize: 22
                         Layout.preferredWidth: 22
