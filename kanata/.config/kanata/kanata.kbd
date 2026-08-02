@@ -1,12 +1,16 @@
-;; Home row mods (Ctrl Alt Super Shift) + Caps as Esc/Ctrl
+;; Linux kanata config (Mac will use a separate file later, e.g. kanata.macos.kbd)
 ;;
-;; Left:  A=Ctrl  S=Alt  D=Super  F=Shift
-;; Right: J=Shift  K=Super  L=Alt  ;=Ctrl
+;; Home row mods — finger-compatible with Mac Cmd muscle memory:
+;;   Mac:   A=Ctrl  S=Opt   D=Cmd   F=Shift
+;;   Linux: A=Super S=Alt   D=Ctrl  F=Shift
+;; So ring finger (D) stays the "primary" mod: Cmd on Mac, Ctrl on Linux.
+;;
+;; Left:  A=Super  S=Alt  D=Ctrl  F=Shift
+;; Right: J=Shift  K=Ctrl  L=Alt  ;=Super
 ;; Caps:  tap=Esc, hold=Ctrl
 ;;
-;; tap-hold-release: action decided on release — better for typing rolls.
-;; Tune $tap-time / $hold-time if letters accidentally become mods (raise hold)
-;; or mods feel laggy (lower hold).
+;; Tip: disable HRM in Vial on this machine — let kanata own the holds.
+;; Tune $tap-time / $hold-time if letters become mods (raise hold) or mods lag (lower).
 
 (defcfg
   process-unmapped-keys yes
@@ -29,20 +33,20 @@
 (defalias
   caps (tap-hold $tap-time $hold-time esc lctl)
 
-  ;; home row mods: Ctrl Alt Super Shift
-  ctl  (tap-hold-release $tap-time $hold-time a lctl)
+  ;; home row mods: Super Alt Ctrl Shift (Linux)
+  met  (tap-hold-release $tap-time $hold-time a lmet)
   alt  (tap-hold-release $tap-time $hold-time s lalt)
-  met  (tap-hold-release $tap-time $hold-time d lmet)
+  ctl  (tap-hold-release $tap-time $hold-time d lctl)
   sft  (tap-hold-release $tap-time $hold-time f lsft)
 
   rsft (tap-hold-release $tap-time $hold-time j rsft)
-  rmet (tap-hold-release $tap-time $hold-time k rmet)
+  rctl (tap-hold-release $tap-time $hold-time k rctl)
   ralt (tap-hold-release $tap-time $hold-time l ralt)
-  rctl (tap-hold-release $tap-time $hold-time scln rctl)
+  rmet (tap-hold-release $tap-time $hold-time scln rmet)
 )
 
 (deflayer base
   @caps
-  @ctl @alt @met @sft
-  @rsft @rmet @ralt @rctl
+  @met @alt @ctl @sft
+  @rsft @rctl @ralt @rmet
 )

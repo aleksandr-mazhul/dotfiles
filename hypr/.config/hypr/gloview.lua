@@ -36,6 +36,7 @@ hl.config({
     },
 })
 
+-- Mac Mission Control: Ctrl+↑ (not Super)
 hl.bind("CTRL + UP", hl.plugin.gloview.toggle)
 hl.bind("CTRL + DOWN", hl.plugin.gloview.close)
 hl.bind("CTRL + LEFT", hl.plugin.gloview.prev)

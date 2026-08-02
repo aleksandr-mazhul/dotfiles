@@ -1,6 +1,7 @@
 -- Hyprland 0.56 Lua config (converted from hyprland.conf)
 
 hl.plugin.load("/home/stranger/.local/lib/hypr/gloview.so")
+hl.plugin.load("/home/stranger/.local/lib/hypr/dynamic-cursors.so")
 
 require("monitors")
 require("workspaces")
@@ -76,7 +77,7 @@ hl.config({
 
     misc = {
         force_default_wallpaper = -1,
-        disable_hyprland_logo = false,
+        disable_hyprland_logo = true,
         allow_session_lock_restore = true,
     },
 
@@ -90,10 +91,16 @@ hl.config({
         kb_layout = "us,ru",
         kb_variant = "",
         kb_model = "",
-        kb_options = "grp:win_space_toggle",
+        -- Win+Space = RuEn default; Ctrl+Space = RuEn when Mac mode is on
+        kb_options = "grp:win_space_toggle,grp:ctrl_space_toggle",
         kb_rules = "",
         follow_mouse = 1,
-        sensitivity = 0,
+        -- Mac-like key repeat: brightness hold ramps ~16 steps without feeling frantic
+        repeat_rate = 25,
+        repeat_delay = 250,
+        -- Mac-like: slower base speed + adaptive accel (precise slow, faster flicks)
+        sensitivity = -0.72,
+        accel_profile = "adaptive",
         touchpad = {
             natural_scroll = false,
         },
@@ -123,13 +130,26 @@ hl.animation({ leaf = "fadeLayersOut", enabled = false })
 hl.animation({ leaf = "workspaces", enabled = true, speed = 4.2, bezier = "easeOutQuint", style = "slide" })
 hl.animation({ leaf = "workspacesIn", enabled = true, speed = 4.2, bezier = "easeOutQuint", style = "slide" })
 hl.animation({ leaf = "workspacesOut", enabled = true, speed = 4.2, bezier = "easeOutQuint", style = "slide" })
-hl.animation({ leaf = "zoomFactor", enabled = true, speed = 7, bezier = "quick" })
+-- Instant cursor zoom (shake-to-find); animation made grow/shrink feel sluggish
+hl.animation({ leaf = "zoomFactor", enabled = false })
 
 hl.gesture({ fingers = 3, direction = "horizontal", action = "workspace" })
 
+-- Per-device overrides (names from `hyprctl devices`)
 hl.device({
     name = "epic-mouse-v1",
-    sensitivity = -0.5,
+    sensitivity = -0.72,
+    accel_profile = "adaptive",
+})
+hl.device({
+    name = "compx-vgn-dragonfly-4k-receiver-1",
+    sensitivity = -0.72,
+    accel_profile = "adaptive",
+})
+hl.device({
+    name = "ergohaven-k:03-v3/v4-mouse",
+    sensitivity = -0.72,
+    accel_profile = "adaptive",
 })
 
 hl.on("hyprland.start", function()
@@ -137,13 +157,15 @@ hl.on("hyprland.start", function()
     hl.exec_cmd("~/.config/hypr/scripts/vpn-autostart.sh")
     -- Rice owns notifications; stop swaync if it grabbed the bus.
     hl.exec_cmd("systemctl --user stop swaync.service")
-    hl.exec_cmd("qs -c rice -n -d")
-    hl.exec_cmd("hyprpolkitagent")
+    -- Wallpaper before UI so the bar never paints over the default logo/flash.
     hl.exec_cmd("swww-daemon")
     hl.exec_cmd("waypaper --restore")
+    hl.exec_cmd("qs -c rice -n -d")
+    hl.exec_cmd("hyprpolkitagent")
     hl.exec_cmd("hypridle")
     hl.exec_cmd("wl-paste --type text --watch cliphist store")
     hl.exec_cmd("wl-paste --type image --watch cliphist store")
+    -- OCR models are heavy; script defers ~25s so login stays snappy.
     hl.exec_cmd("~/.config/hypr/scripts/ocr-daemon-start.sh")
     hl.exec_cmd("xrdb -merge ~/.Xresources")
     hl.exec_cmd("~/.config/hypr/scripts/session-autostart.sh")
@@ -154,5 +176,6 @@ end)
 
 require("colors-matugen")
 require("gloview")
+require("dynamic-cursors")
 require("binds")
 require("rules")

@@ -40,10 +40,11 @@ hl.window_rule({
     opacity = "1.0 override",
 })
 
+-- Bound apps switch focus to their workspace (no silent).
 hl.window_rule({
     name = "telegram-to-T",
     match = { class = "org.telegram.desktop" },
-    workspace = "3 silent",
+    workspace = "3",
 })
 
 -- Media viewer shares Telegram's class; keep it on the current workspace
@@ -59,11 +60,5 @@ hl.window_rule({
 hl.window_rule({
     name = "cursor-to-C",
     match = { class = "^(cursor|Cursor)$" },
-    workspace = "7 silent",
-})
-
-hl.window_rule({
-    name = "kitty-to-Z",
-    match = { class = "^(kitty)$" },
-    workspace = "5 silent",
+    workspace = "7",
 })
