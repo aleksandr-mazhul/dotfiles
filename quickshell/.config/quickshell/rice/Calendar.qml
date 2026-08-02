@@ -13,6 +13,7 @@ PanelWindow {
     property int viewMonth: new Date().getMonth()
     property int selectedDay: new Date().getDate()
     property var eventDays: ({}) // { "1": ["work","home"], ... }
+    property int eventDaysRev: 0
     property var events: []
     property var calColors: ({
         home: "#34AADC",
@@ -67,6 +68,8 @@ PanelWindow {
     }
 
     function monthCells() {
+        // Depend on eventDaysRev so the grid rebuilds when markers arrive.
+        void root.eventDaysRev
         const first = new Date(viewYear, viewMonth, 1)
         const start = (first.getDay() + 6) % 7
         const daysInMonth = new Date(viewYear, viewMonth + 1, 0).getDate()
@@ -74,9 +77,17 @@ PanelWindow {
         const isCurrentMonth = today.getFullYear() === viewYear && today.getMonth() === viewMonth
         const cells = []
         for (let i = 0; i < start; i++)
-            cells.push({ day: 0, today: false })
-        for (let d = 1; d <= daysInMonth; d++)
-            cells.push({ day: d, today: isCurrentMonth && d === today.getDate() })
+            cells.push({ day: 0, today: false, cals: [] })
+        for (let d = 1; d <= daysInMonth; d++) {
+            const key = String(d)
+            const raw = root.eventDays ? root.eventDays[key] : null
+            const cals = Array.isArray(raw) ? raw.slice(0, 3) : []
+            cells.push({
+                day: d,
+                today: isCurrentMonth && d === today.getDate(),
+                cals: cals
+            })
+        }
         return cells
     }
 
@@ -136,21 +147,25 @@ PanelWindow {
     }
 
     function dayCals(day) {
-        const v = root.eventDays[String(day)]
+        void root.eventDaysRev
+        const v = root.eventDays ? root.eventDays[String(day)] : null
         return Array.isArray(v) ? v : []
     }
 
     function refreshColors() {
+        colorsProc.running = false
         colorsProc.running = true
     }
 
     function refreshMonth() {
+        daysProc.running = false
         daysProc.command = ["bash", root.script, "days", root.monthKey()]
         daysProc.running = true
         refreshEvents()
     }
 
     function refreshEvents() {
+        eventsProc.running = false
         eventsProc.command = ["bash", root.script, "events", root.selectedIso()]
         eventsProc.running = true
     }
@@ -158,6 +173,7 @@ PanelWindow {
     function syncAndRefresh() {
         busy = true
         statusText = "Syncing…"
+        syncProc.running = false
         syncProc.running = true
     }
 
@@ -262,6 +278,8 @@ PanelWindow {
         if (open) {
             OverlayHub.closeAll()
             refreshColors()
+            // Local markers first, then sync pulls remote updates.
+            refreshMonth()
             syncAndRefresh()
             watchProc.running = true
             openAnim.play()
@@ -452,16 +470,22 @@ PanelWindow {
                         id: cell
                         required property var modelData
                         Layout.fillWidth: true
-                        Layout.preferredHeight: 38
+                        Layout.preferredHeight: 40
                         visible: modelData.day > 0
 
                         readonly property bool selected: modelData.day === root.selectedDay
-                        readonly property var cals: root.dayCals(modelData.day)
+                        readonly property var cals: {
+                            // Prefer baked-in model data; fall back to live map.
+                            const baked = modelData.cals
+                            if (Array.isArray(baked) && baked.length)
+                                return baked
+                            return root.dayCals(modelData.day)
+                        }
 
                         Rectangle {
                             anchors.horizontalCenter: parent.horizontalCenter
                             anchors.verticalCenter: parent.verticalCenter
-                            anchors.verticalCenterOffset: -3
+                            anchors.verticalCenterOffset: -4
                             width: 28
                             height: 28
                             radius: 14
@@ -479,24 +503,25 @@ PanelWindow {
                             }
                         }
 
-                        // Apple-style colored dots / split capsule
+                        // Apple-style event markers under the day number
                         Row {
+                            id: dots
                             anchors.horizontalCenter: parent.horizontalCenter
                             anchors.bottom: parent.bottom
-                            anchors.bottomMargin: 1
-                            spacing: cell.cals.length > 2 ? 1 : 2
+                            anchors.bottomMargin: 2
+                            spacing: cell.cals.length > 1 ? 1 : 0
                             visible: cell.cals.length > 0
+                            z: 2
 
                             Repeater {
-                                model: cell.cals.slice(0, 3)
+                                model: cell.cals
 
                                 Rectangle {
-                                    required property string modelData
-                                    required property int index
-                                    width: cell.cals.length === 1 ? 6 : (cell.cals.length === 2 ? 7 : 5)
-                                    height: cell.cals.length === 1 ? 6 : 5
+                                    required property var modelData
+                                    width: cell.cals.length === 1 ? 6 : 5
+                                    height: 5
                                     radius: height / 2
-                                    color: root.calAccent(modelData)
+                                    color: root.calAccent(String(modelData))
                                 }
                             }
                         }
@@ -1017,11 +1042,17 @@ PanelWindow {
         stdout: StdioCollector {
             onStreamFinished: {
                 try {
-                    const obj = JSON.parse(text.trim() || "{}")
+                    const raw = text.trim()
+                    // Tolerate any noise before/after the JSON object.
+                    const start = raw.indexOf("{")
+                    const end = raw.lastIndexOf("}")
+                    const slice = (start >= 0 && end > start) ? raw.slice(start, end + 1) : "{}"
+                    const obj = JSON.parse(slice)
                     root.eventDays = obj && typeof obj === "object" ? obj : {}
                 } catch (e) {
                     root.eventDays = {}
                 }
+                root.eventDaysRev++
             }
         }
     }

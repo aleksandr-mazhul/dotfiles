@@ -58,11 +58,11 @@ PanelWindow {
     function show() {
         OverlayHub.closeOthers(root)
         open = true
-        selectedIndex = 0
         searchField.text = ""
         typeFilter = "all"
         filterMenuOpen = false
         markedLines = []
+        selectedIndex = 0
         refreshList()
         openAnim.play()
         dimAnim.from = 0
@@ -153,6 +153,10 @@ PanelWindow {
     function applyFilter() {
         const q = searchField.text.trim().toLowerCase()
         let base = items.slice()
+
+        // Newest first (cliphist ids grow over time). Mixed text+image by time.
+        base.sort((a, b) => (parseInt(b.id, 10) || 0) - (parseInt(a.id, 10) || 0))
+
         if (typeFilter === "image")
             base = base.filter(it => it.isImage)
         else if (typeFilter === "text")
@@ -167,15 +171,16 @@ PanelWindow {
 
         filtered = base
         rebuildListModel()
-        clampSelection()
+        selectNewest()
     }
 
     function rebuildListModel() {
         const rows = []
+        // Raycast-style: Today / Yesterday / N days ago / date blocks
         let lastGroup = ""
         for (let i = 0; i < filtered.length; i++) {
             const it = filtered[i]
-            const group = it.dayGroup || "Recent"
+            const group = it.dayGroup || "Today"
             if (group !== lastGroup) {
                 rows.push({ kind: "header", title: group })
                 lastGroup = group
@@ -183,9 +188,24 @@ PanelWindow {
             rows.push({ kind: "item", item: it })
         }
         listModel = rows
-        // Keep selection on first item row
-        if (selectedIndex >= listModel.length || selectedIndex < 0 || (listModel[selectedIndex] && listModel[selectedIndex].kind !== "item"))
-            selectedIndex = firstItemIndex()
+    }
+
+    function selectNewest() {
+        selectedIndex = firstItemIndex()
+        // Keep "Today" header in view — anchoring on the first item scrolls it away.
+        scrollToTop.restart()
+    }
+
+    Timer {
+        id: scrollToTop
+        interval: 16
+        repeat: false
+        onTriggered: {
+            if (!listView)
+                return
+            listView.positionViewAtBeginning()
+            listView.contentY = 0
+        }
     }
 
     function firstItemIndex() {
@@ -292,8 +312,6 @@ PanelWindow {
         typeFilter = value
         filterMenuOpen = false
         applyFilter()
-        selectedIndex = firstItemIndex()
-        listView.positionViewAtIndex(selectedIndex, ListView.Beginning)
         searchField.forceActiveFocus()
     }
 
@@ -555,6 +573,8 @@ PanelWindow {
                     spacing: 2
                     model: root.listModel
                     currentIndex: root.selectedIndex
+                    // Don't auto-scroll to current item — that hides the Today header above it.
+                    highlightFollowsCurrentItem: false
                     boundsBehavior: Flickable.StopAtBounds
 
                     delegate: Item {
@@ -566,13 +586,16 @@ PanelWindow {
                         Text {
                             visible: modelData.kind === "header"
                             anchors.left: parent.left
-                            anchors.leftMargin: 16
+                            anchors.leftMargin: 14
+                            anchors.right: parent.right
+                            anchors.rightMargin: 14
                             anchors.verticalCenter: parent.verticalCenter
                             text: modelData.title || ""
                             color: Theme.textMuted
                             font.family: Theme.fontFamily
                             font.pixelSize: Theme.fontSizeSm
                             font.bold: true
+                            elide: Text.ElideRight
                         }
 
                         Rectangle {

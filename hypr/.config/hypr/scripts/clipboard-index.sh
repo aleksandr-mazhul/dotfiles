@@ -197,8 +197,9 @@ def fmt_bytes(n: int) -> str:
     return f"{n / 1024 / 1024:.1f} MB"
 
 def day_bucket(mtime: int) -> str:
+    """Relative day label for Raycast-style section headers."""
     if not mtime:
-        return "Recent"
+        return "Today"
     now = datetime.now().date()
     d = datetime.fromtimestamp(mtime).date()
     delta = (now - d).days
@@ -206,9 +207,11 @@ def day_bucket(mtime: int) -> str:
         return "Today"
     if delta == 1:
         return "Yesterday"
+    if delta == 2:
+        return "2 days ago"
     if delta < 7:
-        return "This week"
-    return d.strftime("%Y-%m-%d")
+        return f"{delta} days ago"
+    return d.strftime("%d.%m.%Y")
 
 items = []
 for line in cliphist_list():
@@ -232,7 +235,8 @@ for line in cliphist_list():
         "sizeLabel": "",
         "mtime": 0,
         "mtimeLabel": "",
-        "dayGroup": "Recent",
+        "dayGroup": "Today",
+        "isToday": True,
         "thumb": "",
         "previewPath": "",
         "dimsLabel": "",
@@ -249,6 +253,7 @@ for line in cliphist_list():
         item["mtime"] = int(info.get("mtime") or 0)
         item["mtimeLabel"] = info.get("mtime_label") or ""
         item["dayGroup"] = day_bucket(item["mtime"])
+        item["isToday"] = item["dayGroup"] == "Сегодня"
         item["thumb"] = info.get("thumb") or ""
         item["previewPath"] = info.get("preview_path") or item["thumb"]
         item["dimsLabel"] = info.get("dims_label") or (f"{w}×{h}" if w and h else "")
@@ -260,9 +265,24 @@ for line in cliphist_list():
             text = text[:87] + "…"
         item["label"] = text or "Text"
         item["preview"] = text
-        item["dayGroup"] = "Recent"
 
     items.append(item)
+
+# Newest first — id grows monotonically with copy time
+items.sort(key=lambda it: int(it.get("id") or 0), reverse=True)
+
+# Propagate known image mtimes down the stack so neighboring text gets a day label.
+# (cliphist itself does not store timestamps.)
+carry_mtime = 0
+for it in items:
+    if it.get("mtime"):
+        carry_mtime = int(it["mtime"])
+    elif carry_mtime:
+        it["mtime"] = carry_mtime
+        it["mtimeLabel"] = datetime.fromtimestamp(carry_mtime).strftime("%Y-%m-%d %H:%M")
+    group = day_bucket(int(it.get("mtime") or 0))
+    it["dayGroup"] = group
+    it["isToday"] = group == "Today"
 
 json.dump({"cache": str(cache), "items": items}, sys.stdout, ensure_ascii=False)
 PY
