@@ -2,7 +2,7 @@
 hl.config({
     general = {
         col = {
-            active_border = { colors = { "rgba({{ colors.primary.default.hex_stripped }}ee)", "rgba({{ colors.secondary.default.hex_stripped }}ee)" }, angle = 45 },
+            active_border = { colors = { "rgba(ffb688ee)", "rgba(e5bfa9ee)" }, angle = 45 },
             inactive_border = "rgba({{ colors.surface_variant.default.hex_stripped }}aa)",
         },
     },

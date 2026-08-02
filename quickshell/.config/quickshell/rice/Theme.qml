@@ -2,7 +2,7 @@ pragma Singleton
 import QtQuick
 
 // Semantic UI palette for all RicePanel overlays.
-// Keeps matugen accents, but forces readable contrast on dark panels.
+// Surfaces follow wallpaper; sand accents are pinned in Colors.qml.
 QtObject {
     // Surfaces — slightly elevated so rows separate from the panel
     readonly property color background: Colors.background
@@ -10,7 +10,7 @@ QtObject {
     readonly property color surfaceContainer: Colors.surface_container_high
     readonly property color surfaceVariant: Colors.surface_variant
 
-    // Accents from wallpaper
+    // Accents — warm sand palette (not wallpaper-derived)
     readonly property color primary: Colors.primary
     readonly property color secondary: Colors.secondary
     readonly property color error: Colors.error

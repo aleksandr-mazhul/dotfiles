@@ -1,0 +1,249 @@
+#!/usr/bin/env python3
+"""Post-process matugen outputs so text stays readable on every wallpaper.
+
+Runs after `matugen image …`. Guarantees WCAG-ish contrast for:
+  - Kitty fg / dim (color8) vs background  (higher bar: terminal is often translucent)
+  - Quickshell text / text_muted vs surface panels
+
+Never invents a new palette — only lightens failing foreground tones toward white
+while keeping hue when possible (HSL mix).
+"""
+from __future__ import annotations
+
+import re
+import sys
+import os
+from pathlib import Path
+
+CFG = Path(os.environ.get("XDG_CONFIG_HOME", Path.home() / ".config"))
+KITTY = CFG / "kitty" / "colors-matugen.conf"
+QS = CFG / "quickshell" / "rice" / "Colors.qml"
+
+# Transparent terminal mixes with wallpaper → need stronger contrast than opaque UI.
+KITTY_FG_MIN = 7.0
+KITTY_DIM_MIN = 5.0
+KITTY_ANSI_MIN = 3.5
+QS_TEXT_MIN = 7.0
+QS_MUTED_MIN = 4.5
+
+# Pinned by theme-warm-accents / matugen templates — contrast pass must not drift these
+KITTY_ACCENT_KEYS = frozenset({
+    "selection_foreground",
+    "selection_background",
+    "cursor",
+    "cursor_text_color",
+    "url_color",
+    "active_border_color",
+    "color2",
+    "color3",
+    "color4",
+    "color5",
+    "color6",
+    "color10",
+    "color11",
+    "color12",
+    "color13",
+    "color14",
+})
+
+
+def parse_hex(s: str) -> tuple[float, float, float]:
+    s = s.strip().lstrip("#")
+    if len(s) == 3:
+        s = "".join(c * 2 for c in s)
+    r, g, b = int(s[0:2], 16), int(s[2:4], 16), int(s[4:6], 16)
+    return r / 255.0, g / 255.0, b / 255.0
+
+
+def to_hex(rgb: tuple[float, float, float]) -> str:
+    r, g, b = [max(0, min(255, int(round(c * 255)))) for c in rgb]
+    return f"#{r:02x}{g:02x}{b:02x}"
+
+
+def _lin(c: float) -> float:
+    return c / 12.92 if c <= 0.04045 else ((c + 0.055) / 1.055) ** 2.4
+
+
+def rel_lum(rgb: tuple[float, float, float]) -> float:
+    r, g, b = rgb
+    return 0.2126 * _lin(r) + 0.7152 * _lin(g) + 0.0722 * _lin(b)
+
+
+def contrast(a: tuple[float, float, float], b: tuple[float, float, float]) -> float:
+    la, lb = rel_lum(a), rel_lum(b)
+    lighter, darker = max(la, lb), min(la, lb)
+    return (lighter + 0.05) / (darker + 0.05)
+
+
+def lerp(a: tuple[float, float, float], b: tuple[float, float, float], t: float):
+    return tuple(x + (y - x) * t for x, y in zip(a, b))
+
+
+def ensure_on_bg(
+    fg: tuple[float, float, float],
+    bg: tuple[float, float, float],
+    min_ratio: float,
+    *,
+    toward: tuple[float, float, float] | None = None,
+) -> tuple[float, float, float]:
+    """Lighten (or darken) fg until contrast vs bg is enough."""
+    if contrast(fg, bg) >= min_ratio:
+        return fg
+
+    # Dark UI → push toward white; light UI → toward black
+    if toward is None:
+        toward = (1.0, 1.0, 1.0) if rel_lum(bg) < 0.5 else (0.0, 0.0, 0.0)
+
+    best = fg
+    for i in range(1, 41):
+        cand = lerp(fg, toward, i / 40.0)
+        if contrast(cand, bg) >= min_ratio:
+            return cand
+        best = cand
+    return best
+
+
+def fix_kitty(path: Path) -> bool:
+    if not path.is_file():
+        return False
+    text = path.read_text()
+    colors: dict[str, str] = {}
+    for m in re.finditer(r"^([A-Za-z0-9_]+)\s+(#[0-9A-Fa-f]{3,8})\s*$", text, re.M):
+        colors[m.group(1)] = m.group(2).lower()
+
+    if "background" not in colors or "foreground" not in colors:
+        return False
+
+    bg = parse_hex(colors["background"])
+    changed = False
+
+    def setc(key: str, rgb: tuple[float, float, float]):
+        nonlocal changed
+        hx = to_hex(rgb)
+        if colors.get(key, "").lower() != hx:
+            colors[key] = hx
+            changed = True
+
+    setc("foreground", ensure_on_bg(parse_hex(colors["foreground"]), bg, KITTY_FG_MIN))
+
+    # Dim / labels (color8) — the usual "blends with wallpaper" offender
+    for key, need in (
+        ("color8", KITTY_DIM_MIN),
+        ("color7", KITTY_DIM_MIN),
+        ("inactive_border_color", KITTY_ANSI_MIN),
+    ):
+        if key in colors:
+            setc(key, ensure_on_bg(parse_hex(colors[key]), bg, need))
+
+    # Error reds only — warm sand accents are pinned and must not drift
+    for key in ("color1", "color9"):
+        if key in colors:
+            setc(key, ensure_on_bg(parse_hex(colors[key]), bg, KITTY_ANSI_MIN))
+
+    for key in KITTY_ACCENT_KEYS:
+        pass  # pinned sand accents — intentionally not adjusted here
+
+    # selection / cursor label contrast (skip pinned sand pairs)
+    if (
+        "selection_foreground" not in KITTY_ACCENT_KEYS
+        and "selection_foreground" in colors
+        and "selection_background" in colors
+    ):
+        sbg = parse_hex(colors["selection_background"])
+        setc(
+            "selection_foreground",
+            ensure_on_bg(parse_hex(colors["selection_foreground"]), sbg, 4.5),
+        )
+    if (
+        "cursor_text_color" not in KITTY_ACCENT_KEYS
+        and "cursor_text_color" in colors
+        and "cursor" in colors
+    ):
+        setc(
+            "cursor_text_color",
+            ensure_on_bg(parse_hex(colors["cursor_text_color"]), parse_hex(colors["cursor"]), 4.5),
+        )
+
+    if not changed:
+        return False
+
+    def repl(m: re.Match) -> str:
+        key = m.group(1)
+        if key in colors:
+            return f"{key}{' ' * max(1, len(m.group(0)) - len(key) - len(colors[key]) - 1)}{colors[key]}"
+        return m.group(0)
+
+    # Simpler rewrite: replace known keys line-by-line
+    out_lines = []
+    for line in text.splitlines():
+        m = re.match(r"^([A-Za-z0-9_]+)(\s+)(#[0-9A-Fa-f]{3,8})\s*$", line)
+        if m and m.group(1) in colors:
+            key, ws = m.group(1), m.group(2)
+            out_lines.append(f"{key}{ws}{colors[key]}")
+        else:
+            out_lines.append(line)
+    path.write_text("\n".join(out_lines) + ("\n" if text.endswith("\n") else ""))
+    return True
+
+
+def fix_quickshell(path: Path) -> bool:
+    if not path.is_file():
+        return False
+    text = path.read_text()
+
+    def grab(name: str) -> str | None:
+        m = re.search(rf'readonly property color {name}:\s*"?(#[0-9A-Fa-f]{{6}})"?', text)
+        return m.group(1) if m else None
+
+    surface = grab("surface") or grab("background")
+    text_c = grab("text")
+    muted = grab("text_muted")
+    if not surface or not text_c:
+        return False
+
+    bg = parse_hex(surface)
+    changed = False
+
+    def put(name: str, rgb: tuple[float, float, float]):
+        nonlocal text, changed
+        hx = to_hex(rgb)
+        m = re.search(
+            rf'readonly property color {name}:\s*"(#[0-9A-Fa-f]{{6}})"',
+            text,
+        )
+        if not m or m.group(1).lower() == hx:
+            return
+        text = re.sub(
+            rf'(readonly property color {name}:\s*")(#[0-9A-Fa-f]{{6}})(")',
+            rf"\1{hx}\3",
+            text,
+            count=1,
+        )
+        changed = True
+
+    put("text", ensure_on_bg(parse_hex(text_c), bg, QS_TEXT_MIN))
+    if muted:
+        put("text_muted", ensure_on_bg(parse_hex(muted), bg, QS_MUTED_MIN))
+
+    # primary/secondary are pinned by theme-warm-accents — don't shift accent hues
+
+    if changed:
+        path.write_text(text)
+    return changed
+
+
+def main() -> int:
+    fixed = []
+    if fix_kitty(KITTY):
+        fixed.append("kitty")
+    if fix_quickshell(QS):
+        fixed.append("quickshell")
+    if fixed:
+        print("theme-ensure-contrast: fixed " + ", ".join(fixed))
+    else:
+        print("theme-ensure-contrast: ok (no changes)")
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

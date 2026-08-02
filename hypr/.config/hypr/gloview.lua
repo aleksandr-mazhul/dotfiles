@@ -36,7 +36,7 @@ hl.config({
     },
 })
 
--- Mission Control: Super+↑ (Cmd on Mac keyboards via kanata)
+-- Mission Control: Super+↑ (Super+arrows free — text nav is Alt/Ctrl via kanata)
 hl.bind("SUPER + UP", hl.plugin.gloview.toggle)
 hl.bind("SUPER + DOWN", hl.plugin.gloview.close)
 hl.bind("SUPER + LEFT", hl.plugin.gloview.prev)

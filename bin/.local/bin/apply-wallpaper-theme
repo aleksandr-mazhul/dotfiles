@@ -1,5 +1,8 @@
 #!/usr/bin/env bash
-# Apply wallpaper theme colors via matugen after Waypaper changes wallpaper
+# Apply wallpaper theme colors via matugen after Waypaper changes wallpaper.
+#
+# Pipeline: matugen (surfaces from wallpaper) → theme-warm-accents (sand UI chrome)
+#           → theme-ensure-contrast (text readability only; accents stay sand).
 set -euo pipefail
 
 wallpaper="${1:-}"
@@ -14,16 +17,36 @@ fi
 cfg="${XDG_CONFIG_HOME:-$HOME/.config}"
 sddm_theme="/usr/share/sddm/themes/adaptive"
 sddm_cache="$cfg/sddm-adaptive"
+# Resolve next to this script (works via symlink from ~/.local/bin)
+self_dir="$(cd "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")" && pwd)"
+ensure_contrast="${self_dir}/theme-ensure-contrast"
+warm_accents="${self_dir}/theme-warm-accents"
 
 mkdir -p "$sddm_cache"
 
 # Keep hyprlock background in sync with desktop wallpaper
 ln -sfn "$wallpaper" "$cfg/hypr/lock-wallpaper"
 
-# Cache login assets in home, then push into SDDM theme if writable
-cp -f "$wallpaper" "$sddm_cache/background.jpg"
+# Higher matugen contrast → safer Material roles out of the box; post-pass
+# still hardens Kitty/Quickshell against translucent terminals + wild wallpapers.
+matugen image "$wallpaper" \
+  --mode dark \
+  --type scheme-tonal-spot \
+  --contrast 0.35 \
+  --prefer saturation
 
-matugen image "$wallpaper" --mode dark --type scheme-tonal-spot --prefer saturation
+# Pin warm sand/beige accents (wallpaper hue must not drive primary/secondary)
+if [[ -x "$warm_accents" ]]; then
+  "$warm_accents" || true
+fi
+
+# Auto-fix fg/dim/ANSI contrast (no per-wallpaper cfg edits)
+if [[ -x "$ensure_contrast" ]]; then
+  "$ensure_contrast" || true
+fi
+
+# SDDM cache is best-effort — must not abort the theme pipeline above
+cp -f "$wallpaper" "$sddm_cache/background.jpg" 2>/dev/null || true
 
 if [[ -d "$sddm_theme" && -w "$sddm_theme" ]]; then
   cp -f "$sddm_cache/background.jpg" "$sddm_theme/background.jpg"

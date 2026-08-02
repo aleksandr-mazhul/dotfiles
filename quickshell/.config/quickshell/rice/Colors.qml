@@ -4,17 +4,18 @@ pragma Singleton
 import QtQuick
 
 QtObject {
-    readonly property color background: "#19120d"
-    readonly property color surface: "#19120d"
-    readonly property color surface_container: "#261e19"
-    readonly property color surface_container_high: "#312823"
-    readonly property color surface_variant: "#52443c"
+    readonly property color background: "#0e1415"
+    readonly property color surface: "#0e1415"
+    readonly property color surface_container: "#202628"
+    readonly property color surface_container_high: "#2b3132"
+    readonly property color surface_variant: "#3f484a"
+    // Sand accent palette — locked; surfaces/text follow wallpaper
     readonly property color primary: "#ffb688"
     readonly property color secondary: "#e5bfa9"
-    readonly property color text: "#f0dfd7"
-    readonly property color text_muted: "#d7c3b8"
+    readonly property color text: "#f7fcfe"
+    readonly property color text_muted: "#c4cdcf"
     readonly property color text_on_primary: "#512400"
-    readonly property color outline: "#9f8d83"
-    readonly property color outline_variant: "#52443c"
-    readonly property color error: "#ffb4ab"
+    readonly property color outline: "#c4a882"
+    readonly property color outline_variant: "#747d7f"
+    readonly property color error: "#ffbbb3"
 }

@@ -1,0 +1,236 @@
+#!/usr/bin/env python3
+"""Force warm sand/beige accent colors after matugen wallpaper theming.
+
+Surfaces/background stay wallpaper-derived; primary/secondary accents are pinned
+to the palette loved in commit 8aeb6f4 so forest/green wallpapers don't shift
+accents to cyan/green.
+"""
+from __future__ import annotations
+
+import re
+import sys
+import os
+from pathlib import Path
+
+CFG = Path(os.environ.get("XDG_CONFIG_HOME", Path.home() / ".config"))
+
+# Loved sand palette (matugen scheme-tonal-spot from warm wallpaper, 8aeb6f4)
+PRIMARY = "#ffb688"
+SECONDARY = "#e5bfa9"
+ON_PRIMARY = "#512400"
+PRIMARY_CONTAINER = "#6e380f"
+TERTIARY = "#cac993"
+OUTLINE_ACCENT = "#c4a882"
+
+STRIP = {
+    PRIMARY: PRIMARY.lstrip("#"),
+    SECONDARY: SECONDARY.lstrip("#"),
+    ON_PRIMARY: ON_PRIMARY.lstrip("#"),
+    PRIMARY_CONTAINER: PRIMARY_CONTAINER.lstrip("#"),
+    TERTIARY: TERTIARY.lstrip("#"),
+}
+
+
+def patch_quickshell(path: Path) -> bool:
+    if not path.is_file():
+        return False
+    text = path.read_text()
+    repl = {
+        r'(readonly property color primary:\s*")#[0-9a-fA-F]{6}(")': rf"\1{PRIMARY}\2",
+        r'(readonly property color secondary:\s*")#[0-9a-fA-F]{6}(")': rf"\1{SECONDARY}\2",
+        r'(readonly property color text_on_primary:\s*")#[0-9a-fA-F]{6}(")': rf"\1{ON_PRIMARY}\2",
+        r'(readonly property color outline:\s*")#[0-9a-fA-F]{6}(")': rf"\1{OUTLINE_ACCENT}\2",
+    }
+    out = text
+    for pat, sub in repl.items():
+        out = re.sub(pat, sub, out, count=1)
+    if out != text:
+        path.write_text(out)
+        return True
+    return False
+
+
+def patch_hypr(path: Path) -> bool:
+    if not path.is_file():
+        return False
+    text = path.read_text()
+    out = text
+    out = re.sub(
+        r'"rgba\([0-9a-fA-F]{8}\)", "rgba\([0-9a-fA-F]{8}\)"',
+        f'"rgba({STRIP[PRIMARY]}ee)", "rgba({STRIP[SECONDARY]}ee)"',
+        out,
+    )
+    out = re.sub(
+        r'border_locked_active = "rgba\([0-9a-fA-F]{8}\)"',
+        f'border_locked_active = "rgba({STRIP[TERTIARY]}ee)"',
+        out,
+    )
+    out = re.sub(
+        r'text_color = "rgba\([0-9a-fA-F]{8}\)"',
+        f'text_color = "rgba({STRIP[ON_PRIMARY]}00)"',
+        out,
+    )
+    out = re.sub(
+        r'active = "rgba\([0-9a-fA-F]{8}\)"',
+        f'active = "rgba({STRIP[PRIMARY]}ff)"',
+        out,
+    )
+    out = re.sub(
+        r'inactive = "rgba\([0-9a-fA-F]{8}\)"',
+        f'inactive = "rgba({STRIP[PRIMARY_CONTAINER]}cc)"',
+        out,
+    )
+    out = re.sub(
+        r'locked_active = "rgba\([0-9a-fA-F]{8}\)"',
+        f'locked_active = "rgba({STRIP[PRIMARY]}ff)"',
+        out,
+    )
+    out = re.sub(
+        r'locked_inactive = "rgba\([0-9a-fA-F]{8}\)"',
+        f'locked_inactive = "rgba({STRIP[PRIMARY_CONTAINER]}cc)"',
+        out,
+    )
+    if out != text:
+        path.write_text(out)
+        return True
+    return False
+
+
+def _set_kv_line(text: str, key: str, value: str) -> tuple[str, bool]:
+    pat = rf"^({re.escape(key)}\s+)#[0-9a-fA-F]{{3,8}}\s*$"
+    new_line = f"{key} {value}"
+    if re.search(pat, text, re.M):
+        out = re.sub(pat, new_line, text, count=1, flags=re.M)
+        return out, out != text
+    return text, False
+
+
+def patch_kitty(path: Path) -> bool:
+    if not path.is_file():
+        return False
+    text = path.read_text()
+    changed = False
+    for key, val in (
+        ("selection_foreground", ON_PRIMARY),
+        ("selection_background", PRIMARY),
+        ("cursor", PRIMARY),
+        ("cursor_text_color", ON_PRIMARY),
+        ("url_color", SECONDARY),
+        ("active_border_color", PRIMARY),
+        ("color2", SECONDARY),
+        ("color3", TERTIARY),
+        ("color4", PRIMARY),
+        ("color5", PRIMARY),
+        ("color6", SECONDARY),
+        ("color10", SECONDARY),
+        ("color11", TERTIARY),
+        ("color12", PRIMARY),
+        ("color13", PRIMARY),
+        ("color14", SECONDARY),
+    ):
+        text, c = _set_kv_line(text, key, val)
+        changed = changed or c
+    if changed:
+        path.write_text(text)
+    return changed
+
+
+def patch_css_vars(path: Path, pairs: list[tuple[str, str]]) -> bool:
+    if not path.is_file():
+        return False
+    text = path.read_text()
+    changed = False
+    for var, val in pairs:
+        pat = rf"({re.escape(var)}\s*)#[0-9a-fA-F]{{6}}"
+        if re.search(pat, text):
+            new = re.sub(pat, rf"\1{val}", text, count=1)
+            if new != text:
+                text = new
+                changed = True
+    if changed:
+        path.write_text(text)
+    return changed
+
+
+def patch_hyprlock(path: Path) -> bool:
+    if not path.is_file():
+        return False
+    text = path.read_text()
+    repl = {
+        r"(\$accent = rgba\()[0-9a-fA-F]{8}(ff\))": rf"\1{STRIP[PRIMARY]}\2",
+        r"(\$accent_dim = rgba\()[0-9a-fA-F]{8}(66\))": rf"\1{STRIP[PRIMARY]}\2",
+        r"(\$accent_glow = rgba\()[0-9a-fA-F]{8}(99\))": rf"\1{STRIP[PRIMARY]}\2",
+        r"(\$check = rgba\()[0-9a-fA-F]{8}(cc\))": rf"\1{STRIP[PRIMARY]}\2",
+        r"(\$caps = rgba\()[0-9a-fA-F]{8}(cc\))": rf"\1{STRIP[TERTIARY]}\2",
+    }
+    out = text
+    for pat, sub in repl.items():
+        out = re.sub(pat, sub, out, count=1)
+    if out != text:
+        path.write_text(out)
+        return True
+    return False
+
+
+def patch_kv_conf(path: Path, key: str, value: str) -> bool:
+    if not path.is_file():
+        return False
+    text = path.read_text()
+    pat = rf"^({re.escape(key)}=)#[0-9a-fA-F]{{6}}\s*$"
+    if not re.search(pat, text, re.M):
+        return False
+    out = re.sub(pat, rf"\1{value.lstrip('#')}" if "=" in key and key.endswith("=") else rf"\1{value}", text, count=1, flags=re.M)
+    # sddm uses accent= without #
+    out = re.sub(rf"^{re.escape(key)}=#[0-9a-fA-F]{{6}}\s*$", f"{key}={value}", out, count=1, flags=re.M)
+    if out != text:
+        path.write_text(out)
+        return True
+    return False
+
+
+def main() -> int:
+    fixed: list[str] = []
+
+    if patch_quickshell(CFG / "quickshell" / "rice" / "Colors.qml"):
+        fixed.append("quickshell")
+    if patch_hypr(CFG / "hypr" / "colors-matugen.lua"):
+        fixed.append("hypr")
+    if patch_kitty(CFG / "kitty" / "colors-matugen.conf"):
+        fixed.append("kitty")
+    if patch_css_vars(
+        CFG / "gtk-3.0" / "gtk.css",
+        [
+            ("@define-color accent_color", PRIMARY),
+            ("@define-color accent_bg_color", PRIMARY),
+            ("@define-color accent_fg_color", ON_PRIMARY),
+        ],
+    ):
+        fixed.append("gtk3")
+    if patch_css_vars(
+        CFG / "gtk-4.0" / "gtk.css",
+        [("@define-color accent_color", PRIMARY), ("@define-color accent_bg_color", PRIMARY), ("@define-color accent_fg_color", ON_PRIMARY)],
+    ):
+        fixed.append("gtk4")
+    if patch_css_vars(
+        CFG / "wofi" / "colors-matugen.css",
+        [
+            ("--wofi-primary:", PRIMARY),
+            ("--wofi-on-primary:", ON_PRIMARY),
+            ("--wofi-outline:", OUTLINE_ACCENT),
+        ],
+    ):
+        fixed.append("wofi")
+    if patch_hyprlock(CFG / "hypr" / "hyprlock-colors.conf"):
+        fixed.append("hyprlock")
+    if patch_kv_conf(CFG / "sddm-adaptive" / "colors.conf", "accent", PRIMARY):
+        fixed.append("sddm")
+
+    if fixed:
+        print("theme-warm-accents: applied sand accents to " + ", ".join(fixed))
+    else:
+        print("theme-warm-accents: ok (no changes)")
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

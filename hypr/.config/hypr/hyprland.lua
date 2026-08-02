@@ -75,6 +75,22 @@ hl.config({
         new_status = "master",
     },
 
+    -- Tabbed groups: native groupbar OFF — rice GroupStackBar draws an inset strip
+    group = {
+        auto_group = false,
+        drag_into_group = 0,
+        merge_groups_on_drag = false,
+        merge_groups_on_groupbar = false,
+        insert_after_current = true,
+        col = {
+            border_active = { colors = { "rgba(ffb688ee)", "rgba(e5bfa9ee)" }, angle = 45 },
+            border_inactive = "rgba(52443caa)",
+        },
+        groupbar = {
+            enabled = false,
+        },
+    },
+
     misc = {
         force_default_wallpaper = -1,
         disable_hyprland_logo = true,
@@ -85,6 +101,9 @@ hl.config({
         no_hardware_cursors = 1,
         enable_hyprcursor = true,
         sync_gsettings_theme = true,
+        -- Don't teleport the pointer to the newly focused window on keyboard focus
+        no_warps = true,
+        warp_on_change_workspace = 0,
     },
 
     input = {

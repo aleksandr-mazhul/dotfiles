@@ -9,14 +9,27 @@
 ;; Right: J=Shift  K=Ctrl  L=Alt  ;=Super
 ;; Caps:  tap=Esc, hold=Ctrl
 ;;
+;; Text navigation:
+;;   Alt/Opt + ←/→           word (→ Ctrl+←/→ via defoverrides; works in Telegram/Qt)
+;;   Ctrl/Cmd-finger + ←/→   line start/end
+;;   Ctrl/Cmd-finger + ↑/↓   document start/end
+;;   + Shift                 selection
+;;   Alt + Backspace/Delete  delete word
+;;
+;; Super+arrows stay free for Mission Control (GloView).
+;;
 ;; Tip: disable HRM in Vial on this machine — let kanata own the holds.
-;; Tune $tap-time / $hold-time if letters become mods (raise hold) or mods lag (lower).
 
 (defcfg
   process-unmapped-keys yes
   concurrent-tap-hold yes
-  ;; Optional: only the Ergohaven
-  ;; linux-dev /dev/input/by-id/usb-Ergohaven_K:03_v3_v4_vial:f64c2b3c-event-kbd
+  ;; Exact kbd nodes only — name filters still match duplicate HID interfaces
+  ;; (Ergohaven "… Keyboard", multiple Dragonfly nodes) and break Alt+arrows in Qt.
+  linux-dev (
+    /dev/input/by-id/usb-Ergohaven_K:03_v3_v4_vial:f64c2b3c-event-kbd
+    /dev/input/by-id/usb-Compx_VGN_Dragonfly_4K_Receiver-event-kbd
+    /dev/input/by-id/usb-SEMICO_USB_Gaming_Keyboard-event-kbd
+  )
 )
 
 (defvar
@@ -28,25 +41,70 @@
   caps
   a s d f
   j k l scln
+  lctl rctl
+  left right up down
 )
 
 (defalias
-  caps (tap-hold $tap-time $hold-time esc lctl)
+  ;; Ctrl held → line / document edges (must be a layer, not overrides:
+  ;; otherwise Alt→Ctrl+← would also become Home).
+  linebeg (unmod (lctl rctl) home)
+  lineend (unmod (lctl rctl) end)
+  docbeg  (unmod (lctl rctl) lctl home)
+  docend  (unmod (lctl rctl) lctl end)
+
+  plctl (multi lctl (layer-while-held mctl))
+  prctl (multi rctl (layer-while-held mctl))
+
+  caps (tap-hold $tap-time $hold-time esc @plctl)
 
   ;; home row mods: Super Alt Ctrl Shift (Linux)
   met  (tap-hold-release $tap-time $hold-time a lmet)
   alt  (tap-hold-release $tap-time $hold-time s lalt)
-  ctl  (tap-hold-release $tap-time $hold-time d lctl)
+  ctl  (tap-hold-release $tap-time $hold-time d @plctl)
   sft  (tap-hold-release $tap-time $hold-time f lsft)
 
-  rsft (tap-hold-release $tap-time $hold-time j rsft)
-  rctl (tap-hold-release $tap-time $hold-time k rctl)
-  ralt (tap-hold-release $tap-time $hold-time l ralt)
-  rmet (tap-hold-release $tap-time $hold-time scln rmet)
+  rsft  (tap-hold-release $tap-time $hold-time j rsft)
+  hrctl (tap-hold-release $tap-time $hold-time k @prctl)
+  ralt  (tap-hold-release $tap-time $hold-time l ralt)
+  rmet  (tap-hold-release $tap-time $hold-time scln rmet)
 )
 
 (deflayer base
   @caps
   @met @alt @ctl @sft
-  @rsft @rctl @ralt @rmet
+  @rsft @hrctl @ralt @rmet
+  @plctl @prctl
+  left right up down
+)
+
+(deflayer mctl
+  _
+  _ _ _ _
+  _ _ _ _
+  _ _
+  @linebeg @lineend @docbeg @docend
+)
+
+;; Alt/Opt word motion — global overrides (reliable in Telegram / Qt / GTK).
+;; Do NOT override Ctrl+arrows here (those are line edges via mctl).
+(defoverrides
+  (lalt left)  (lctl left)
+  (lalt right) (lctl right)
+  (ralt left)  (lctl left)
+  (ralt right) (lctl right)
+
+  (lsft lalt left)  (lsft lctl left)
+  (lsft lalt right) (lsft lctl right)
+  (rsft lalt left)  (rsft lctl left)
+  (rsft lalt right) (rsft lctl right)
+  (lsft ralt left)  (lsft lctl left)
+  (lsft ralt right) (lsft lctl right)
+  (rsft ralt left)  (rsft lctl left)
+  (rsft ralt right) (rsft lctl right)
+
+  (lalt bspc) (lctl bspc)
+  (ralt bspc) (lctl bspc)
+  (lalt del)  (lctl del)
+  (ralt del)  (lctl del)
 )

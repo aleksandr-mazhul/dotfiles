@@ -15,6 +15,7 @@ ShellRoot {
     Calendar { id: calendarPanel }
     Notifications { id: notifications }
     Osd {}
+    GroupStackBar {}
 
     Variants {
         model: Quickshell.screens
