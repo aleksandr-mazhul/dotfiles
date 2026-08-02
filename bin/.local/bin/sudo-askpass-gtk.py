@@ -1,13 +1,34 @@
 #!/usr/bin/env python3
-"""Simple GUI sudo askpass — shows current keyboard layout."""
+"""Simple GUI sudo askpass — forces EN layout on all Hyprland keyboards."""
+import json
+import subprocess
+import sys
+
 import gi
+
 gi.require_version("Gtk", "3.0")
 from gi.repository import Gtk, GLib
-import subprocess
+
+
+def force_us_all() -> None:
+    try:
+        raw = subprocess.check_output(["hyprctl", "-j", "devices"], text=True)
+        data = json.loads(raw)
+    except Exception:
+        return
+    for kb in data.get("keyboards") or []:
+        name = kb.get("name")
+        if not name:
+            continue
+        subprocess.run(
+            ["hyprctl", "switchxkblayout", name, "0"],
+            check=False,
+            capture_output=True,
+        )
+
 
 def active_layout() -> str:
     try:
-        import json
         raw = subprocess.check_output(["hyprctl", "-j", "devices"], text=True)
         data = json.loads(raw)
         for kb in data.get("keyboards", []):
@@ -17,18 +38,10 @@ def active_layout() -> str:
         pass
     return "?"
 
-# Force US before dialog
-try:
-    subprocess.run(
-        ["hyprctl", "switchxkblayout", "ergohaven-k:03-v3/v4", "0"],
-        check=False,
-        capture_output=True,
-    )
-except Exception:
-    pass
 
+force_us_all()
 layout = active_layout()
-prompt = " ".join(__import__("sys").argv[1:]) or "Password:"
+prompt = " ".join(sys.argv[1:]) or "Password:"
 
 dialog = Gtk.MessageDialog(
     message_type=Gtk.MessageType.QUESTION,
@@ -40,6 +53,7 @@ dialog.format_secondary_text(
     "Должна быть English (US). Если нет — переключи до ввода."
 )
 dialog.set_default_response(Gtk.ResponseType.OK)
+dialog.set_keep_above(True)
 box = dialog.get_message_area()
 entry = Gtk.Entry()
 entry.set_visibility(False)
@@ -47,18 +61,13 @@ entry.set_activates_default(True)
 entry.set_hexpand(True)
 box.add(entry)
 dialog.show_all()
+entry.grab_focus()
 
-# keep layout glued to US while dialog open
+
 def keep_us():
-    try:
-        subprocess.run(
-            ["hyprctl", "switchxkblayout", "ergohaven-k:03-v3/v4", "0"],
-            check=False,
-            capture_output=True,
-        )
-    except Exception:
-        pass
+    force_us_all()
     return True
+
 
 GLib.timeout_add_seconds(1, keep_us)
 resp = dialog.run()

@@ -9,6 +9,7 @@ cd "$ROOT"
 
 packages=(
   bin
+  entropy
   fastfetch
   fish
   gtk
@@ -18,6 +19,7 @@ packages=(
   matugen
   misc
   nwg-look
+  quickshell
   vibepanel
   waybar
   waypaper
@@ -37,8 +39,47 @@ if [[ -d bin/.local/bin ]]; then
     if [[ -e "$dest" && ! -L "$dest" ]]; then
       echo "  rm real file $dest (will symlink from package)"
       rm -f "$dest"
+    elif [[ -L "$dest" ]]; then
+      # Replace foreign symlinks (e.g. AppImage direct link) with stow-managed ones.
+      echo "  rm old symlink $dest -> $(readlink "$dest")"
+      rm -f "$dest"
     fi
   done
+fi
+
+# bin desktop entries / icons
+if [[ -d bin/.local/share/applications ]]; then
+  mkdir -p "$TARGET/.local/share/applications"
+  for f in bin/.local/share/applications/*; do
+    [[ -f "$f" ]] || continue
+    base="$(basename "$f")"
+    dest="$TARGET/.local/share/applications/$base"
+    if [[ -e "$dest" || -L "$dest" ]]; then
+      echo "  rm $dest (will symlink from package)"
+      rm -f "$dest"
+    fi
+  done
+fi
+if [[ -d bin/.local/share/icons ]]; then
+  while IFS= read -r -d '' f; do
+    rel="${f#bin/}"
+    dest="$TARGET/$rel"
+    mkdir -p "$(dirname "$dest")"
+    if [[ -e "$dest" || -L "$dest" ]]; then
+      echo "  rm $dest (will symlink from package)"
+      rm -f "$dest"
+    fi
+  done < <(find bin/.local/share/icons -type f -print0)
+fi
+
+# entropy app settings
+if [[ -f entropy/.config/entropy/app_settings.json ]]; then
+  dest="$TARGET/.config/entropy/app_settings.json"
+  mkdir -p "$(dirname "$dest")"
+  if [[ -e "$dest" || -L "$dest" ]]; then
+    echo "  rm $dest (will symlink from package)"
+    rm -f "$dest"
+  fi
 fi
 
 # x11: .Xresources
@@ -59,7 +100,11 @@ for pkg in "${packages[@]}"; do
     continue
   fi
   echo "  stow $pkg"
-  stow --adopt -v -t "$TARGET" "$pkg" 2>&1 || stow -R -v -t "$TARGET" "$pkg"
+  if ! stow --adopt -v -t "$TARGET" "$pkg" 2>&1; then
+    if ! stow -R -v -t "$TARGET" "$pkg" 2>&1; then
+      echo "  WARN: stow $pkg failed (left as-is)"
+    fi
+  fi
 done
 
 ok_link() {
@@ -89,6 +134,8 @@ ok_link() {
 echo "==> Verify"
 for p in \
   .config/hypr \
+  .config/quickshell \
+  .config/entropy \
   .config/matugen \
   .config/waypaper \
   .config/kitty \
@@ -102,6 +149,7 @@ for p in \
   .config/gtk-3.0 \
   .config/gtk-4.0 \
   .config/kanata \
+  .local/bin/entropy \
   .Xresources
 do
   ok_link "$p"

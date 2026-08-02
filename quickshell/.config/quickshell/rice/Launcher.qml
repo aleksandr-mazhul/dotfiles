@@ -1,7 +1,6 @@
 import QtQuick
 import QtQuick.Layouts
 import Quickshell
-import Quickshell.Io
 import Quickshell.Hyprland
 
 // Raycast-style hub: built-in commands (Clipboard / Wallpapers / VPN) + apps.
@@ -12,8 +11,6 @@ RicePanel {
     property var commands: []
     property var apps: []
     property var filtered: []
-    property int savedLayoutIndex: -1
-    property string kbDevice: ""
 
     title: "Launcher"
     searchPlaceholder: "Search apps & commands…"
@@ -27,12 +24,16 @@ RicePanel {
         loadApps()
     }
     onPanelOpened: {
+        // EN for search typing; restore previous layout on close.
+        // eh-layout-sync keeps Ergohaven firmware in step with Hyprland.
+        Quickshell.execDetached(["bash", "-lc", "~/.config/hypr/scripts/launcher-layout.sh open"])
         buildCommands()
         loadApps()
         applyFilter()
-        layoutCaptureProc.running = true
     }
-    onPanelClosed: restoreLayout()
+    onPanelClosed: {
+        Quickshell.execDetached(["bash", "-lc", "~/.config/hypr/scripts/launcher-layout.sh close"])
+    }
     onQueryChanged: applyFilter()
     onActivated: (item, index) => {
         let action = null
@@ -156,51 +157,6 @@ RicePanel {
             }
         ]
     }
-
-    // Force English (us) while searching; restore previous layout on close.
-    function restoreLayout() {
-        if (savedLayoutIndex < 0 || !kbDevice)
-            return
-        layoutSwitchProc.exec(["hyprctl", "switchxkblayout", kbDevice, String(savedLayoutIndex)])
-        savedLayoutIndex = -1
-        kbDevice = ""
-    }
-
-    Process {
-        id: layoutCaptureProc
-        command: ["bash", "-c",
-            "hyprctl devices -j | python3 -c '"
-            + "import json,sys; "
-            + "devs=json.load(sys.stdin); "
-            + "kbs=devs.get(\"keyboards\") or []; "
-            + "kb=next((k for k in kbs if k.get(\"main\")), None) or (kbs[0] if kbs else None); "
-            + "sys.exit(0) if not kb else None; "
-            + "layouts=[x.strip() for x in (kb.get(\"layout\") or \"us\").split(\",\") if x.strip()]; "
-            + "us=next((i for i,l in enumerate(layouts) if l==\"us\" or l.startswith(\"us\")), 0); "
-            + "print(kb.get(\"name\",\"\")); "
-            + "print(int(kb.get(\"active_layout_index\", 0))); "
-            + "print(int(us))"
-            + "'"]
-        stdout: StdioCollector {
-            onStreamFinished: {
-                const lines = text.trim().split("\n")
-                if (lines.length < 3 || !lines[0])
-                    return
-                root.kbDevice = lines[0]
-                root.savedLayoutIndex = parseInt(lines[1], 10)
-                const usIdx = parseInt(lines[2], 10)
-                if (isNaN(root.savedLayoutIndex) || isNaN(usIdx) || !root.kbDevice) {
-                    root.savedLayoutIndex = -1
-                    root.kbDevice = ""
-                    return
-                }
-                if (root.savedLayoutIndex !== usIdx)
-                    layoutSwitchProc.exec(["hyprctl", "switchxkblayout", root.kbDevice, String(usIdx)])
-            }
-        }
-    }
-
-    Process { id: layoutSwitchProc }
 
     function loadApps() {
         const entries = DesktopEntries.applications.values || []

@@ -1,0 +1,11 @@
+[Desktop Entry]
+Name=Entropy
+Comment=Ergohaven keyboard configurator (Vial-QMK / Vial-RMK)
+GenericName=Keyboard Configurator
+Exec=entropy %U
+Icon=entropy
+Type=Application
+Terminal=false
+StartupNotify=true
+Categories=Utility;HardwareSettings;
+Keywords=entropy;ergohaven;vial;keyboard;qmk;rmk;

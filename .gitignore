@@ -7,3 +7,6 @@ hypr/.config/hypr/lock-wallpaper
 
 # Hyprland may recreate a stub .conf when on Lua; ignore it (use hyprland.lua)
 hypr/.config/hypr/hyprland.conf
+
+# Third-party plugin sources (built binary lives under ~/.local/lib/hypr)
+hypr/.config/hypr/vendor/

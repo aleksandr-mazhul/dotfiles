@@ -98,12 +98,30 @@ hl.config({
         -- Mac-like key repeat: brightness hold ramps ~16 steps without feeling frantic
         repeat_rate = 25,
         repeat_delay = 250,
-        -- Mac-like: slower base speed + adaptive accel (precise slow, faster flicks)
+        -- Mac-like pointer feel; slower base + adaptive accel
         sensitivity = -0.72,
         accel_profile = "adaptive",
         touchpad = {
             natural_scroll = false,
+            -- 1/2/3-finger click → LMB/RMB/MMB (2-finger tap = right click)
+            clickfinger_behavior = true,
+            tap_to_click = true,
+            -- 3-finger drag = hold LMB and move (text selection like macOS)
+            drag_3fg = 1,
+            tap_and_drag = true,
+            disable_while_typing = true,
         },
+    },
+
+    gestures = {
+        workspace_swipe_distance = 400,
+        workspace_swipe_min_speed_to_force = 25,
+        workspace_swipe_cancel_ratio = 0.25,
+        workspace_swipe_create_new = false,
+        workspace_swipe_direction_lock = true,
+        workspace_swipe_direction_lock_threshold = 10,
+        -- Fingers left → left workspace, fingers right → right (as requested)
+        workspace_swipe_invert = false,
     },
 })
 
@@ -133,7 +151,23 @@ hl.animation({ leaf = "workspacesOut", enabled = true, speed = 4.2, bezier = "ea
 -- Instant cursor zoom (shake-to-find); animation made grow/shrink feel sluggish
 hl.animation({ leaf = "zoomFactor", enabled = false })
 
-hl.gesture({ fingers = 3, direction = "horizontal", action = "workspace" })
+-- Mac-like trackpad gestures (3-finger kept free for drag_3fg text select)
+-- 4↑ Mission Control · 4↓ close · 4←/→ workspaces
+hl.gesture({
+    fingers = 4,
+    direction = "up",
+    action = function()
+        hl.plugin.gloview.toggle()
+    end,
+})
+hl.gesture({
+    fingers = 4,
+    direction = "down",
+    action = function()
+        hl.plugin.gloview.close()
+    end,
+})
+hl.gesture({ fingers = 4, direction = "horizontal", action = "workspace" })
 
 -- Per-device overrides (names from `hyprctl devices`)
 hl.device({
@@ -161,7 +195,8 @@ hl.on("hyprland.start", function()
     hl.exec_cmd("swww-daemon")
     hl.exec_cmd("waypaper --restore")
     hl.exec_cmd("qs -c rice -n -d")
-    hl.exec_cmd("hyprpolkitagent")
+    -- Binary lives under /usr/lib; user unit is the reliable start.
+    hl.exec_cmd("systemctl --user start hyprpolkitagent.service")
     hl.exec_cmd("hypridle")
     hl.exec_cmd("wl-paste --type text --watch cliphist store")
     hl.exec_cmd("wl-paste --type image --watch cliphist store")
@@ -169,6 +204,11 @@ hl.on("hyprland.start", function()
     hl.exec_cmd("~/.config/hypr/scripts/ocr-daemon-start.sh")
     hl.exec_cmd("xrdb -merge ~/.Xresources")
     hl.exec_cmd("~/.config/hypr/scripts/session-autostart.sh")
+    -- Ergohaven: Entropy Live Features + Hyprland→keyboard layout sync (Wayland).
+    hl.exec_cmd("~/.config/hypr/scripts/entropy-autostart.sh")
+    hl.exec_cmd("~/.config/hypr/scripts/eh-layout-sync.sh")
+    -- Each window remembers EN/RU; restores on focus (pauses while launcher forces EN).
+    hl.exec_cmd("~/.config/hypr/scripts/eh-window-layout.py")
     hl.exec_cmd("hyprctl dispatch renameworkspace 1 W & hyprctl dispatch renameworkspace 2 E & hyprctl dispatch renameworkspace 3 T & hyprctl dispatch renameworkspace 4 D & hyprctl dispatch renameworkspace 5 Z & hyprctl dispatch renameworkspace 6 X & hyprctl dispatch renameworkspace 7 C & hyprctl dispatch renameworkspace 8 Q & hyprctl dispatch renameworkspace 9 B & hyprctl dispatch renameworkspace 10 U")
     -- Restore last workspace and keep saving focus changes across reboots.
     hl.exec_cmd("~/.config/hypr/scripts/workspace-persist.sh watch")

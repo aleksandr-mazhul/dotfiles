@@ -1,0 +1,3 @@
+#!/usr/bin/env bash
+# Entropy — Ergohaven keyboard companion (AppImage).
+exec "${HOME}/Applications/Entropy.AppImage" "$@"
