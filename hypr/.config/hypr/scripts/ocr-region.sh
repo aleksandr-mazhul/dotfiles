@@ -32,7 +32,7 @@ if [[ ! -S "$SOCK" ]]; then
   # One replaceable status toast while model warms (first time in session)
   "$NOTIFY" --id "$OCR_NOTIFY_ID" --urgency low --time 5000 --transient \
     OCR dialog-information "OCR" "Загрузка модели…"
-  "$DAEMON_START" || true
+  "$DAEMON_START" --now || true
 fi
 
 text="$("$OCR_PY" "$OCR_SCRIPT" ocr "$tmp" 2>/tmp/ocr-easyocr.err || true)"

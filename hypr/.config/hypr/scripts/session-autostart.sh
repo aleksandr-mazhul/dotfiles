@@ -1,9 +1,17 @@
 #!/usr/bin/env bash
 # Session startup: daily apps (VPN is handled by vpn-autostart.sh — starts earlier).
+# Stagger so qs/swww get the first seconds of the session.
 set -uo pipefail
 
-# Let the compositor settle before spawning windows
 sleep 0.5
-Telegram >/dev/null 2>&1 &
-cursor >/dev/null 2>&1 &
 kitty >/dev/null 2>&1 &
+
+(
+  sleep 2
+  Telegram >/dev/null 2>&1 &
+) &
+
+(
+  sleep 4
+  cursor >/dev/null 2>&1 &
+) &
