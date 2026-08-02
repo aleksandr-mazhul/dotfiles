@@ -1,0 +1,32 @@
+# Herdr — non-color settings only.
+# Theme colors are generated from ~/.config/quickshell/rice/Colors.qml
+# by theme-warm-accents (wallpaper pipeline). Do not put hex colors here.
+
+onboarding = false
+
+[theme]
+name = "vesper"
+
+
+[theme.custom]
+panel_bg = "reset"
+accent = "#ffb688"
+green = "#e5bfa9"
+yellow = "#e5bfa9"
+red = "#ffbbb3"
+blue = "#ffb688"
+teal = "#e5bfa9"
+peach = "#c4a882"
+mauve = "#e5bfa9"
+text = "#f7fcfe"
+subtext0 = "#c4cdcf"
+overlay0 = "#747d7f"
+overlay1 = "#c4a882"
+surface0 = "#202628"
+surface1 = "#2b3132"
+surface_dim = "#3f484a"
+
+
+[ui]
+accent = "#ffb688"
+

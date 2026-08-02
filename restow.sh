@@ -13,19 +13,24 @@ packages=(
   fastfetch
   fish
   gtk
+  herdr
   hypr
   kanata
   kitty
   matugen
   misc
+  nvim
   nwg-look
   quickshell
+  starship
+  tmux
   vibepanel
   waybar
   waypaper
   wofi
   x11
   xsettingsd
+  yazi
 )
 
 echo "==> Preparing conflicting real files (replace with symlinks)"
@@ -149,6 +154,11 @@ for p in \
   .config/gtk-3.0 \
   .config/gtk-4.0 \
   .config/kanata \
+  .config/nvim \
+  .config/yazi \
+  .config/tmux \
+  .config/starship.toml \
+  .tmux.conf \
   .local/bin/entropy \
   .Xresources
 do

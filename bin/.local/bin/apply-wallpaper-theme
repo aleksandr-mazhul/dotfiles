@@ -69,4 +69,17 @@ if command -v qs >/dev/null 2>&1; then
     || { qs -c rice kill 2>/dev/null || true; qs -c rice -n -d 2>/dev/null || true; }
 fi
 
+# Reload Herdr UI colors (sand accents + wallpaper surfaces)
+if command -v herdr >/dev/null 2>&1; then
+  herdr server reload-config 2>/dev/null || true
+fi
+
+# Refresh hyprpolkitagent so Qt/hyprtoolkit palette picks up new colors
+# (skip restart while an auth dialog is visible)
+if command -v hyprctl >/dev/null 2>&1; then
+  if ! hyprctl clients -j 2>/dev/null | grep -q '"class": "hyprpolkitagent"'; then
+    systemctl --user try-restart hyprpolkitagent.service 2>/dev/null || true
+  fi
+fi
+
 notify-send -a Waypaper "Theme updated" "$(basename "$wallpaper")" 2>/dev/null || true

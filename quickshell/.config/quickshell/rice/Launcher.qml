@@ -91,13 +91,27 @@ RicePanel {
                 cls = normId(ipc.class || ipc.initialClass || "")
             } catch (e) {}
 
+            // Skip transient/empty toplevels: hint.indexOf("") === 0 would
+            // match every app and block launches.
+            if (!appId && !cls)
+                continue
+
             let hit = false
             for (let h = 0; h < hints.length; h++) {
                 const hint = hints[h]
-                if (appId === hint || cls === hint)
+                if (!hint)
+                    continue
+                if (appId === hint || cls === hint) {
                     hit = true
-                else if (hint.length >= 4 && (appId.indexOf(hint) >= 0 || cls.indexOf(hint) >= 0 || hint.indexOf(appId) >= 0 || hint.indexOf(cls) >= 0))
-                    hit = true
+                } else if (hint.length >= 4) {
+                    // Only "window id contains hint" (not reverse): reverse
+                    // plus empty ids falsely matched every launch.
+                    if ((appId && appId.indexOf(hint) >= 0) || (cls && cls.indexOf(hint) >= 0))
+                        hit = true
+                    else if ((appId && appId.length >= 4 && hint.indexOf(appId) >= 0)
+                          || (cls && cls.length >= 4 && hint.indexOf(cls) >= 0))
+                        hit = true
+                }
                 if (hit)
                     break
             }
@@ -109,17 +123,36 @@ RicePanel {
             if (t.wayland && t.wayland.activate)
                 t.wayland.activate()
             else if (t.address)
-                Quickshell.execDetached(["hyprctl", "dispatch", "focuswindow", "address:" + t.address])
+                // Hyprland 0.56 Lua: classic `hyprctl dispatch` is broken.
+                Quickshell.execDetached([
+                    "hyprctl", "eval",
+                    'hl.dispatch(hl.dsp.focus({ window = "address:' + t.address + '" }))'
+                ])
             return true
         }
         return false
     }
 
+    function launchEntry(entry) {
+        if (!entry)
+            return
+        if (entry.execute) {
+            try {
+                entry.execute()
+                return
+            } catch (e) {}
+        }
+        // Fallback if DesktopEntries.execute is unavailable/broken.
+        if (entry.command && entry.command.length)
+            Quickshell.execDetached(entry.command.slice())
+        else if (entry.execString)
+            Quickshell.execDetached(["bash", "-lc", entry.execString])
+    }
+
     function focusOrLaunch(entry) {
         if (focusExisting(entry))
             return
-        if (entry && entry.execute)
-            entry.execute()
+        launchEntry(entry)
     }
 
     function buildCommands() {

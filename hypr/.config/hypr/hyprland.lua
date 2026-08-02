@@ -228,7 +228,8 @@ hl.on("hyprland.start", function()
     hl.exec_cmd("~/.config/hypr/scripts/eh-layout-sync.sh")
     -- Each window remembers EN/RU; restores on focus (pauses while launcher forces EN).
     hl.exec_cmd("~/.config/hypr/scripts/eh-window-layout.py")
-    hl.exec_cmd("hyprctl dispatch renameworkspace 1 W & hyprctl dispatch renameworkspace 2 E & hyprctl dispatch renameworkspace 3 T & hyprctl dispatch renameworkspace 4 D & hyprctl dispatch renameworkspace 5 Z & hyprctl dispatch renameworkspace 6 X & hyprctl dispatch renameworkspace 7 C & hyprctl dispatch renameworkspace 8 Q & hyprctl dispatch renameworkspace 9 B & hyprctl dispatch renameworkspace 10 U")
+    -- Names match Mac skhd/yabai spaces.sh (W C V D G X Z E T I P Q U Y R A)
+    hl.exec_cmd("hyprctl dispatch renameworkspace 1 W & hyprctl dispatch renameworkspace 2 C & hyprctl dispatch renameworkspace 3 V & hyprctl dispatch renameworkspace 4 D & hyprctl dispatch renameworkspace 5 G & hyprctl dispatch renameworkspace 6 X & hyprctl dispatch renameworkspace 7 Z & hyprctl dispatch renameworkspace 8 E & hyprctl dispatch renameworkspace 9 T & hyprctl dispatch renameworkspace 10 I & hyprctl dispatch renameworkspace 11 P & hyprctl dispatch renameworkspace 12 Q & hyprctl dispatch renameworkspace 13 U & hyprctl dispatch renameworkspace 14 Y & hyprctl dispatch renameworkspace 15 R & hyprctl dispatch renameworkspace 16 A")
     -- Restore last workspace and keep saving focus changes across reboots.
     hl.exec_cmd("~/.config/hypr/scripts/workspace-persist.sh watch")
 end)

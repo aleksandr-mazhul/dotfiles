@@ -18,6 +18,10 @@
 ;;
 ;; Super+arrows stay free for Mission Control (GloView).
 ;;
+;; Mouse tab buttons (firmware → Super+Shift+[ / ]):
+;;   remapped here to Ctrl+Page_Up/Down for browsers & tabbed apps.
+;;   kitty also binds Ctrl+Page_Up/Down → tmux prev/next window.
+;;
 ;; Tip: disable HRM in Vial on this machine — let kanata own the holds.
 
 (defcfg
@@ -107,4 +111,14 @@
   (ralt bspc) (lctl bspc)
   (lalt del)  (lctl del)
   (ralt del)  (lctl del)
+
+  ;; Mac-like tab switch (mouse / Super+Shift+[ ]) → native Linux tab keys
+  (lsft lmet lbrc) (lctl pgup)
+  (lsft lmet rbrc) (lctl pgdn)
+  (rsft lmet lbrc) (lctl pgup)
+  (rsft lmet rbrc) (lctl pgdn)
+  (lsft rmet lbrc) (lctl pgup)
+  (lsft rmet rbrc) (lctl pgdn)
+  (rsft rmet lbrc) (lctl pgup)
+  (rsft rmet rbrc) (lctl pgdn)
 )

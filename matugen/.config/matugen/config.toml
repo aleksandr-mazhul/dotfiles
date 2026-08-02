@@ -30,7 +30,7 @@ output_path = "~/.config/sddm-adaptive/colors.conf"
 input_path = "~/.config/matugen/templates/kitty-colors.conf"
 output_path = "~/.config/kitty/colors-matugen.conf"
 
-# GTK3/4 accent overrides
+# GTK3/4 accent overrides (+ classic theme_* colors for Qt gtk3 / polkit)
 [templates.gtk3]
 input_path = "~/.config/matugen/templates/gtk.css"
 output_path = "~/.config/gtk-3.0/gtk.css"
@@ -38,6 +38,11 @@ output_path = "~/.config/gtk-3.0/gtk.css"
 [templates.gtk4]
 input_path = "~/.config/matugen/templates/gtk.css"
 output_path = "~/.config/gtk-4.0/gtk.css"
+
+# hyprtoolkit palette (hyprpolkitagent when built on hyprtoolkit)
+[templates.hyprtoolkit]
+input_path = "~/.config/matugen/templates/hyprtoolkit-colors.conf"
+output_path = "~/.config/hypr/hyprtoolkit.conf"
 
 # Quickshell overlay shell (rice) colors
 [templates.quickshell]

@@ -188,6 +188,126 @@ def patch_kv_conf(path: Path, key: str, value: str) -> bool:
     return False
 
 
+def _upsert_toml_section(text: str, section: str, body: str) -> str:
+    """Replace or append a TOML section (header + body, no nested tables)."""
+    pat = rf"(?ms)^\[{re.escape(section)}\]\n(?:(?!^\[).*\n?)*"
+    block = f"[{section}]\n{body.rstrip()}\n"
+    if re.search(pat, text):
+        return re.sub(pat, block + "\n", text, count=1)
+    if text and not text.endswith("\n"):
+        text += "\n"
+    return text + "\n" + block + "\n"
+
+
+def read_colors_qml(path: Path) -> dict[str, str] | None:
+    """Parse rice Colors.qml — the post-pipeline source of truth for UI chrome."""
+    if not path.is_file():
+        return None
+    props = {
+        m.group(1): m.group(2)
+        for m in re.finditer(
+            r'readonly property color (\w+):\s*"(#[0-9a-fA-F]{6})"',
+            path.read_text(),
+        )
+    }
+    required = {
+        "primary",
+        "secondary",
+        "text",
+        "text_muted",
+        "outline",
+        "outline_variant",
+        "error",
+        "surface_container",
+        "surface_container_high",
+        "surface_variant",
+    }
+    if not required <= props.keys():
+        return None
+    return props
+
+
+def patch_herdr() -> bool:
+    """Write Herdr theme from Colors.qml (no duplicated hex in herdr templates)."""
+    colors = read_colors_qml(CFG / "quickshell" / "rice" / "Colors.qml")
+    if not colors:
+        print("theme-warm-accents: herdr skipped (Colors.qml missing/incomplete)", file=sys.stderr)
+        return False
+
+    herdr_dir = CFG / "herdr"
+    config_path = herdr_dir / "config.toml"
+    herdr_dir.mkdir(parents=True, exist_ok=True)
+
+    # Drop obsolete matugen fragment if present
+    obsolete = herdr_dir / "colors-matugen.toml"
+    if obsolete.is_file():
+        obsolete.unlink()
+
+    primary = colors["primary"]
+    secondary = colors["secondary"]
+    custom = {
+        "panel_bg": "reset",
+        "accent": primary,
+        "green": secondary,
+        "yellow": secondary,  # Colors.qml has no tertiary; secondary is the warm pair
+        "red": colors["error"],
+        "blue": primary,
+        "teal": secondary,
+        "peach": colors["outline"],
+        "mauve": secondary,
+        "text": colors["text"],
+        "subtext0": colors["text_muted"],
+        "overlay0": colors["outline_variant"],
+        "overlay1": colors["outline"],
+        "surface0": colors["surface_container"],
+        "surface1": colors["surface_container_high"],
+        "surface_dim": colors["surface_variant"],
+    }
+    custom_body = "\n".join(
+        f'{k} = "{v}"' if v != "reset" else f'{k} = "reset"' for k, v in custom.items()
+    ) + "\n"
+
+    if config_path.is_file():
+        cfg_text = config_path.read_text()
+    else:
+        cfg_text = (
+            "# Herdr — theme colors generated from quickshell/rice/Colors.qml\n"
+            "onboarding = false\n"
+        )
+
+    cfg_text = _upsert_toml_section(cfg_text, "theme", 'name = "vesper"\n')
+    cfg_text = _upsert_toml_section(cfg_text, "theme.custom", custom_body)
+    cfg_text = _upsert_toml_section(cfg_text, "ui", f'accent = "{primary}"\n')
+
+    prev = config_path.read_text() if config_path.is_file() else None
+    if prev != cfg_text:
+        config_path.write_text(cfg_text)
+        return True
+    return False
+
+
+def patch_hyprtoolkit(path: Path) -> bool:
+    """Pin sand accents in hyprtoolkit.conf (polkit / hypr* toolkit UI)."""
+    if not path.is_file():
+        return False
+    text = path.read_text()
+    out = text
+    out = re.sub(
+        r"(?m)^(accent\s*=\s*rgba\()[0-9a-fA-F]{8}(\)\s*)$",
+        rf"\1{STRIP[PRIMARY]}ff\2",
+        out,
+    )
+    out = re.sub(
+        r"(?m)^(accent_secondary\s*=\s*rgba\()[0-9a-fA-F]{8}(\)\s*)$",
+        rf"\1{STRIP[SECONDARY]}ff\2",
+        out,
+    )
+    if out != text:
+        path.write_text(out)
+        return True
+    return False
+
+
 def main() -> int:
     fixed: list[str] = []
 
@@ -197,20 +317,31 @@ def main() -> int:
         fixed.append("hypr")
     if patch_kitty(CFG / "kitty" / "colors-matugen.conf"):
         fixed.append("kitty")
-    if patch_css_vars(
-        CFG / "gtk-3.0" / "gtk.css",
-        [
-            ("@define-color accent_color", PRIMARY),
-            ("@define-color accent_bg_color", PRIMARY),
-            ("@define-color accent_fg_color", ON_PRIMARY),
-        ],
-    ):
-        fixed.append("gtk3")
-    if patch_css_vars(
-        CFG / "gtk-4.0" / "gtk.css",
-        [("@define-color accent_color", PRIMARY), ("@define-color accent_bg_color", PRIMARY), ("@define-color accent_fg_color", ON_PRIMARY)],
-    ):
-        fixed.append("gtk4")
+    gtk_accent_pairs = [
+        ("@define-color accent_color", PRIMARY),
+        ("@define-color accent_bg_color", PRIMARY),
+        ("@define-color accent_fg_color", ON_PRIMARY),
+        ("@define-color theme_selected_bg_color", PRIMARY),
+        ("@define-color theme_selected_fg_color", ON_PRIMARY),
+        ("@define-color theme_unfocused_selected_bg_color", SECONDARY),
+        ("@define-color theme_unfocused_selected_fg_color", ON_PRIMARY),
+    ]
+    for gtk_name, gtk_css in (("gtk3", CFG / "gtk-3.0" / "gtk.css"), ("gtk4", CFG / "gtk-4.0" / "gtk.css")):
+        touched = patch_css_vars(gtk_css, gtk_accent_pairs)
+        if gtk_css.is_file():
+            text = gtk_css.read_text()
+            # Dialog rule literals stay sand even if a future wallpaper pass rewrites hexes
+            out = (
+                text.replace("#ffb688", PRIMARY)
+                .replace("#e5bfa9", SECONDARY)
+                .replace("#512400", ON_PRIMARY)
+                .replace("#c4a882", OUTLINE_ACCENT)
+            )
+            if out != text:
+                gtk_css.write_text(out)
+                touched = True
+        if touched:
+            fixed.append(gtk_name)
     if patch_css_vars(
         CFG / "wofi" / "colors-matugen.css",
         [
@@ -224,6 +355,10 @@ def main() -> int:
         fixed.append("hyprlock")
     if patch_kv_conf(CFG / "sddm-adaptive" / "colors.conf", "accent", PRIMARY):
         fixed.append("sddm")
+    if patch_herdr():
+        fixed.append("herdr")
+    if patch_hyprtoolkit(CFG / "hypr" / "hyprtoolkit.conf"):
+        fixed.append("hyprtoolkit")
 
     if fixed:
         print("theme-warm-accents: applied sand accents to " + ", ".join(fixed))
