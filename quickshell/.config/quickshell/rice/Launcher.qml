@@ -2,6 +2,7 @@ import QtQuick
 import QtQuick.Layouts
 import Quickshell
 import Quickshell.Io
+import Quickshell.Hyprland
 
 // Raycast-style hub: built-in commands (Clipboard / Wallpapers / VPN) + apps.
 // Dedicated hotkeys still open each overlay directly.
@@ -34,12 +35,90 @@ RicePanel {
     onPanelClosed: restoreLayout()
     onQueryChanged: applyFilter()
     onActivated: (item, index) => {
-        const action = item && item.kind === "command"
-            ? item.action
-            : (item && item.execute ? () => item.execute() : null)
+        let action = null
+        if (item && item.kind === "command")
+            action = item.action
+        else if (item)
+            action = () => focusOrLaunch(item)
         close()
         if (action)
             Qt.callLater(action)
+    }
+
+    function normId(s) {
+        return String(s || "").toLowerCase().replace(/[^a-z0-9]+/g, "")
+    }
+
+    function appHints(entry) {
+        const hints = []
+        const push = (s) => {
+            const n = normId(s)
+            if (n && n.length >= 2 && hints.indexOf(n) < 0)
+                hints.push(n)
+        }
+        push(entry.startupClass)
+        push(entry.id)
+        if (entry.id) {
+            const parts = String(entry.id).split(".")
+            const last = parts[parts.length - 1]
+            if (last && last.toLowerCase() !== "desktop")
+                push(last)
+        }
+        if (entry.command && entry.command.length)
+            push(String(entry.command[0]).split("/").pop())
+        return hints
+    }
+
+    // If the app is already open, jump to its workspace and focus it.
+    function focusExisting(entry) {
+        const hints = appHints(entry)
+        if (!hints.length)
+            return false
+
+        try {
+            if (Hyprland.refreshToplevels)
+                Hyprland.refreshToplevels()
+        } catch (e) {}
+
+        const tops = (Hyprland.toplevels && Hyprland.toplevels.values) ? Hyprland.toplevels.values : []
+        for (let i = 0; i < tops.length; i++) {
+            const t = tops[i]
+            const appId = normId(t.wayland ? t.wayland.appId : "")
+            let cls = ""
+            try {
+                const ipc = t.lastIpcObject || {}
+                cls = normId(ipc.class || ipc.initialClass || "")
+            } catch (e) {}
+
+            let hit = false
+            for (let h = 0; h < hints.length; h++) {
+                const hint = hints[h]
+                if (appId === hint || cls === hint)
+                    hit = true
+                else if (hint.length >= 4 && (appId.indexOf(hint) >= 0 || cls.indexOf(hint) >= 0 || hint.indexOf(appId) >= 0 || hint.indexOf(cls) >= 0))
+                    hit = true
+                if (hit)
+                    break
+            }
+            if (!hit)
+                continue
+
+            if (t.workspace && t.workspace.activate)
+                t.workspace.activate()
+            if (t.wayland && t.wayland.activate)
+                t.wayland.activate()
+            else if (t.address)
+                Quickshell.execDetached(["hyprctl", "dispatch", "focuswindow", "address:" + t.address])
+            return true
+        }
+        return false
+    }
+
+    function focusOrLaunch(entry) {
+        if (focusExisting(entry))
+            return
+        if (entry && entry.execute)
+            entry.execute()
     }
 
     function buildCommands() {
@@ -52,7 +131,7 @@ RicePanel {
                 genericName: "Paste from clipboard history",
                 keywords: ["clipboard", "clip", "paste", "буфер", "история"],
                 icon: "edit-paste",
-                shortcut: "Ctrl+Q",
+                shortcut: "Super+Q",
                 action: () => OverlayHub.open("clipboard")
             },
             {
