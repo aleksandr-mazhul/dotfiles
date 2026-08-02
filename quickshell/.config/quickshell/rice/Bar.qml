@@ -37,7 +37,8 @@ PanelWindow {
         : (root.pinned || root.revealed || root.panelOpen)
 
     readonly property int fullHeight: Theme.barHeight + Theme.barMargin * 2
-    readonly property int triggerHeight: 3
+    // Tall enough to catch the cursor at the physical screen edge.
+    readonly property int triggerHeight: 10
     // Only pinned bar reserves space. Autohide overlays content — no exclusiveZone flicker.
     readonly property bool reserveSpace: root.pinned && !root.fullscreenActive
 
@@ -54,8 +55,10 @@ PanelWindow {
         right: true
     }
 
+    // Always flush to the top edge so the autohide hit-strip is reachable.
+    // Visual inset lives on barRow (topMargin), not on the layer.
     margins {
-        top: Theme.barMargin
+        top: 0
         left: Theme.barMargin
         right: Theme.barMargin
     }
@@ -64,7 +67,9 @@ PanelWindow {
     focusable: false
     // Input region: full bar when shown, thin top strip when autohidden.
     mask: Region { item: barHitbox }
-    WlrLayershell.layer: root.fullscreenActive ? WlrLayer.Overlay : WlrLayer.Top
+    // Overlay while a menu is open so the same island hitbox toggles close
+    // (menus are Overlay and would otherwise sit above the Top bar).
+    WlrLayershell.layer: (root.fullscreenActive || root.panelOpen) ? WlrLayer.Overlay : WlrLayer.Top
     WlrLayershell.namespace: "rice-bar"
     WlrLayershell.keyboardFocus: WlrKeyboardFocus.None
 
@@ -80,6 +85,33 @@ PanelWindow {
         root.hovering = false
         if (!root.panelOpen)
             root.revealed = false
+    }
+
+    function onEdgeEnter() {
+        root.hovering = true
+        hideTimer.stop()
+        if (!root.showContent)
+            showTimer.restart()
+        else
+            root.revealed = true
+    }
+
+    function onEdgeLeave() {
+        // Height/mask can change mid-reveal; confirm leave after the frame settles.
+        Qt.callLater(function () {
+            if (barHover.hovered) {
+                root.hovering = true
+                hideTimer.stop()
+                return
+            }
+            root.hovering = false
+            showTimer.stop()
+            if (root.panelOpen)
+                return
+            if (root.pinned && !root.fullscreenActive)
+                return
+            hideTimer.restart()
+        })
     }
 
     function openQuickSettings() {
@@ -164,6 +196,14 @@ PanelWindow {
         }
     }
 
+    onShowContentChanged: {
+        if (root.showContent) {
+            hideTimer.stop()
+            if (barHover.hovered)
+                root.hovering = true
+        }
+    }
+
     onPanelOpenChanged: {
         if (root.panelOpen) {
             keepOpen()
@@ -188,13 +228,13 @@ PanelWindow {
 
     Timer {
         id: showTimer
-        interval: 350
+        interval: 100
         onTriggered: root.revealed = true
     }
 
     Timer {
         id: hideTimer
-        interval: 550
+        interval: 400
         onTriggered: {
             if (root.panelOpen || root.hovering)
                 return
@@ -204,73 +244,89 @@ PanelWindow {
         }
     }
 
-    // Hover only — never steal button clicks from bar islands.
-    HoverHandler {
-        id: barHover
-        onHoveredChanged: {
-            if (barHover.hovered) {
-                root.hovering = true
-                hideTimer.stop()
-                if (!root.showContent)
-                    showTimer.restart()
-                else
-                    root.revealed = true
-            } else {
-                root.hovering = false
-                showTimer.stop()
-                if (root.panelOpen)
-                    return
-                if (root.pinned && !root.fullscreenActive)
-                    return
-                hideTimer.restart()
-            }
-        }
-    }
+    // True while the bar is up or still sliding/fading — keeps the input mask full.
+    readonly property bool barInteractive: root.showContent || barMotion.opacity > 0.02
 
-    // Hit region only — size of the layer stays fixed.
+    // Hit region for the input mask: full bar when shown/animating, top strip when hidden.
     Item {
         id: barHitbox
         anchors.left: parent.left
         anchors.right: parent.right
         anchors.top: parent.top
-        height: root.showContent ? parent.height : root.triggerHeight
+        height: root.barInteractive ? parent.height : root.triggerHeight
     }
 
-    RowLayout {
-        id: barRow
-        anchors.fill: parent
-        spacing: Theme.barGap
-        // Instant show/hide without resizing the Wayland layer.
+    // Track hover on the whole layer (mask still clips input to barHitbox).
+    // ApprovesTakeOver so island TapHandlers keep a stable open/close hitbox.
+    HoverHandler {
+        id: barHover
+        grabPermissions: PointerHandler.ApprovesTakeOverByAnything
+        onHoveredChanged: {
+            if (hovered)
+                root.onEdgeEnter()
+            else
+                root.onEdgeLeave()
+        }
+    }
+
+    // Slide + fade — QML-side so Hyprland layer tweens stay off.
+    Item {
+        id: barMotion
+        width: parent.width
+        height: parent.height
+        y: root.showContent ? 0 : -(Theme.barHeight + Theme.barMargin)
         opacity: root.showContent ? 1 : 0
-        visible: root.showContent
+        visible: opacity > 0.001
         z: 1
+        clip: false
 
-        RowLayout {
-            spacing: Theme.barGap
-            Layout.alignment: Qt.AlignLeft | Qt.AlignVCenter
-
-            BarWorkspaces {}
-            BarActiveWindow {}
+        Behavior on y {
+            NumberAnimation {
+                duration: root.showContent ? 340 : 260
+                easing.type: root.showContent ? Easing.OutCubic : Easing.InCubic
+            }
+        }
+        Behavior on opacity {
+            NumberAnimation {
+                duration: root.showContent ? 300 : 220
+                easing.type: root.showContent ? Easing.OutCubic : Easing.InCubic
+            }
         }
 
-        Item { Layout.fillWidth: true }
-
         RowLayout {
+            id: barRow
+            anchors.fill: parent
+            anchors.topMargin: Theme.barMargin
+            anchors.bottomMargin: Theme.barMargin
             spacing: Theme.barGap
-            Layout.alignment: Qt.AlignRight | Qt.AlignVCenter
 
-            BarQsButton {
-                onActivated: root.openQuickSettings()
+            RowLayout {
+                spacing: Theme.barGap
+                Layout.alignment: Qt.AlignLeft | Qt.AlignVCenter
+
+                BarWorkspaces {}
+                BarActiveWindow {}
             }
 
-            BarClockButton {
-                onActivated: root.openCalendar()
-            }
+            Item { Layout.fillWidth: true }
 
-            BarNotifButton {
-                muted: !!(notifCenter && notifCenter.dnd)
-                unread: notifCenter ? notifCenter.unread : 0
-                onActivated: root.openNotifications()
+            RowLayout {
+                spacing: Theme.barGap
+                Layout.alignment: Qt.AlignRight | Qt.AlignVCenter
+
+                BarQsButton {
+                    onActivated: root.openQuickSettings()
+                }
+
+                BarClockButton {
+                    onActivated: root.openCalendar()
+                }
+
+                BarNotifButton {
+                    muted: !!(notifCenter && notifCenter.dnd)
+                    unread: notifCenter ? notifCenter.unread : 0
+                    onActivated: root.openNotifications()
+                }
             }
         }
     }

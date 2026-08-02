@@ -1,8 +1,9 @@
 import QtQuick
 import QtQuick.Layouts
 
-// Root is MouseArea so clicks always hit this island (not child IconImage/ColorOverlay).
-MouseArea {
+// Island chrome + hit target. TapHandler (not MouseArea) so the bar's
+// HoverHandler cannot steal presses — same open/close hitbox every time.
+Item {
     id: root
 
     property bool clickable: false
@@ -12,15 +13,18 @@ MouseArea {
     implicitHeight: Theme.barHeight
     implicitWidth: Math.max(Theme.barHeight, contentHost.implicitWidth + Theme.barIslandPadH * 2)
 
-    // When not clickable, let children (e.g. workspace cells) receive clicks.
-    acceptedButtons: root.clickable ? Qt.LeftButton : Qt.NoButton
-    hoverEnabled: true
-    preventStealing: root.clickable
-    cursorShape: root.clickable ? Qt.PointingHandCursor : Qt.ArrowCursor
+    // Full-island hover + click target (matches the visible rounded rect).
+    TapHandler {
+        enabled: root.clickable
+        acceptedButtons: Qt.LeftButton
+        gesturePolicy: TapHandler.ReleaseWithinBounds
+        onTapped: root.activated()
+    }
 
-    onClicked: {
-        if (root.clickable)
-            root.activated()
+    HoverHandler {
+        id: islandHover
+        enabled: root.clickable
+        cursorShape: root.clickable ? Qt.PointingHandCursor : Qt.ArrowCursor
     }
 
     Rectangle {
@@ -34,8 +38,7 @@ MouseArea {
 
     RowLayout {
         id: contentHost
-        // When this island is the button, disable children so IconImage /
-        // ColorOverlay cannot steal the click from this MouseArea.
+        // Icons must not steal taps from TapHandler.
         enabled: !root.clickable
         anchors.fill: parent
         anchors.leftMargin: Theme.barIslandPadH
