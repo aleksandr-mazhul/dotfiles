@@ -78,25 +78,27 @@ Item {
         }
     }
 
+    // Stronger dim toward hyprlock blur+brightness feel (no GPU blur in greeter).
     Rectangle {
         anchors.fill: parent
         gradient: Gradient {
-            GradientStop { position: 0.0; color: Qt.rgba(cSurface.r, cSurface.g, cSurface.b, 0.40) }
-            GradientStop { position: 0.40; color: Qt.rgba(cSurface.r, cSurface.g, cSurface.b, 0.12) }
-            GradientStop { position: 1.0; color: Qt.rgba(cSurface.r, cSurface.g, cSurface.b, 0.78) }
+            GradientStop { position: 0.0; color: Qt.rgba(cSurface.r, cSurface.g, cSurface.b, 0.55) }
+            GradientStop { position: 0.35; color: Qt.rgba(cSurface.r, cSurface.g, cSurface.b, 0.28) }
+            GradientStop { position: 0.70; color: Qt.rgba(cSurface.r, cSurface.g, cSurface.b, 0.45) }
+            GradientStop { position: 1.0; color: Qt.rgba(cSurface.r, cSurface.g, cSurface.b, 0.82) }
         }
     }
 
     Column {
         anchors.horizontalCenter: parent.horizontalCenter
         anchors.verticalCenter: parent.verticalCenter
-        anchors.verticalCenterOffset: -80
-        spacing: 10
+        anchors.verticalCenterOffset: -40
+        spacing: 8
 
         Text {
             anchors.horizontalCenter: parent.horizontalCenter
             font.family: "JetBrains Mono"
-            font.pixelSize: 100
+            font.pixelSize: 96
             font.weight: Font.Medium
             color: cText
             style: Text.Outline
@@ -125,9 +127,9 @@ Item {
     Column {
         anchors.horizontalCenter: parent.horizontalCenter
         anchors.bottom: parent.bottom
-        anchors.bottomMargin: Math.max(90, parent.height * 0.11)
+        anchors.bottomMargin: 100
         spacing: 12
-        width: 340
+        width: 320
 
         Text {
             anchors.horizontalCenter: parent.horizontalCenter
@@ -160,9 +162,11 @@ Item {
                 anchors.leftMargin: 16
                 anchors.rightMargin: 16
                 echoMode: TextInput.Password
+                passwordCharacter: "●"
                 color: cText
                 font.family: "JetBrains Mono"
                 font.pixelSize: 16
+                font.letterSpacing: 8
                 horizontalAlignment: Text.AlignHCenter
                 verticalAlignment: Text.AlignVCenter
                 background: Item {}
