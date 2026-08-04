@@ -1,0 +1,15 @@
+# Curated AUR for this rice (subset of aur.txt)
+# Install via: ./packages/install.sh --rice
+tty-clock
+cbonsai
+pipes.sh
+peaclock
+zen-browser-bin
+kanata-bin
+gromit-mpx
+apple_cursor
+apple_hyprcursor
+vibepanel-bin
+yay
+zoom
+yandex-browser
