@@ -1,67 +1,235 @@
-# Dotfiles — Описание конфигурационных файлов
+# Dotfiles — Hyprland rice (Arch Linux)
 
+Персональная среда на **Arch + Hyprland**: Mac-like ввод (Kanata), динамическая палитра с обоев (SSOT), Quickshell-бар, Kitty/Fish/Tmux, Zen Browser и полный инвентарь пакетов для восстановления с нуля.
 
-## 📦 Восстановление после переустановки
-
-Одна команда (после `git clone`):
-
-```bash
-./bootstrap.sh
-```
-
-Подробности: [`RESTORE.md`](RESTORE.md). Списки пакетов: [`packages/`](packages/).
-Правила для AI-агентов: [`AGENTS.md`](AGENTS.md).
-
-- `packages/repo.txt` + `aur.txt` — полный инвентарь
-- `./packages/export.sh` — обновить списки после новых установок
-- `dotfiles-register-app <pkg>` — зарегистрировать одно приложение
-
-Этот репозиторий содержит мои персональные конфигурационные файлы ("дотфайлы") для настройки окружения в Linux. Они предназначены для создания согласованной, эффективной и эстетически приятной рабочей среды с использованием тайлового оконного менеджера Hyprland и сопутствующих утилит.
-
-## 🚀 Ключевые компоненты и их назначение
-
-### 1. **Hyprland (`/hypr`)**
-Это сердце моей системы — конфигурация для тайлового Wayland-композитора Hyprland.
-- **`hyprland.conf`**: Основной файл, который определяет всё: от внешнего вида окон (отступы, тени, скругления, анимации) до раскладки клавиатуры и назначения горячих клавиш. Здесь задаются переменные для часто используемых программ (`$terminal`, `$menu`, `$browser`) и настраивается автозапуск ключевых сервисов (`waybar`, `hyprpaper`).
-- **`monitors.conf` & `workspaces.conf`**: Вынесенные в отдельные файлы настройки для управления мониторами и рабочими столами. Это делает основную конфигурацию чище.
-- **Горячие клавиши (Keybindings)**: Настроены интуитивные сочетания клавиш для управления окнами, переключения рабочих столов, запуска приложений и управления громкостью/яркостью. Основной модификатор — `ALT` (`$mainMod`).
-
-### 2. **Waybar (`/waybar`)**
-Конфигурация для системной панели (статус-бара), которая предоставляет важную информацию в реальном времени.
-- **`config` & `style.css`**: JSON-подобный файл `config` определяет структуру и модули панели (слева — рабочие столы, по центру — заголовок активного окна, справа — системная информация). CSS-файл `style.css` отвечает за её внешний вид (цвета, шрифты, отступы), создавая единый стиль с остальным окружением.
-- **Модули**: Настроены модули для отображения:
-    - Рабочих столов Hyprland (с кастомными иконками).
-    - Раскладки клавиатуры.
-    - Уровня громкости (Pulseaudio).
-    - Загрузки CPU и использования RAM.
-    - Состояния батареи.
-    - Сетевого подключения.
-    - Температуры процессора.
-    - Текущего времени и даты.
-
-### 3. **Kitty (`/kitty`)**
-Конфигурация для эмулятора терминала Kitty, который является основным инструментом для работы в командной строке.
-- **`kitty.conf`**: Очень подробный файл, настраивающий всё до мелочей:
-    - **Шрифты**: Используется `JetBrains Mono` с поддержкой лигатур.
-    - **Цветовая схема**: Задана кастомная палитра (в стиле Tokyo Night), которая приятна для глаз и хорошо читается.
-    - **Прозрачность**: Настроен эффект полупрозрачности с размытием фона (`background_opacity` и `background_blur`), что улучшает визуальное восприятие.
-    - **Производительность и рендеринг**: Оптимизированы параметры для плавной работы.
-    - **Горячие клавиши**: Настроены сочетания для копирования/вставки, управления окнами и вкладками внутри Kitty.
-
-### 4. **Wofi (`/wofi`)**
-Конфигурация для Wofi — быстрого и легковесного лаунчера приложений для Wayland.
-- **`style.css`**: Определяет внешний вид меню запуска. Стилизован в той же цветовой палитре, что и терминал с Waybar, для создания консистентного пользовательского опыта. Настроен шрифт, цвета фона, текста и выделенного элемента.
-
-### 5. **Fish Shell (`/fish`)**
-Конфигурация для командной оболочки Fish.
-- **`config.fish`**: Минималистичная конфигурация, которая при запуске интерактивной сессии автоматически выполняет `fastfetch`.
-
-### 6. **Fastfetch (`/fastfetch`)**
-Конфигурация для `fastfetch` — утилиты для отображения системной информации в терминале.
-- **`config.jsonc`**: Определяет, какие именно модули (ОС, хост, ядро, DE/WM, терминал, CPU, память) и в каком порядке будут показаны при запуске команды.
+Управляется через **GNU Stow**. Секреты (логины, SSH, токены) в репозиторий не входят — см. [RESTORE.md](RESTORE.md).
 
 ---
 
-## 🎯 Общая цель
-Все эти конфигурации работают вместе, чтобы создать быструю, функциональную и визуально согласованную рабочую среду в Linux, полностью управляемую с клавиатуры и настроенную под мои личные предпочтения и рабочие процессы.
+## Быстрый старт после переустановки
 
+```bash
+git clone git@github.com:aleksandr-mazhul/dotfiles.git ~/dotfiles
+cd ~/dotfiles
+./bootstrap.sh
+```
+
+| Вариант | Что делает |
+| --- | --- |
+| `./bootstrap.sh` | Все пакеты (`repo.txt` + `aur.txt`) → restow → kanata → fish → тема → SDDM |
+| `./bootstrap.sh --rice` | Урезанный rice-набор |
+| `./bootstrap.sh --configs` | Только конфиги/сервисы/тема (пакеты уже стоят) |
+
+Обои (опционально):
+
+```bash
+BOOTSTRAP_WALLPAPER=~/Pictures/Wallpapers/nature/foo.jpg ./bootstrap.sh
+```
+
+Подробный scope восстановления: **[RESTORE.md](RESTORE.md)**.  
+Списки приложений: **[packages/](packages/)**.  
+Правила для AI-агентов: **[AGENTS.md](AGENTS.md)**.
+
+---
+
+## Архитектура
+
+```text
+Wallpaper
+   │
+   ▼
+theme-extract → theme-match → theme-build → palette.toml (SSOT)
+                                              │
+                                         theme-render
+                                              │
+    ┌───────────┬──────────┬─────────┬────────┼────────┬──────────┐
+    ▼           ▼          ▼         ▼        ▼        ▼          ▼
+  Kitty      Hyprland   Quickshell  GTK    nvim     tmux/starship  …
+  Zen/Vimium  lock      wofi/yazi   bat    btop     cava/glow/…
+```
+
+Обычный цикл после смены обоев:
+
+```bash
+apply-wallpaper-theme ~/Pictures/Wallpapers/….jpg
+exec fish   # обновить fish-обёртки (cbonsai, pipes, gum, …)
+```
+
+Шаблоны и детали пайплайна: [theme/.config/theme/README.md](theme/.config/theme/README.md).
+
+---
+
+## Структура репозитория
+
+| Путь | Назначение |
+| --- | --- |
+| `hypr/` | Hyprland (Lua): окна, binds, rules, lock, скрипты |
+| `kanata/` | Home-row mods + remaps, user systemd unit |
+| `quickshell/` | Бар / лаунчер / календарь / уведомления / clipboard (QS rice) |
+| `kitty/` | Терминал + цвета/вкладки из SSOT |
+| `fish/` | Shell, fzf/rice theme snippets |
+| `tmux/` | Сессии, continuum/resurrect, status из SSOT |
+| `nvim/` | LazyVim + palette bridge |
+| `theme/` | `harmonies.toml`, templates, SSOT docs |
+| `bin/` | `theme-*`, `apply-wallpaper-theme`, `zen-browser`, helpers |
+| `zen/` | Keyboard shortcuts, `user.js`, Vimium mirror |
+| `starship/`, `yazi/`, `gtk/`, `wofi/`, `waypaper/` | CLI/UI consumers |
+| `obs/` | Сцены/профили (без websocket password) |
+| `sddm/` | Adaptive login theme (`sddm/install.sh`) |
+| `packages/` | Инвентарь pacman/AUR + install/export |
+| `bootstrap.sh` | Полное восстановление одной командой |
+| `restow.sh` | Переустановка всех Stow-пакетов в `$HOME` |
+
+Применить только конфиги (пакеты уже установлены):
+
+```bash
+./restow.sh
+```
+
+---
+
+## Ключевые компоненты
+
+### Hyprland (`hypr/`)
+
+Конфиг на **Lua** (`hyprland.lua`, `binds.lua`, `rules.lua`), не классический `hyprland.conf`.
+
+- **Модификаторы:** `ALT` = window mgmt (`mainMod`), `SUPER` = система/бар/утилиты (`secondMod`)
+- Mac-like привычки: Ctrl≈Cmd в приложениях; мышиные кнопки вкладок → Kanata → `Ctrl+PgUp/Dn`
+- Workspace rules для браузеров/приложений, float-правила, скрипты скриншотов/OCR/clipboard/Zoom tabs
+
+### Kanata (`kanata/`)
+
+- Home-row mods (Super/Alt/Ctrl/Shift)
+- `Super+Shift+[ ]` → `Ctrl+Page_Up/Down` (вкладки в Zen / окна в tmux через Kitty)
+- User unit: `systemctl --user enable --now kanata.service`  
+  (пользователь должен быть в группе `input`)
+
+### Quickshell rice (`quickshell/`)
+
+Основной UI поверх Hyprland: бар, launcher, calendar, notifications, wallpaper picker, clipboard island. Цвета из `Colors.qml` (рендер SSOT).
+
+### Kitty + Fish + Tmux + Starship
+
+- **Kitty** — основной терминал, прозрачность, SSOT colors/tabs; `Ctrl+PgUp/Dn` → tmux prev/next window
+- **Fish** — login shell, `theme-fzf` / `theme-rice` wrappers
+- **Tmux** — resurrect + continuum (сейв каждые 5 мин), deep scrollback, status из SSOT chrome tokens
+- **Starship** — prompt из той же палитры
+
+### Theme SSOT (`theme/` + `bin/theme-*`)
+
+Единый источник правды: `~/.config/theme/palette.toml`.
+
+Рендерится в: Hypr, lock, Kitty, GTK3/4, Quickshell, Wofi, Starship, Tmux, Yazi, fzf, bat, lazygit, nvim, Herdr, Vimium, btop, cava, peaclock, glow, bottom и fish-обёртки rice-утилит.
+
+### Zen Browser (`zen/` + `zen-browser`)
+
+В git только:
+
+- `zen-keyboard-shortcuts.json`
+- `user.js`
+- `vimium-options.json` (зеркало; CSS пишет `theme-render`)
+
+Лаунчер `zen-browser` синхронизирует shortcuts/`user.js` в профиль и Vimium CSS до/после запуска. Полный профиль (cookies/logins) **не** коммитится.
+
+### nvim (`nvim/`)
+
+LazyVim-стек + `palette.lua` / `ssot-colors` под обойную гамму.
+
+### Прочее
+
+| Пакет | Заметка |
+| --- | --- |
+| `yazi/` | Файловый TUI + theme |
+| `waypaper/` | Выбор обоев → theme pipeline |
+| `wofi/` | Fallback launcher styles |
+| `herdr/` | Доп. theming consumer |
+| `obs/` | Recording/scenes для Hyprland |
+| `misc/` | mimeapps, gromit-mpx, … |
+| `git/` | Глобальный `.gitconfig` |
+| `fastfetch/` | Fetch при старте fish |
+
+---
+
+## Пакеты и новые приложения
+
+| Файл | Содержимое |
+| --- | --- |
+| `packages/repo.txt` | Все явные пакеты official (~197) |
+| `packages/aur.txt` | AUR (~21; без `*-debug`) |
+| `packages/rice-*.txt` | Курируемый rice-минимум |
+| `packages/install.sh` | Установка списков |
+| `packages/export.sh` | Обновить списки с текущей машины |
+
+После установки чего-то нового:
+
+```bash
+./packages/export.sh
+# или
+dotfiles-register-app <pkg> [--aur] [--rice]
+./restow.sh          # если добавили конфиг в Stow-пакет
+# при необходимости — шаблон в theme/ + mapping в theme-render
+```
+
+Чеклист для агентов: [AGENTS.md](AGENTS.md).
+
+---
+
+## Типичный day-to-day
+
+```bash
+# Сменить обои и перекрасить весь стек
+apply-wallpaper-theme ~/Pictures/Wallpapers/….jpg
+
+# Только перерисовать consumers из текущего palette.toml
+theme-render
+
+# Только Vimium CSS (Zen лучше закрыть)
+theme-vimium
+
+# Переложить симлинки после правок в репо
+./restow.sh
+```
+
+Полезные rice-команды (после `exec fish`): `cava`, `btop`, `btm`, `peaclock`, `cbonsai -l`, `tty-clock`, `pipes.sh`, `glow README.md`.
+
+---
+
+## Что не восстанавливается из git
+
+| Данные | Причина |
+| --- | --- |
+| Профиль Zen / пароли браузера | секреты и PII |
+| SSH / GPG / `gh` tokens | секреты |
+| Discord, Spotify, JetBrains, VS Code data | тяжёлые и machine-local |
+| Пароль OBS websocket | gitignored |
+| Библиотека обоев | копировать отдельно в `~/Pictures/Wallpapers` |
+
+После `bootstrap.sh`: положить обои и ключи, `gh auth login`, один раз открыть Zen через `zen-browser`.
+
+---
+
+## Требования
+
+- Arch Linux (или совместимый pacman)
+- Сеть + `sudo` (для пакетов и SDDM)
+- Реальный терминал для пароля (`yay` / `sudo`)
+- Для Kanata: группа `input`, затем re-login
+
+---
+
+## Документация
+
+| Документ | О чём |
+| --- | --- |
+| [RESTORE.md](RESTORE.md) | Scope bootstrap: что входит / что нет |
+| [packages/README.md](packages/README.md) | Инвентарь и install/export |
+| [theme/.../README.md](theme/.config/theme/README.md) | SSOT pipeline и consumers |
+| [AGENTS.md](AGENTS.md) | Как агентам добавлять приложения |
+| [.cursor/rules/](.cursor/rules/) | Cursor rules для этого репо |
+
+---
+
+## Лицензия / использование
+
+Личный rice. Можно форкать и адаптировать; пути вроде `/home/stranger` и профиль Zen захардкожены под эту машину — при переносе проверьте `ZEN_PROFILE`, `restow.sh` target и списки пакетов.
