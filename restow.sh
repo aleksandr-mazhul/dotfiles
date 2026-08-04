@@ -12,6 +12,7 @@ packages=(
   entropy
   fastfetch
   fish
+  git
   gtk
   herdr
   hypr

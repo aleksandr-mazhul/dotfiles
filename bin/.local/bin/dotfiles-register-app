@@ -1,0 +1,72 @@
+#!/usr/bin/env bash
+# Register a newly installed package into packages/*.txt (and optionally rice lists).
+#
+# Usage:
+#   dotfiles-register-app <pkg> [--aur] [--rice]
+#
+# Examples:
+#   dotfiles-register-app glow
+#   dotfiles-register-app peaclock --aur --rice
+set -euo pipefail
+
+SCRIPT="$(readlink -f "$0")"
+ROOT="$(cd "$(dirname "$SCRIPT")/../../.." && pwd)"
+if [[ ! -d "$ROOT/packages" && -d "${HOME}/dotfiles/packages" ]]; then
+  ROOT="${HOME}/dotfiles"
+fi
+PKG_DIR="$ROOT/packages"
+[[ -d "$PKG_DIR" ]] || { echo "packages/ not found (ROOT=$ROOT)" >&2; exit 1; }
+
+pkg="${1:-}"
+shift || true
+[[ -n "$pkg" ]] || { echo "usage: $0 <pkg> [--aur] [--rice]" >&2; exit 2; }
+
+is_aur=0
+to_rice=0
+for a in "$@"; do
+  case "$a" in
+    --aur|aur) is_aur=1 ;;
+    --rice|rice) to_rice=1 ;;
+    *) echo "unknown arg: $a" >&2; exit 2 ;;
+  esac
+done
+
+if ! pacman -Q "$pkg" &>/dev/null; then
+  echo "package not installed: $pkg" >&2
+  echo "Install first (pacman/yay), then re-run." >&2
+  exit 1
+fi
+
+if [[ "$is_aur" -eq 0 ]] && pacman -Qqm | grep -qx "$pkg"; then
+  is_aur=1
+fi
+
+add_line() {
+  local file="$1" line="$2"
+  touch "$file"
+  if grep -qxF "$line" "$file" 2>/dev/null; then
+    echo "already listed: $line ($file)"
+    return 0
+  fi
+  echo "$line" >>"$file"
+  local tmp
+  tmp="$(mktemp)"
+  { grep -E '^\s*#' "$file" || true; grep -vE '^\s*(#|$)' "$file" | sort -u; } >"$tmp"
+  mv "$tmp" "$file"
+  echo "added: $line → $file"
+}
+
+if [[ "$is_aur" -eq 1 ]]; then
+  add_line "$PKG_DIR/aur.txt" "$pkg"
+  [[ "$to_rice" -eq 1 ]] && add_line "$PKG_DIR/rice-aur.txt" "$pkg"
+else
+  add_line "$PKG_DIR/repo.txt" "$pkg"
+  [[ "$to_rice" -eq 1 ]] && add_line "$PKG_DIR/rice-repo.txt" "$pkg"
+fi
+
+echo
+echo "Next (if this app has config worth tracking):"
+echo "  1. add files under an appropriate Stow package"
+echo "  2. ./restow.sh"
+echo "  3. optional SSOT: theme template + theme-render mapping"
+echo "  4. commit when the user asks"

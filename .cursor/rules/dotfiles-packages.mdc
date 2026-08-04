@@ -1,0 +1,17 @@
+---
+description: Dotfiles package install + inventory rules for Arch rice
+alwaysApply: true
+---
+
+# Dotfiles — new apps & restore
+
+When adding or installing software in this repo:
+
+1. Install the package (`pacman` / user-run `yay` if password needed).
+2. Refresh inventory: `./packages/export.sh` or `dotfiles-register-app <pkg>`.
+3. Stow any durable config under the correct package; update `restow.sh` if new package.
+4. If themable, add a `theme/.../templates` entry and wire `theme-render`.
+5. Never commit secrets (tokens, browser profiles, OBS websocket password, SSH keys).
+6. Commit/push only when the user asks.
+
+Full restore for humans: `./bootstrap.sh` (see `RESTORE.md`, `AGENTS.md`).
