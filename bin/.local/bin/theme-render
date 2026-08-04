@@ -1,0 +1,388 @@
+#!/usr/bin/env python3
+"""Render all consumer configs from ~/.config/theme/palette.toml (SSOT)."""
+from __future__ import annotations
+
+import json
+import os
+import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from _theme_core import CFG, flat_palette, load_palette, render_template  # noqa: E402
+
+VIMIUM_EXT_ID = "{d7742d87-e61d-4b78-b8a1-b469842139fa}"
+
+TEMPLATES_DIR = Path(__file__).resolve().parents[3] / "theme/.config/theme/templates"
+# When stowed, templates live under ~/.config/theme/templates
+STOWED_TEMPLATES = CFG / "theme" / "templates"
+
+
+def tmpl_dir() -> Path:
+    if STOWED_TEMPLATES.is_dir():
+        return STOWED_TEMPLATES
+    if TEMPLATES_DIR.is_dir():
+        return TEMPLATES_DIR
+    raise FileNotFoundError("theme templates not found")
+
+
+def write(path: Path, content: str) -> None:
+    text = content if content.endswith("\n") else content + "\n"
+    try:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(text)
+    except PermissionError as e:
+        print(f"theme-render: permission denied writing {path}: {e}", file=sys.stderr)
+
+
+def main() -> int:
+    if len(sys.argv) > 1 and sys.argv[1] in ("--vimium-only", "vimium"):
+        # Always rewrite so a Zen shutdown race cannot leave stale CSS
+        changed = _update_vimium(tmpl_dir(), flat_palette(load_palette()), force=True)
+        print("theme-vimium: synced" if changed else "theme-vimium: write skipped/failed")
+        return 0
+
+    pal = load_palette()
+    flat = flat_palette(pal)
+    # Absolute path so glow / GLAMOUR_STYLE work outside login shells
+    flat["glow_style_path"] = str(CFG / "glow/ssot.json")
+    tdir = tmpl_dir()
+    mapping = {
+        "quickshell-colors.qml.tmpl": CFG / "quickshell/rice/Colors.qml",
+        "hyprland-colors.lua.tmpl": CFG / "hypr/colors-matugen.lua",
+        "hyprlock-colors.conf.tmpl": CFG / "hypr/hyprlock-colors.conf",
+        "hyprtoolkit-colors.conf.tmpl": CFG / "hypr/hyprtoolkit.conf",
+        "kitty-colors.conf.tmpl": CFG / "kitty/colors-matugen.conf",
+        "gtk.css.tmpl": None,  # dual write
+        "wofi-colors.css.tmpl": CFG / "wofi/colors-matugen.css",
+        "sddm-colors.conf.tmpl": CFG / "sddm-adaptive/colors.conf",
+        "starship.toml.tmpl": CFG / "starship.toml",
+        "tmux-theme.sh.tmpl": CFG / "tmux/theme-status.sh",
+        "yazi-theme.toml.tmpl": CFG / "yazi/theme.toml",
+        "fzf.fish.tmpl": CFG / "fish/conf.d/theme-fzf.fish",
+        "lazygit-config.yml.tmpl": CFG / "lazygit/config.yml",
+        "nvim-palette.lua.tmpl": CFG / "nvim/lua/config/palette.lua",
+        "herdr-theme.toml.tmpl": CFG / "herdr/config.toml",
+        "kitty-tabs.conf.tmpl": CFG / "kitty/tabs-theme.conf",
+        "btop.theme.tmpl": CFG / "btop/themes/ssot.theme",
+        "cava-theme.tmpl": CFG / "cava/themes/ssot",
+        "peaclock.config.tmpl": CFG / "peaclock/config",
+        "glow-ssot.json.tmpl": CFG / "glow/ssot.json",
+        "glow.yml.tmpl": CFG / "glow/glow.yml",
+        "bottom.toml.tmpl": CFG / "bottom/bottom.toml",
+        "theme-rice.fish.tmpl": CFG / "fish/conf.d/theme-rice.fish",
+    }
+
+    rendered = 0
+    for name, dest in mapping.items():
+        src = tdir / name
+        if not src.is_file():
+            print(f"theme-render: skip missing template {name}", file=sys.stderr)
+            continue
+        body = render_template(src.read_text(), flat)
+        if name == "gtk.css.tmpl":
+            write(CFG / "gtk-3.0/gtk.css", body)
+            write(CFG / "gtk-4.0/gtk.css", body)
+            rendered += 2
+            continue
+        if dest is None:
+            continue
+        write(dest, body)
+        rendered += 1
+
+    # bat theme + config (simple ANSI-linked)
+    bat_dir = CFG / "bat/themes/ssot"
+    bat_dir.mkdir(parents=True, exist_ok=True)
+    write(
+        bat_dir / "ssot.tmTheme",
+        render_template((tdir / "bat-ssot.tmTheme.tmpl").read_text(), flat)
+        if (tdir / "bat-ssot.tmTheme.tmpl").is_file()
+        else _fallback_bat(flat),
+    )
+    write(CFG / "bat/config", "--theme=ssot\n")
+    rendered += 1
+
+    if _ensure_btop_layout():
+        rendered += 1
+
+    if _ensure_cava_theme():
+        rendered += 1
+
+    # Bust PowerKit color cache so tmux picks up SSOT chrome on next load
+    cache = Path(os.environ.get("XDG_CACHE_HOME", Path.home() / ".cache")) / "tmux-powerkit" / "data"
+    for pattern in ("theme_colors__*", "current_theme"):
+        for p in cache.glob(pattern):
+            try:
+                p.unlink()
+            except OSError:
+                pass
+
+    if _update_vimium(tdir, flat):
+        rendered += 1
+
+    print(f"theme-render: wrote {rendered} targets from palette.toml")
+    return 0
+
+
+def _ensure_btop_layout() -> bool:
+    """Point btop at SSOT theme and apply a calmer default layout (idempotent)."""
+    conf = CFG / "btop/btop.conf"
+    if not conf.is_file():
+        return False
+    try:
+        text = conf.read_text()
+    except OSError as e:
+        print(f"theme-render: skip btop.conf: {e}", file=sys.stderr)
+        return False
+
+    patches = {
+        "color_theme": '"ssot"',
+        "theme_background": "false",
+        "rounded_corners": "true",
+        "vim_keys": "true",
+        "shown_boxes": '"cpu gpu0 mem net proc"',
+        "show_gpu_info": '"Off"',
+        "cpu_single_graph": "true",
+        "show_coretemp": "false",
+        "proc_cpu_graphs": "false",
+        "mem_graphs": "false",
+        "gpu_mirror_graph": "false",
+        "swap_disk": "false",
+        "clock_format": '"%H:%M"',
+        "presets": '"cpu:0:default,gpu0:0:default,mem:0:default,net:0:default,proc:0:default"',
+    }
+
+    import re
+
+    changed = False
+    for key, value in patches.items():
+        pat = re.compile(rf"(?m)^({re.escape(key)}\s*=\s*).*$")
+        if not pat.search(text):
+            continue
+        new_text, n = pat.subn(rf"\1{value}", text, count=1)
+        if n and new_text != text:
+            text = new_text
+            changed = True
+
+    if not changed:
+        return False
+    try:
+        conf.write_text(text)
+    except PermissionError as e:
+        print(f"theme-render: permission denied writing {conf}: {e}", file=sys.stderr)
+        return False
+    return True
+
+
+def _ensure_cava_theme() -> bool:
+    """Point cava at SSOT theme file (idempotent)."""
+    import re
+
+    conf = CFG / "cava/config"
+    if not conf.is_file():
+        return False
+    try:
+        text = conf.read_text()
+    except OSError as e:
+        print(f"theme-render: skip cava config: {e}", file=sys.stderr)
+        return False
+
+    pat = re.compile(r"(?m)^(;?\s*)theme\s*=\s*.*$")
+    repl = "theme = 'ssot'"
+    if pat.search(text):
+        new_text, n = pat.subn(repl, text, count=1)
+        if not n or new_text == text:
+            return False
+        text = new_text
+    else:
+        # Insert under [color] if present
+        color_sec = re.compile(r"(?m)^\[color\]\s*$")
+        if color_sec.search(text):
+            text = color_sec.sub("[color]\ntheme = 'ssot'", text, count=1)
+        else:
+            text = text.rstrip() + "\n\n[color]\ntheme = 'ssot'\n"
+
+    try:
+        conf.write_text(text if text.endswith("\n") else text + "\n")
+    except PermissionError as e:
+        print(
+            "theme-render: cava config not writable "
+            f"(try: sudo chown -R \"$USER\" ~/.config/cava): {e}",
+            file=sys.stderr,
+        )
+        return False
+    return True
+
+
+def _zen_profiles() -> list[Path]:
+    zen = CFG / "zen"
+    if not zen.is_dir():
+        return []
+    # Profiles that actually hold extension data
+    return sorted({p.parent.parent for p in zen.glob(f"*/browser-extension-data/{VIMIUM_EXT_ID}")})
+
+
+def _zen_vimium_storages() -> list[Path]:
+    return sorted(
+        (prof / "browser-extension-data" / VIMIUM_EXT_ID / "storage.js")
+        for prof in _zen_profiles()
+        if (prof / "browser-extension-data" / VIMIUM_EXT_ID / "storage.js").is_file()
+    )
+
+
+def _zen_vimium_sync_dbs() -> list[Path]:
+    return sorted(
+        (prof / "storage-sync-v2.sqlite")
+        for prof in _zen_profiles()
+        if (prof / "storage-sync-v2.sqlite").is_file()
+    )
+
+
+def _patch_json_css(path: Path, css: str, *, force: bool = False) -> bool:
+    if not path.is_file():
+        return False
+    try:
+        data = json.loads(path.read_text())
+    except (OSError, json.JSONDecodeError) as e:
+        print(f"theme-render: skip vimium {path}: {e}", file=sys.stderr)
+        return False
+    if not force and data.get("userDefinedLinkHintCss") == css:
+        return False
+    data["userDefinedLinkHintCss"] = css
+    try:
+        path.write_text(json.dumps(data, ensure_ascii=False, separators=(",", ":")))
+    except PermissionError as e:
+        print(f"theme-render: permission denied writing {path}: {e}", file=sys.stderr)
+        return False
+    return True
+
+
+def _patch_sync_sqlite_css(db: Path, css: str, *, force: bool = False) -> bool:
+    """Vimium reads chrome.storage.sync → Firefox storage-sync-v2.sqlite (not storage.js)."""
+    import sqlite3
+
+    try:
+        conn = sqlite3.connect(str(db), timeout=5)
+    except sqlite3.Error as e:
+        print(f"theme-render: cannot open {db}: {e}", file=sys.stderr)
+        return False
+    try:
+        row = conn.execute(
+            "SELECT data FROM storage_sync_data WHERE ext_id = ?",
+            (VIMIUM_EXT_ID,),
+        ).fetchone()
+        if row and row[0]:
+            try:
+                data = json.loads(row[0])
+            except json.JSONDecodeError as e:
+                print(f"theme-render: bad sync JSON in {db}: {e}", file=sys.stderr)
+                return False
+        else:
+            data = {"settingsVersion": "2.4.2", "ignoreKeyboardLayout": True}
+
+        if not force and data.get("userDefinedLinkHintCss") == css:
+            return False
+
+        data["userDefinedLinkHintCss"] = css
+        payload = json.dumps(data, ensure_ascii=False, separators=(",", ":"))
+        conn.execute(
+            """
+            INSERT INTO storage_sync_data (ext_id, data, sync_change_counter)
+            VALUES (?, ?, 1)
+            ON CONFLICT(ext_id) DO UPDATE SET
+              data = excluded.data,
+              sync_change_counter = storage_sync_data.sync_change_counter + 1
+            """,
+            (VIMIUM_EXT_ID, payload),
+        )
+        conn.commit()
+        return True
+    except sqlite3.Error as e:
+        print(f"theme-render: sqlite update failed for {db}: {e}", file=sys.stderr)
+        return False
+    finally:
+        conn.close()
+
+
+def _update_vimium(tdir: Path, flat: dict[str, str], *, force: bool = False) -> bool:
+    tmpl = tdir / "vimium-css.tmpl"
+    if not tmpl.is_file():
+        print("theme-render: skip missing template vimium-css.tmpl", file=sys.stderr)
+        return False
+    css = render_template(tmpl.read_text(), flat).rstrip() + "\n"
+    changed = False
+
+    opts = CFG / "zen" / "vimium-options.json"
+    if opts.is_file():
+        if _patch_json_css(opts, css, force=force):
+            changed = True
+    else:
+        try:
+            opts.parent.mkdir(parents=True, exist_ok=True)
+            opts.write_text(
+                json.dumps(
+                    {
+                        "ignoreKeyboardLayout": True,
+                        "settingsVersion": "2.4.2",
+                        "userDefinedLinkHintCss": css,
+                    },
+                    ensure_ascii=False,
+                    indent=2,
+                )
+                + "\n"
+            )
+            changed = True
+        except PermissionError as e:
+            print(f"theme-render: permission denied writing {opts}: {e}", file=sys.stderr)
+
+    # Local mirror (not what Vimium reads for settings, but keep in sync)
+    for storage in _zen_vimium_storages():
+        if _patch_json_css(storage, css, force=force):
+            changed = True
+
+    # Actual source of truth for Vimium settings
+    sync_ok = False
+    for db in _zen_vimium_sync_dbs():
+        if _patch_sync_sqlite_css(db, css, force=force):
+            changed = True
+            sync_ok = True
+    if not _zen_vimium_sync_dbs():
+        print("theme-render: no storage-sync-v2.sqlite found for Zen", file=sys.stderr)
+    elif not sync_ok and force:
+        print("theme-render: warning: sync DB not updated (is Zen running?)", file=sys.stderr)
+
+    if changed:
+        print("theme-render: updated Vimium CSS (storage.sync)", file=sys.stderr)
+    return changed
+
+
+def _fallback_bat(flat: dict[str, str]) -> str:
+    return f"""<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0"><dict>
+  <key>name</key><string>ssot</string>
+  <key>settings</key><array>
+    <dict><key>settings</key><dict>
+      <key>background</key><string>{flat['background']}</string>
+      <key>foreground</key><string>{flat['on_surface']}</string>
+      <key>caret</key><string>{flat['primary']}</string>
+      <key>selection</key><string>{flat['primary']}</string>
+    </dict></dict>
+    <dict><key>name</key><string>Comment</key>
+      <key>scope</key><string>comment</string>
+      <key>settings</key><dict><key>foreground</key><string>{flat['on_surface_variant']}</string></dict></dict>
+    <dict><key>name</key><string>String</key>
+      <key>scope</key><string>string</string>
+      <key>settings</key><dict><key>foreground</key><string>{flat['secondary']}</string></dict></dict>
+    <dict><key>name</key><string>Keyword</key>
+      <key>scope</key><string>keyword</string>
+      <key>settings</key><dict><key>foreground</key><string>{flat['primary']}</string></dict></dict>
+    <dict><key>name</key><string>Function</key>
+      <key>scope</key><string>entity.name.function</string>
+      <key>settings</key><dict><key>foreground</key><string>{flat['tertiary']}</string></dict></dict>
+  </array>
+</dict></plist>
+"""
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

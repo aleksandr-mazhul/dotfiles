@@ -1,0 +1,147 @@
+{
+  "document": {
+    "block_prefix": "\n",
+    "block_suffix": "\n",
+    "color": "{{ on_surface }}",
+    "margin": 2
+  },
+  "block_quote": {
+    "indent": 1,
+    "indent_token": "│ ",
+    "color": "{{ on_surface_variant }}"
+  },
+  "paragraph": {},
+  "list": {
+    "level_indent": 2
+  },
+  "heading": {
+    "block_suffix": "\n",
+    "color": "{{ primary }}",
+    "bold": true
+  },
+  "h1": {
+    "prefix": " ",
+    "suffix": " ",
+    "color": "{{ on_primary }}",
+    "background_color": "{{ primary }}",
+    "bold": true
+  },
+  "h2": {
+    "prefix": "## ",
+    "color": "{{ primary }}"
+  },
+  "h3": {
+    "prefix": "### ",
+    "color": "{{ secondary }}"
+  },
+  "h4": {
+    "prefix": "#### ",
+    "color": "{{ tertiary }}"
+  },
+  "h5": {
+    "prefix": "##### ",
+    "color": "{{ outline }}"
+  },
+  "h6": {
+    "prefix": "###### ",
+    "color": "{{ on_surface_variant }}",
+    "bold": false
+  },
+  "text": {},
+  "strikethrough": {
+    "crossed_out": true,
+    "color": "{{ on_surface_variant }}"
+  },
+  "emph": {
+    "italic": true,
+    "color": "{{ tertiary }}"
+  },
+  "strong": {
+    "bold": true,
+    "color": "{{ primary }}"
+  },
+  "hr": {
+    "color": "{{ surface_variant }}",
+    "format": "\n────────\n"
+  },
+  "item": {
+    "block_prefix": "• "
+  },
+  "enumeration": {
+    "block_prefix": ". ",
+    "color": "{{ secondary }}"
+  },
+  "task": {
+    "ticked": "[✓] ",
+    "unticked": "[ ] "
+  },
+  "link": {
+    "color": "{{ secondary }}",
+    "underline": true
+  },
+  "link_text": {
+    "color": "{{ primary }}",
+    "bold": true
+  },
+  "image": {
+    "color": "{{ tertiary }}",
+    "underline": true
+  },
+  "image_text": {
+    "color": "{{ on_surface_variant }}",
+    "format": "Image: {{.text}} →"
+  },
+  "code": {
+    "prefix": " ",
+    "suffix": " ",
+    "color": "{{ tertiary }}",
+    "background_color": "{{ surface_container }}"
+  },
+  "code_block": {
+    "color": "{{ on_surface_variant }}",
+    "margin": 2,
+    "chroma": {
+      "text": { "color": "{{ on_surface }}" },
+      "error": { "color": "{{ on_primary }}", "background_color": "{{ error }}" },
+      "comment": { "color": "{{ on_surface_variant }}" },
+      "comment_preproc": { "color": "{{ tertiary }}" },
+      "keyword": { "color": "{{ primary }}" },
+      "keyword_reserved": { "color": "{{ primary }}" },
+      "keyword_namespace": { "color": "{{ secondary }}" },
+      "keyword_type": { "color": "{{ outline }}" },
+      "operator": { "color": "{{ error }}" },
+      "punctuation": { "color": "{{ tertiary }}" },
+      "name": { "color": "{{ on_surface }}" },
+      "name_builtin": { "color": "{{ secondary }}" },
+      "name_tag": { "color": "{{ primary }}" },
+      "name_attribute": { "color": "{{ outline }}" },
+      "name_class": { "color": "{{ on_surface }}", "bold": true },
+      "name_constant": { "color": "{{ tertiary }}" },
+      "name_decorator": { "color": "{{ secondary }}" },
+      "name_function": { "color": "{{ primary }}" },
+      "literal_number": { "color": "{{ tertiary }}" },
+      "literal_string": { "color": "{{ secondary }}" },
+      "literal_string_escape": { "color": "{{ error }}" },
+      "generic_deleted": { "color": "{{ error }}" },
+      "generic_emph": { "italic": true },
+      "generic_inserted": { "color": "{{ secondary }}" },
+      "generic_strong": { "bold": true },
+      "generic_subheading": { "color": "{{ outline }}" }
+    }
+  },
+  "table": {
+    "center_separator": "┼",
+    "column_separator": "│",
+    "row_separator": "─"
+  },
+  "definition_list": {},
+  "definition_term": {
+    "color": "{{ primary }}",
+    "bold": true
+  },
+  "definition_description": {
+    "color": "{{ on_surface_variant }}"
+  },
+  "html_block": {},
+  "html_span": {}
+}

@@ -1,0 +1,3 @@
+#!/bin/bash
+# Alias used by some desktop entries / tooling — same as zen-browser.
+exec "$(dirname "$(readlink -f "$0")")/zen-browser" "$@"

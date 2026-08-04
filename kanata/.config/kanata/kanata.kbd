@@ -13,6 +13,7 @@
 ;;   Alt/Opt + ←/→           word (→ Ctrl+←/→ via defoverrides; works in Telegram/Qt)
 ;;   Ctrl/Cmd-finger + ←/→   line start/end
 ;;   Ctrl/Cmd-finger + ↑/↓   document start/end
+;;   Ctrl+Alt + ←/→          passthrough (Zen workspace folders, etc.)
 ;;   + Shift                 selection
 ;;   Alt + Backspace/Delete  delete word
 ;;
@@ -52,8 +53,10 @@
 (defalias
   ;; Ctrl held → line / document edges (must be a layer, not overrides:
   ;; otherwise Alt→Ctrl+← would also become Home).
-  linebeg (unmod (lctl rctl) home)
-  lineend (unmod (lctl rctl) end)
+  ;; When Alt is also held, keep arrows so Ctrl+Alt+←/→ reach apps (Zen workspaces).
+  ;; fork checks INPUT keys: HRM Alt is physical S/L, not only lalt/ralt.
+  linebeg (fork (unmod (lctl rctl) home) left  (lalt ralt s l))
+  lineend (fork (unmod (lctl rctl) end)  right (lalt ralt s l))
   docbeg  (unmod (lctl rctl) lctl home)
   docend  (unmod (lctl rctl) lctl end)
 
@@ -92,33 +95,34 @@
 
 ;; Alt/Opt word motion — global overrides (reliable in Telegram / Qt / GTK).
 ;; Do NOT override Ctrl+arrows here (those are line edges via mctl).
-(defoverrides
-  (lalt left)  (lctl left)
-  (lalt right) (lctl right)
-  (ralt left)  (lctl left)
-  (ralt right) (lctl right)
+;; Exclude Ctrl so Ctrl+Alt+←/→ stays passthrough (Zen workspace folders).
+(defoverridesv2
+  (lalt left)  (lctl left)  (lctl rctl) ()
+  (lalt right) (lctl right) (lctl rctl) ()
+  (ralt left)  (lctl left)  (lctl rctl) ()
+  (ralt right) (lctl right) (lctl rctl) ()
 
-  (lsft lalt left)  (lsft lctl left)
-  (lsft lalt right) (lsft lctl right)
-  (rsft lalt left)  (rsft lctl left)
-  (rsft lalt right) (rsft lctl right)
-  (lsft ralt left)  (lsft lctl left)
-  (lsft ralt right) (lsft lctl right)
-  (rsft ralt left)  (rsft lctl left)
-  (rsft ralt right) (rsft lctl right)
+  (lsft lalt left)  (lsft lctl left)  (lctl rctl) ()
+  (lsft lalt right) (lsft lctl right) (lctl rctl) ()
+  (rsft lalt left)  (rsft lctl left)  (lctl rctl) ()
+  (rsft lalt right) (rsft lctl right) (lctl rctl) ()
+  (lsft ralt left)  (lsft lctl left)  (lctl rctl) ()
+  (lsft ralt right) (lsft lctl right) (lctl rctl) ()
+  (rsft ralt left)  (rsft lctl left)  (lctl rctl) ()
+  (rsft ralt right) (rsft lctl right) (lctl rctl) ()
 
-  (lalt bspc) (lctl bspc)
-  (ralt bspc) (lctl bspc)
-  (lalt del)  (lctl del)
-  (ralt del)  (lctl del)
+  (lalt bspc) (lctl bspc) (lctl rctl) ()
+  (ralt bspc) (lctl bspc) (lctl rctl) ()
+  (lalt del)  (lctl del)  (lctl rctl) ()
+  (ralt del)  (lctl del)  (lctl rctl) ()
 
   ;; Mac-like tab switch (mouse / Super+Shift+[ ]) → native Linux tab keys
-  (lsft lmet lbrc) (lctl pgup)
-  (lsft lmet rbrc) (lctl pgdn)
-  (rsft lmet lbrc) (lctl pgup)
-  (rsft lmet rbrc) (lctl pgdn)
-  (lsft rmet lbrc) (lctl pgup)
-  (lsft rmet rbrc) (lctl pgdn)
-  (rsft rmet lbrc) (lctl pgup)
-  (rsft rmet rbrc) (lctl pgdn)
+  (lsft lmet lbrc) (lctl pgup) () ()
+  (lsft lmet rbrc) (lctl pgdn) () ()
+  (rsft lmet lbrc) (lctl pgup) () ()
+  (rsft lmet rbrc) (lctl pgdn) () ()
+  (lsft rmet lbrc) (lctl pgup) () ()
+  (lsft rmet rbrc) (lctl pgdn) () ()
+  (rsft rmet lbrc) (lctl pgup) () ()
+  (rsft rmet rbrc) (lctl pgdn) () ()
 )

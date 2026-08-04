@@ -1,0 +1,3 @@
+#!/usr/bin/env bash
+# Sync Vimium CSS in Zen from SSOT palette (called by zen-browser before launch).
+exec "$(dirname "$(readlink -f "$0")")/theme-render" --vimium-only "$@"

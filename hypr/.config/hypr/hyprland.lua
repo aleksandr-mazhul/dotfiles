@@ -55,11 +55,13 @@ hl.config({
             render_power = 3,
             color = "rgba(1a1a1aee)",
         },
+        -- Stronger frost for liquid-glass apps (kitty background_opacity < 1)
         blur = {
             enabled = true,
-            size = 3,
-            passes = 1,
+            size = 8,
+            passes = 2,
             vibrancy = 0.1696,
+            new_optimizations = true,
         },
     },
 
@@ -223,6 +225,8 @@ hl.on("hyprland.start", function()
     hl.exec_cmd("~/.config/hypr/scripts/ocr-daemon-start.sh")
     hl.exec_cmd("xrdb -merge ~/.Xresources")
     hl.exec_cmd("~/.config/hypr/scripts/session-autostart.sh")
+    -- On-screen annotation daemon (paint while recording); idle until toggled.
+    hl.exec_cmd("pidof gromit-mpx || gromit-mpx -o 0.85")
     -- Ergohaven: Entropy Live Features + Hyprland→keyboard layout sync (Wayland).
     hl.exec_cmd("~/.config/hypr/scripts/entropy-autostart.sh")
     hl.exec_cmd("~/.config/hypr/scripts/eh-layout-sync.sh")

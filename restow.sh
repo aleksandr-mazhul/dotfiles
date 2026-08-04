@@ -21,8 +21,10 @@ packages=(
   misc
   nvim
   nwg-look
+  obs
   quickshell
   starship
+  theme
   tmux
   vibepanel
   waybar
@@ -31,6 +33,7 @@ packages=(
   x11
   xsettingsd
   yazi
+  zen
 )
 
 echo "==> Preparing conflicting real files (replace with symlinks)"
@@ -157,9 +160,13 @@ for p in \
   .config/nvim \
   .config/yazi \
   .config/tmux \
+  .config/theme \
+  .config/obs-studio/global.ini \
+  .config/gromit-mpx/gromit-mpx.cfg \
   .config/starship.toml \
   .tmux.conf \
   .local/bin/entropy \
+  .local/bin/obs-record-toggle \
   .Xresources
 do
   ok_link "$p"

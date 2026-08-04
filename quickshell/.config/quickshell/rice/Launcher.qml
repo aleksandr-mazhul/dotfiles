@@ -1,6 +1,7 @@
 import QtQuick
 import QtQuick.Layouts
 import Quickshell
+import Quickshell.Io
 import Quickshell.Hyprland
 
 // Raycast-style hub: built-in commands (Clipboard / Wallpapers / VPN) + apps.
@@ -11,6 +12,26 @@ RicePanel {
     property var commands: []
     property var apps: []
     property var filtered: []
+    // Candidates awaiting Exec-binary existence check (id → entry).
+    property var pendingApps: []
+
+    // DE leftovers / service browsers / helper stubs that aren't useful as
+    // top-level launcher icons on Hyprland. Keep real apps + rice commands.
+    readonly property var junkAppIds: ({
+        "xfce4-about": 1,
+        "avahi-discover": 1,
+        "bssh": 1,
+        "bvnc": 1,
+        "xgps": 1,
+        "xgpsspeed": 1,
+        "lstopo": 1,
+        "uuctl": 1,
+        "qv4l2": 1,
+        "qvidcap": 1,
+        "thunar-settings": 1,
+        "thunar-bulk-rename": 1,
+        "cups": 1  // CUPS web UI duplicate of system-config-printer
+    })
 
     title: "Launcher"
     searchPlaceholder: "Search apps & commands…"
@@ -44,6 +65,34 @@ RicePanel {
         close()
         if (action)
             Qt.callLater(action)
+    }
+
+    // One-shot: drop entries whose Exec binary is missing from PATH / disk.
+    Process {
+        id: binCheck
+        stdout: StdioCollector {
+            onStreamFinished: {
+                const missing = {}
+                const rows = text.split("\n")
+                for (let i = 0; i < rows.length; i++) {
+                    const id = rows[i].trim()
+                    if (id)
+                        missing[id] = 1
+                }
+                const kept = []
+                const pending = root.pendingApps || []
+                for (let i = 0; i < pending.length; i++) {
+                    const e = pending[i]
+                    const id = root.appIdKey(e)
+                    if (!missing[id])
+                        kept.push(e)
+                }
+                root.pendingApps = []
+                kept.sort((a, b) => (a.name || "").localeCompare(b.name || "", undefined, { sensitivity: "base" }))
+                root.apps = kept
+                root.applyFilter()
+            }
+        }
     }
 
     function normId(s) {
@@ -133,9 +182,73 @@ RicePanel {
         return false
     }
 
+    function appIdKey(entry) {
+        let id = String(entry && entry.id ? entry.id : "").trim()
+        if (!id)
+            return ""
+        // Nested wine paths → basename; strip trailing .desktop
+        const slash = id.lastIndexOf("/")
+        if (slash >= 0)
+            id = id.slice(slash + 1)
+        return id.replace(/\.desktop$/i, "").toLowerCase()
+    }
+
+    function execBinary(entry) {
+        const cmd = entry && entry.command
+        if (!cmd || !cmd.length)
+            return ""
+        let i = 0
+        // Desktop entries sometimes wrap with `env VAR=val …`
+        if (String(cmd[0]) === "env") {
+            i = 1
+            while (i < cmd.length && String(cmd[i]).indexOf("=") >= 0)
+                i++
+        }
+        // flatpak run … — treat flatpak itself as the binary
+        if (i >= cmd.length)
+            return ""
+        return String(cmd[i])
+    }
+
+    function isJunkApp(entry) {
+        if (!entry || entry.noDisplay)
+            return true
+
+        const bin = execBinary(entry)
+        if (!bin && !(entry.execString && String(entry.execString).trim()))
+            return true
+
+        const cats = entry.categories || []
+        for (let i = 0; i < cats.length; i++) {
+            if (cats[i] === "Screensaver")
+                return true
+        }
+
+        const id = appIdKey(entry)
+        if (id && junkAppIds[id])
+            return true
+
+        // Wine uninstallers / leftover helpers that sometimes slip past NoDisplay
+        const name = String(entry.name || "").toLowerCase()
+        if (name.indexOf("uninstall") >= 0)
+            return true
+        if (id.indexOf("wine-") === 0 || id.indexOf("wine_") === 0)
+            return true
+
+        return false
+    }
+
     function launchEntry(entry) {
         if (!entry)
             return
+
+        // DesktopEntry.execute() currently ignores runInTerminal — wrap ourselves.
+        if (entry.runInTerminal && entry.command && entry.command.length) {
+            const term = Quickshell.env("TERMINAL") || "kitty"
+            Quickshell.execDetached([term, "-e"].concat(entry.command.slice()))
+            return
+        }
+
         if (entry.execute) {
             try {
                 entry.execute()
@@ -192,16 +305,49 @@ RicePanel {
     }
 
     function loadApps() {
+        // DesktopEntries.applications already excludes Hidden/NoDisplay.
         const entries = DesktopEntries.applications.values || []
         const list = []
+        const checkArgs = [
+            "python3", "-c",
+            "import os, shutil, sys\n" +
+            "args = sys.argv[1:]\n" +
+            "for i in range(0, len(args), 2):\n" +
+            "    eid, bin = args[i], args[i+1]\n" +
+            "    if not bin:\n" +
+            "        print(eid); continue\n" +
+            "    if '/' in bin:\n" +
+            "        ok = os.path.isfile(bin) and os.access(bin, os.X_OK)\n" +
+            "    else:\n" +
+            "        ok = shutil.which(bin) is not None\n" +
+            "    if not ok:\n" +
+            "        print(eid)\n"
+        ]
+
         for (let i = 0; i < entries.length; i++) {
             const e = entries[i]
-            if (!e || e.noDisplay)
+            if (isJunkApp(e))
                 continue
             list.push(e)
+            const id = appIdKey(e)
+            const bin = execBinary(e)
+            if (id)
+                checkArgs.push(id, bin || "")
         }
+
+        // Show filtered list immediately; refine once binary check finishes.
         list.sort((a, b) => (a.name || "").localeCompare(b.name || "", undefined, { sensitivity: "base" }))
         apps = list
+        pendingApps = list.slice()
+
+        if (list.length === 0) {
+            applyFilter()
+            return
+        }
+
+        binCheck.running = false
+        binCheck.command = checkArgs
+        binCheck.running = true
     }
 
     function fieldScore(text, q) {
@@ -274,17 +420,27 @@ RicePanel {
     }
 
     rowDelegate: Rectangle {
+        id: row
         required property var modelData
         required property int index
+        readonly property bool selected: index === root.selectedIndex
         width: ListView.view ? ListView.view.width : root.panelWidth - 28
         height: Theme.rowHeight
-        radius: Theme.radiusSm
+        radius: Theme.radiusMd
         color: {
-            if (index === root.selectedIndex)
-                return Theme.rowSelected
+            if (row.selected)
+                return hover.containsMouse ? Theme.glassTileActiveHover : Theme.glassTileActive
             if (hover.containsMouse)
-                return Theme.rowHover
-            return Theme.row
+                return Theme.glassSurfaceHover
+            return Theme.glassSurface
+        }
+        border.width: 1
+        border.color: row.selected ? Theme.glassTileBorder : Theme.glassBorderSubtle
+        Behavior on color {
+            ColorAnimation { duration: Theme.hoverMs; easing.type: Easing.OutCubic }
+        }
+        Behavior on border.color {
+            ColorAnimation { duration: Theme.hoverMs; easing.type: Easing.OutCubic }
         }
 
         readonly property bool isCommand: modelData && modelData.kind === "command"
@@ -294,12 +450,28 @@ RicePanel {
             anchors.margins: 8
             spacing: 12
 
-            Image {
+            Item {
                 Layout.preferredWidth: 28
                 Layout.preferredHeight: 28
-                source: Quickshell.iconPath(modelData.icon, isCommand ? "applications-system" : "application-x-executable")
-                fillMode: Image.PreserveAspectFit
-                smooth: true
+
+                Image {
+                    id: appIcon
+                    anchors.fill: parent
+                    source: Quickshell.iconPath(modelData.icon, isCommand ? "applications-system" : "application-x-executable")
+                    fillMode: Image.PreserveAspectFit
+                    smooth: true
+                    visible: status !== Image.Error
+                }
+
+                // Real app icons keep their identity; only the "no icon resolved"
+                // state falls back to our own cohesive glyph.
+                RiceIcon {
+                    anchors.fill: parent
+                    visible: appIcon.status === Image.Error
+                    customSource: Qt.resolvedUrl("assets/app-fallback.svg")
+                    tint: Theme.textMuted
+                    implicitSize: 28
+                }
             }
 
             ColumnLayout {
@@ -313,7 +485,7 @@ RicePanel {
                     Text {
                         Layout.fillWidth: true
                         text: modelData.name || modelData.id
-                        color: index === root.selectedIndex ? Theme.textOnAccent : Theme.text
+                        color: Theme.text
                         font.family: Theme.fontFamily
                         font.pixelSize: Theme.fontSize
                         elide: Text.ElideRight
@@ -323,10 +495,9 @@ RicePanel {
                     Text {
                         visible: isCommand && !!(modelData.shortcut && modelData.shortcut.length)
                         text: modelData.shortcut || ""
-                        color: index === root.selectedIndex ? Theme.textOnAccent : Theme.textMuted
+                        color: row.selected ? Theme.primary : Theme.textMuted
                         font.family: Theme.fontFamily
                         font.pixelSize: Theme.fontSizeSm
-                        opacity: index === root.selectedIndex ? 0.85 : 1.0
                     }
                 }
 
@@ -334,11 +505,10 @@ RicePanel {
                     Layout.fillWidth: true
                     visible: !!(modelData.genericName && modelData.genericName.length)
                     text: modelData.genericName || ""
-                    color: index === root.selectedIndex ? Theme.textOnAccent : Theme.textMuted
+                    color: row.selected ? Theme.primary : Theme.textMuted
                     font.family: Theme.fontFamily
                     font.pixelSize: Theme.fontSizeSm
                     elide: Text.ElideRight
-                    opacity: index === root.selectedIndex ? 0.85 : 1.0
                 }
             }
         }
@@ -347,6 +517,7 @@ RicePanel {
             id: hover
             anchors.fill: parent
             hoverEnabled: true
+            cursorShape: Qt.PointingHandCursor
             onEntered: root.selectedIndex = index
             onClicked: {
                 root.selectedIndex = index

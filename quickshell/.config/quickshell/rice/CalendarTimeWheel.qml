@@ -58,9 +58,9 @@ Item {
             Layout.fillWidth: true
             Layout.preferredHeight: 88
             radius: Theme.radiusMd
-            color: Theme.surfaceContainer
+            color: Theme.glassSurface
             border.width: 1
-            border.color: Theme.borderSubtle
+            border.color: Theme.glassBorderSubtle
 
             RowLayout {
                 anchors.fill: parent
@@ -75,12 +75,21 @@ Item {
 
                     Text {
                         text: "▴"
-                        color: Theme.textMuted
+                        color: hourUpMouse.containsMouse ? Theme.primary : Theme.textMuted
                         font.pixelSize: 12
                         Layout.alignment: Qt.AlignHCenter
+                        scale: hourUpMouse.containsMouse ? 1.2 : 1.0
+                        Behavior on color {
+                            ColorAnimation { duration: Theme.hoverMs; easing.type: Easing.OutCubic }
+                        }
+                        Behavior on scale {
+                            NumberAnimation { duration: 90; easing.type: Easing.OutCubic }
+                        }
                         MouseArea {
+                            id: hourUpMouse
                             anchors.fill: parent
                             anchors.margins: -10
+                            hoverEnabled: true
                             cursorShape: Qt.PointingHandCursor
                             onClicked: root.bumpHour(1)
                         }
@@ -100,12 +109,21 @@ Item {
 
                     Text {
                         text: "▾"
-                        color: Theme.textMuted
+                        color: hourDownMouse.containsMouse ? Theme.primary : Theme.textMuted
                         font.pixelSize: 12
                         Layout.alignment: Qt.AlignHCenter
+                        scale: hourDownMouse.containsMouse ? 1.2 : 1.0
+                        Behavior on color {
+                            ColorAnimation { duration: Theme.hoverMs; easing.type: Easing.OutCubic }
+                        }
+                        Behavior on scale {
+                            NumberAnimation { duration: 90; easing.type: Easing.OutCubic }
+                        }
                         MouseArea {
+                            id: hourDownMouse
                             anchors.fill: parent
                             anchors.margins: -10
+                            hoverEnabled: true
                             cursorShape: Qt.PointingHandCursor
                             onClicked: root.bumpHour(-1)
                         }
@@ -129,12 +147,21 @@ Item {
 
                     Text {
                         text: "▴"
-                        color: Theme.textMuted
+                        color: minUpMouse.containsMouse ? Theme.primary : Theme.textMuted
                         font.pixelSize: 12
                         Layout.alignment: Qt.AlignHCenter
+                        scale: minUpMouse.containsMouse ? 1.2 : 1.0
+                        Behavior on color {
+                            ColorAnimation { duration: Theme.hoverMs; easing.type: Easing.OutCubic }
+                        }
+                        Behavior on scale {
+                            NumberAnimation { duration: 90; easing.type: Easing.OutCubic }
+                        }
                         MouseArea {
+                            id: minUpMouse
                             anchors.fill: parent
                             anchors.margins: -10
+                            hoverEnabled: true
                             cursorShape: Qt.PointingHandCursor
                             onClicked: root.bumpMinute(1)
                         }
@@ -154,12 +181,21 @@ Item {
 
                     Text {
                         text: "▾"
-                        color: Theme.textMuted
+                        color: minDownMouse.containsMouse ? Theme.primary : Theme.textMuted
                         font.pixelSize: 12
                         Layout.alignment: Qt.AlignHCenter
+                        scale: minDownMouse.containsMouse ? 1.2 : 1.0
+                        Behavior on color {
+                            ColorAnimation { duration: Theme.hoverMs; easing.type: Easing.OutCubic }
+                        }
+                        Behavior on scale {
+                            NumberAnimation { duration: 90; easing.type: Easing.OutCubic }
+                        }
                         MouseArea {
+                            id: minDownMouse
                             anchors.fill: parent
                             anchors.margins: -10
+                            hoverEnabled: true
                             cursorShape: Qt.PointingHandCursor
                             onClicked: root.bumpMinute(-1)
                         }

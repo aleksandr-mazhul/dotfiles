@@ -1,0 +1,174 @@
+#!/usr/bin/env python3
+"""Toggle OBS recording via obs-websocket (localhost)."""
+from __future__ import annotations
+
+import base64
+import hashlib
+import json
+import os
+import subprocess
+import sys
+import time
+from pathlib import Path
+
+try:
+    import websocket
+except ImportError:
+    print("python-websocket-client is required", file=sys.stderr)
+    sys.exit(1)
+
+HOST = "127.0.0.1"
+PORT = 4455
+PASSWORD = "18332c4lL6KhspXxvuF-hg"
+OBS_BIN = "obs"
+NOTIFY = ["notify-send", "-a", "OBS", "-u", "low"]
+
+
+def notify(title: str, body: str = "") -> None:
+    try:
+        subprocess.Popen(
+            [*NOTIFY, title, body],
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        )
+    except OSError:
+        pass
+
+
+def obs_running() -> bool:
+    try:
+        subprocess.check_call(
+            ["pidof", "obs"],
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        )
+        return True
+    except subprocess.CalledProcessError:
+        return False
+
+
+def ensure_obs() -> None:
+    if obs_running():
+        return
+    env = os.environ.copy()
+    subprocess.Popen(
+        [OBS_BIN, "--disable-shutdown-check", "--minimize-to-tray"],
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+        env=env,
+        start_new_session=True,
+    )
+    notify("OBS", "Starting… pick a screen in the portal dialog if asked")
+    deadline = time.time() + 20
+    while time.time() < deadline:
+        if obs_running() and ws_ready():
+            return
+        time.sleep(0.4)
+    raise RuntimeError("OBS did not become ready in time")
+
+
+def ws_ready() -> bool:
+    try:
+        ws = websocket.create_connection(f"ws://{HOST}:{PORT}", timeout=1)
+        ws.close()
+        return True
+    except Exception:
+        return False
+
+
+def auth_secret(password: str, salt: str, challenge: str) -> str:
+    secret = base64.b64encode(
+        hashlib.sha256((password + salt).encode("utf-8")).digest()
+    ).decode("ascii")
+    return base64.b64encode(
+        hashlib.sha256((secret + challenge).encode("utf-8")).digest()
+    ).decode("ascii")
+
+
+def obs_request(req_type: str, data: dict | None = None) -> dict:
+    ws = websocket.create_connection(f"ws://{HOST}:{PORT}", timeout=5)
+    try:
+        hello = json.loads(ws.recv())
+        if hello.get("op") != 0:
+            raise RuntimeError(f"unexpected hello: {hello}")
+        auth = hello["d"].get("authentication")
+        identify: dict = {
+            "op": 1,
+            "d": {"rpcVersion": hello["d"]["rpcVersion"]},
+        }
+        if auth:
+            identify["d"]["authentication"] = auth_secret(
+                PASSWORD, auth["salt"], auth["challenge"]
+            )
+        ws.send(json.dumps(identify))
+        identified = json.loads(ws.recv())
+        if identified.get("op") != 2:
+            raise RuntimeError(f"identify failed: {identified}")
+
+        payload = {
+            "op": 6,
+            "d": {
+                "requestType": req_type,
+                "requestId": req_type,
+            },
+        }
+        if data:
+            payload["d"]["requestData"] = data
+        ws.send(json.dumps(payload))
+        while True:
+            msg = json.loads(ws.recv())
+            if msg.get("op") == 7 and msg["d"].get("requestId") == req_type:
+                status = msg["d"].get("requestStatus", {})
+                if not status.get("result", False):
+                    raise RuntimeError(
+                        f"{req_type} failed: {status.get('comment')}"
+                    )
+                return msg["d"].get("responseData") or {}
+    finally:
+        ws.close()
+
+
+def main() -> int:
+    action = (sys.argv[1] if len(sys.argv) > 1 else "toggle").lower()
+    try:
+        ensure_obs()
+        if action == "status":
+            st = obs_request("GetRecordStatus")
+            print(json.dumps(st))
+            return 0
+        if action == "start":
+            st = obs_request("GetRecordStatus")
+            if not st.get("outputActive"):
+                obs_request("StartRecord")
+                notify("Recording started", str(Path.home() / "Videos" / "OBS"))
+            else:
+                notify("Already recording")
+            return 0
+        if action == "stop":
+            st = obs_request("GetRecordStatus")
+            if st.get("outputActive"):
+                obs_request("StopRecord")
+                notify("Recording stopped", str(Path.home() / "Videos" / "OBS"))
+            else:
+                notify("Not recording")
+            return 0
+
+        # toggle
+        result = obs_request("ToggleRecord")
+        active = result.get("outputActive")
+        if active is None:
+            st = obs_request("GetRecordStatus")
+            active = st.get("outputActive")
+        if active:
+            notify("Recording started", str(Path.home() / "Videos" / "OBS"))
+        else:
+            notify("Recording stopped", str(Path.home() / "Videos" / "OBS"))
+        return 0
+    except Exception as exc:
+        notify("OBS error", str(exc))
+        print(exc, file=sys.stderr)
+        return 1
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

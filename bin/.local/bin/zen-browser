@@ -1,0 +1,57 @@
+#!/bin/bash
+# Always use the configured Zen profile, sync tracked shortcut prefs, and inject
+# current SSOT Vimium CSS BEFORE Zen reads extension storage (and repair AFTER
+# exit — Zen may flush stale in-memory settings back on shutdown).
+set -euo pipefail
+
+profile="${ZEN_PROFILE:-$HOME/.config/zen/iqy4nxax.Default (release)}"
+zen_cfg="${XDG_CONFIG_HOME:-$HOME/.config}/zen"
+render="${HOME}/.local/bin/theme-render"
+[[ -x "$render" ]] || render="${HOME}/dotfiles/bin/.local/bin/theme-render"
+log="${XDG_CACHE_HOME:-$HOME/.cache}/theme-vimium.log"
+mkdir -p "$(dirname "$log")" "$profile"
+
+sync_tracked() {
+  # Canonical copies live in ~/.config/zen/ (stowed from dotfiles/zen)
+  local src dst
+  src="$zen_cfg/zen-keyboard-shortcuts.json"
+  dst="$profile/zen-keyboard-shortcuts.json"
+  if [[ -f "$src" ]]; then
+    cp -f "$src" "$dst"
+  fi
+  src="$zen_cfg/user.js"
+  dst="$profile/user.js"
+  if [[ -f "$src" ]]; then
+    cp -f "$src" "$dst"
+  fi
+}
+
+sync_vimium() {
+  local why="$1"
+  {
+    echo "---- $(date -Iseconds) sync ($why) ----"
+    if [[ -x "$render" ]]; then
+      "$render" --vimium-only || echo "theme-render failed: $?"
+    else
+      echo "theme-render not found at $render"
+    fi
+  } >>"$log" 2>&1 || true
+}
+
+sync_tracked
+sync_vimium "pre-launch"
+
+# Don't use exec — we need a post-exit sync after Zen overwrites storage.js
+set +e
+/opt/zen-browser-bin/zen-bin --profile "$profile" "$@"
+status=$?
+set -e
+
+sync_vimium "post-exit"
+
+# Pull shortcut edits made inside Zen back into the tracked canonical file
+if [[ -f "$profile/zen-keyboard-shortcuts.json" ]]; then
+  cp -f "$profile/zen-keyboard-shortcuts.json" "$zen_cfg/zen-keyboard-shortcuts.json" 2>/dev/null || true
+fi
+
+exit "$status"

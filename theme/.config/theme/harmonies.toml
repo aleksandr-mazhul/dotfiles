@@ -1,0 +1,100 @@
+# Curated safe accent families for the SSOT theme engine.
+# Accents are tasteful (limited chroma); surfaces come from wallpaper at build time.
+
+[sand]
+family = "sand"
+# Loved warm sand (warm wallpaper bias target)
+primary = "#ffb688"
+secondary = "#e5bfa9"
+on_primary = "#512400"
+primary_container = "#6e380f"
+tertiary = "#cac993"
+outline = "#c4a882"
+error = "#ffb4ab"
+hue_center = 28
+warm = true
+
+[warm-amber]
+family = "warm"
+primary = "#ffb95f"
+secondary = "#e8c49a"
+on_primary = "#452b00"
+primary_container = "#6a3f00"
+tertiary = "#c9c07a"
+outline = "#c9a882"
+error = "#ffb4ab"
+hue_center = 38
+warm = true
+
+[soft-rose]
+family = "warm"
+primary = "#ffb2c0"
+secondary = "#e8b4c0"
+on_primary = "#5c1130"
+primary_container = "#7a2946"
+tertiary = "#d4b896"
+outline = "#c9a0a8"
+error = "#ffb4ab"
+hue_center = 350
+warm = true
+
+[clay]
+family = "warm"
+primary = "#e6b8a2"
+secondary = "#d4c0b0"
+on_primary = "#4a2c1a"
+primary_container = "#6b4030"
+tertiary = "#c4c090"
+outline = "#b89888"
+error = "#ffb4ab"
+hue_center = 18
+warm = true
+
+[slate-teal]
+family = "cool"
+# Restrained cool — avoids loud cyan
+primary = "#8ec8c0"
+secondary = "#b0c8c4"
+on_primary = "#003732"
+primary_container = "#1a504a"
+tertiary = "#c4b89a"
+outline = "#8aa8a4"
+error = "#ffb4ab"
+hue_center = 170
+warm = false
+
+[mist-blue]
+family = "cool"
+primary = "#a8c0e0"
+secondary = "#b8c8d8"
+on_primary = "#1a3050"
+primary_container = "#304868"
+tertiary = "#c8b8a0"
+outline = "#90a0b8"
+error = "#ffb4ab"
+hue_center = 215
+warm = false
+
+[sage]
+family = "cool"
+primary = "#a8c4a0"
+secondary = "#b8c8b0"
+on_primary = "#1a3818"
+primary_container = "#305028"
+tertiary = "#c8b890"
+outline = "#90a888"
+error = "#ffb4ab"
+hue_center = 110
+warm = false
+
+[lavender]
+family = "cool"
+primary = "#c4b0e0"
+secondary = "#c8b8d8"
+on_primary = "#382050"
+primary_container = "#503868"
+tertiary = "#c8b898"
+outline = "#a090b8"
+error = "#ffb4ab"
+hue_center = 270
+warm = false

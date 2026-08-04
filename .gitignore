@@ -10,3 +10,15 @@ hypr/.config/hypr/hyprland.conf
 
 # Third-party plugin sources (built binary lives under ~/.local/lib/hypr)
 hypr/.config/hypr/vendor/
+
+# Scratch / logs / secrets
+.tmp-*
+nvim.log
+obs/.config/obs-studio/logs/
+obs/.config/obs-studio/.sentinel/
+**/*.sqlite
+**/*.sqlite-wal
+**/*.sqlite-shm
+chromium-ffmpeg/
+*.bak
+obs/.config/obs-studio/plugin_config/obs-websocket/config.json

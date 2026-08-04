@@ -37,15 +37,18 @@ PanelWindow {
 
     function toggle() { open = !open }
     function show() { open = true }
-    function close() { open = false; expanded = "" }
+    function close() { open = false }
 
     onOpenChanged: {
         if (open) {
+            closeAnim.stop()
             OverlayHub.closeAll()
             refreshStatus()
             openAnim.play()
             Qt.callLater(() => panel.forceActiveFocus())
         } else {
+            openAnim.stop()
+            closeAnim.play()
             expanded = ""
         }
     }
@@ -183,7 +186,8 @@ PanelWindow {
         Quickshell.execDetached(["kitty", "--title", "Updates", "-e", "bash", "-lc", cmd])
     }
 
-    visible: open
+    // Stay visible through the close animation so it doesn't vanish mid-fade.
+    visible: open || closeAnim.running
     color: "transparent"
     exclusiveZone: 0
     exclusionMode: ExclusionMode.Ignore
@@ -200,8 +204,12 @@ PanelWindow {
         right: true
     }
 
+    // Pinned bar already reserves its strip — only leave qsPanelGap under it.
+    // Unpinned: clear the floating bar height so the title isn't covered.
     margins {
-        top: Theme.barHeight + Theme.barMargin * 2 + 6
+        top: OverlayHub.barPinned
+            ? Theme.qsPanelGap
+            : (Theme.barHeight + Theme.barMargin * 2 + Theme.qsPanelGap)
         right: Theme.barMargin
     }
 
@@ -244,10 +252,10 @@ PanelWindow {
     Rectangle {
         id: panel
         anchors.fill: parent
-        color: Theme.background
+        color: Theme.glassBackground
         radius: Theme.radiusLg
         border.width: 1
-        border.color: Theme.borderSubtle
+        border.color: Theme.glassBorder
         focus: root.open
         transformOrigin: Item.TopRight
         opacity: 1
@@ -263,17 +271,34 @@ PanelWindow {
             }
         }
 
+        // Soft inner highlight — Apple-like glass edge without heavy chrome
+        Rectangle {
+            anchors.fill: parent
+            anchors.margins: 1
+            radius: Theme.radiusLg - 1
+            color: "transparent"
+            border.width: 1
+            border.color: Theme.glassBorderSubtle
+        }
+
         RiceOpenAnim {
             id: openAnim
             target: panel
             fromScale: 0.96
         }
 
+        RiceCloseAnim {
+            id: closeAnim
+            target: panel
+            toScale: 0.96
+        }
+
         Flickable {
             id: flick
             anchors.fill: parent
-            anchors.margins: 12
+            anchors.margins: 10
             clip: true
+            z: 1
             contentWidth: width
             contentHeight: panelCol.implicitHeight
             boundsBehavior: Flickable.StopAtBounds
@@ -282,12 +307,12 @@ PanelWindow {
             ColumnLayout {
                 id: panelCol
                 width: flick.width
-                spacing: 10
+                spacing: 8
 
             GridLayout {
                 columns: 2
-                columnSpacing: 8
-                rowSpacing: 8
+                columnSpacing: 6
+                rowSpacing: 6
                 Layout.fillWidth: true
 
                 RowLayout {
@@ -297,18 +322,26 @@ PanelWindow {
                         text: "Quick Settings"
                         color: Theme.text
                         font.family: Theme.fontFamily
-                        font.pixelSize: Theme.fontSizeLg
-                        font.bold: true
+                        font.pixelSize: Theme.fontSize
+                        font.weight: Font.DemiBold
                         Layout.fillWidth: true
                     }
                     RiceIcon {
-                        name: "window-close"
-                        implicitSize: 16
-                        Layout.preferredWidth: 16
-                        Layout.preferredHeight: 16
+                        id: closeIcon
+                        customSource: Qt.resolvedUrl("assets/close.svg")
+                        tint: closeMouse.containsMouse ? Theme.text : Theme.textMuted
+                        implicitSize: 14
+                        Layout.preferredWidth: 14
+                        Layout.preferredHeight: 14
+                        scale: closeMouse.containsMouse ? 1.12 : 1.0
+                        Behavior on scale {
+                            NumberAnimation { duration: 90; easing.type: Easing.OutCubic }
+                        }
                         MouseArea {
+                            id: closeMouse
                             anchors.fill: parent
                             anchors.margins: -6
+                            hoverEnabled: true
                             cursorShape: Qt.PointingHandCursor
                             onClicked: root.close()
                         }
@@ -477,9 +510,12 @@ PanelWindow {
                         width: ListView.view.width
                         height: 36
                         radius: Theme.radiusSm
-                        color: vpnRow.containsMouse ? Theme.rowHover : Theme.surface
+                        color: vpnRow.containsMouse ? Theme.glassSurfaceHover : Theme.glassSurface
                         border.width: 1
-                        border.color: "transparent"
+                        border.color: Theme.glassBorderSubtle
+                        Behavior on color {
+                            ColorAnimation { duration: Theme.hoverMs; easing.type: Easing.OutCubic }
+                        }
                         Text {
                             anchors.left: parent.left
                             anchors.right: parent.right
@@ -550,7 +586,9 @@ PanelWindow {
                         width: ListView.view.width
                         height: 34
                         radius: Theme.radiusSm
-                        color: Theme.surface
+                        color: Theme.glassSurface
+                        border.width: 1
+                        border.color: Theme.glassBorderSubtle
                         RowLayout {
                             anchors.fill: parent
                             anchors.margins: 8
@@ -1078,17 +1116,23 @@ PanelWindow {
         signal expandClicked()
 
         Layout.fillWidth: true
-        Layout.preferredHeight: 58
+        Layout.preferredHeight: 54
         radius: Theme.radiusMd
         color: {
             if (tile.active)
-                return Qt.rgba(Theme.primary.r, Theme.primary.g, Theme.primary.b, tile.hovered ? 0.28 : 0.20)
-            return tile.hovered ? Theme.rowHover : Theme.surface
+                return tile.hovered ? Theme.glassTileActiveHover : Theme.glassTileActive
+            return tile.hovered ? Theme.glassSurfaceHover : Theme.glassSurface
         }
         border.width: 1
         border.color: tile.active
-            ? Qt.rgba(Theme.primary.r, Theme.primary.g, Theme.primary.b, 0.65)
-            : (tile.hovered ? Theme.border : Theme.borderSubtle)
+            ? Theme.glassTileBorder
+            : Theme.glassBorderSubtle
+        Behavior on color {
+            ColorAnimation { duration: Theme.hoverMs; easing.type: Easing.OutCubic }
+        }
+        Behavior on border.color {
+            ColorAnimation { duration: Theme.hoverMs; easing.type: Easing.OutCubic }
+        }
 
         RowLayout {
             anchors.fill: parent
@@ -1149,10 +1193,17 @@ PanelWindow {
                 Layout.preferredHeight: 28
                 radius: 8
                 color: chevMouse.containsMouse ? Theme.rowHover : "transparent"
+                Behavior on color {
+                    ColorAnimation { duration: Theme.hoverMs; easing.type: Easing.OutCubic }
+                }
                 RiceIcon {
                     anchors.centerIn: parent
                     name: tile.expanded ? "go-up" : "go-down"
                     implicitSize: 14
+                    rotation: tile.expanded ? 180 : 0
+                    Behavior on rotation {
+                        NumberAnimation { duration: Theme.hoverMs; easing.type: Easing.OutCubic }
+                    }
                 }
                 MouseArea {
                     id: chevMouse
@@ -1175,11 +1226,14 @@ PanelWindow {
         property bool hovered: mouse.containsMouse
         signal activated()
         Layout.fillWidth: true
-        Layout.preferredHeight: prow.detail.length ? 48 : 42
+        Layout.preferredHeight: prow.detail.length ? 46 : 40
         radius: Theme.radiusSm
-        color: prow.hovered ? Theme.rowHover : Theme.surface
+        color: prow.hovered ? Theme.glassSurfaceHover : Theme.glassSurface
         border.width: 1
-        border.color: prow.hovered ? Theme.border : "transparent"
+        border.color: Theme.glassBorderSubtle
+        Behavior on color {
+            ColorAnimation { duration: Theme.hoverMs; easing.type: Easing.OutCubic }
+        }
         RowLayout {
             anchors.fill: parent
             anchors.margins: 10
@@ -1296,28 +1350,28 @@ PanelWindow {
                 x: slider.leftPadding
                 y: slider.topPadding + slider.availableHeight / 2 - height / 2
                 implicitWidth: 200
-                implicitHeight: 10
+                implicitHeight: 8
                 width: slider.availableWidth
                 height: implicitHeight
-                radius: 5
-                color: Theme.surfaceVariant
+                radius: 4
+                color: Theme.glassTrack
                 Rectangle {
                     width: slider.visualPosition * parent.width
                     height: parent.height
-                    color: Theme.primary
-                    radius: 5
+                    color: Theme.glassFill
+                    radius: 4
                 }
             }
             handle: Rectangle {
                 x: slider.leftPadding + slider.visualPosition * (slider.availableWidth - width)
                 y: slider.topPadding + slider.availableHeight / 2 - height / 2
-                width: 20
-                height: 20
-                radius: 10
+                width: 18
+                height: 18
+                radius: 9
                 color: Theme.primary
-                border.width: 2
-                border.color: Theme.background
-                scale: slider.hovered || slider.pressed ? 1.12 : 1
+                border.width: 1
+                border.color: Theme.glassBorder
+                scale: slider.hovered || slider.pressed ? 1.10 : 1
                 Behavior on scale {
                     NumberAnimation { duration: 80 }
                 }
@@ -1329,10 +1383,17 @@ PanelWindow {
             Layout.preferredHeight: 28
             radius: 8
             color: chevMouse.containsMouse ? Theme.rowHover : "transparent"
+            Behavior on color {
+                ColorAnimation { duration: Theme.hoverMs; easing.type: Easing.OutCubic }
+            }
             RiceIcon {
                 anchors.centerIn: parent
-                name: srow.expanded ? "go-up" : "go-down"
+                name: "go-down"
                 implicitSize: 14
+                rotation: srow.expanded ? 180 : 0
+                Behavior on rotation {
+                    NumberAnimation { duration: Theme.hoverMs; easing.type: Easing.OutCubic }
+                }
             }
             MouseArea {
                 id: chevMouse
@@ -1355,10 +1416,16 @@ PanelWindow {
         Layout.preferredHeight: 36
         radius: Theme.radiusSm
         color: drow.checked
-            ? Qt.rgba(Theme.primary.r, Theme.primary.g, Theme.primary.b, drow.hovered ? 0.28 : 0.18)
-            : (drow.hovered ? Theme.rowHover : Theme.surface)
+            ? (drow.hovered ? Theme.glassTileActiveHover : Theme.glassTileActive)
+            : (drow.hovered ? Theme.glassSurfaceHover : Theme.glassSurface)
         border.width: 1
-        border.color: drow.checked ? Qt.rgba(Theme.primary.r, Theme.primary.g, Theme.primary.b, 0.55) : "transparent"
+        border.color: drow.checked ? Theme.glassTileBorder : Theme.glassBorderSubtle
+        Behavior on color {
+            ColorAnimation { duration: Theme.hoverMs; easing.type: Easing.OutCubic }
+        }
+        Behavior on border.color {
+            ColorAnimation { duration: Theme.hoverMs; easing.type: Easing.OutCubic }
+        }
         RowLayout {
             anchors.fill: parent
             anchors.margins: 8
@@ -1420,13 +1487,13 @@ PanelWindow {
                 radius: Theme.radiusSm
                 color: {
                     if (modelData.connected)
-                        return Qt.rgba(Theme.primary.r, Theme.primary.g, Theme.primary.b, row.hovered ? 0.28 : 0.18)
-                    return row.hovered ? Theme.rowHover : Theme.surface
+                        return row.hovered ? Theme.glassTileActiveHover : Theme.glassTileActive
+                    return row.hovered ? Theme.glassSurfaceHover : Theme.glassSurface
                 }
                 border.width: 1
                 border.color: modelData.connected
-                    ? Qt.rgba(Theme.primary.r, Theme.primary.g, Theme.primary.b, 0.55)
-                    : "transparent"
+                    ? Theme.glassTileBorder
+                    : Theme.glassBorderSubtle
                 RowLayout {
                     anchors.fill: parent
                     anchors.margins: 8

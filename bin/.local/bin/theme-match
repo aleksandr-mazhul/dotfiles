@@ -1,0 +1,47 @@
+#!/usr/bin/env python3
+"""Match extract.json against curated harmonies → ~/.config/theme/match.json"""
+from __future__ import annotations
+
+import json
+import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from _theme_core import ensure_theme_dir, match_harmony  # noqa: E402
+
+
+def main() -> int:
+    theme = ensure_theme_dir()
+    extract_path = theme / "extract.json"
+    if not extract_path.is_file():
+        print("theme-match: missing extract.json — run theme-extract first", file=sys.stderr)
+        return 1
+    data = json.loads(extract_path.read_text())
+    colors = data.get("colors") or []
+    hid, harmony, delta = match_harmony(colors)
+    out = {
+        "harmony_id": hid,
+        "hue_shift": delta,
+        "family": harmony.get("family"),
+        "accents": {
+            k: harmony[k]
+            for k in (
+                "primary",
+                "secondary",
+                "on_primary",
+                "primary_container",
+                "tertiary",
+                "outline",
+                "error",
+            )
+            if k in harmony
+        },
+    }
+    path = theme / "match.json"
+    path.write_text(json.dumps(out, indent=2) + "\n")
+    print(f"theme-match: {hid} (shift {delta:.1f}°) → {path}")
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

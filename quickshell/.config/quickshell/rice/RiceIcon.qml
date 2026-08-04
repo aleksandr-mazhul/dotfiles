@@ -47,6 +47,9 @@ Item {
             source: mono
             color: root.tint
             cached: true
+            Behavior on color {
+                ColorAnimation { duration: Theme.hoverMs; easing.type: Easing.OutCubic }
+            }
         }
     }
 

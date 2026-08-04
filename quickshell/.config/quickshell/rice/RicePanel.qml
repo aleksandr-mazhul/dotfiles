@@ -44,7 +44,8 @@ PanelWindow {
     signal queryChanged(string text)
     signal filterChanged(string value)
 
-    visible: open
+    // Stay visible through the close animation so it doesn't vanish mid-fade.
+    visible: open || closeAnim.running
     color: "transparent"
     exclusiveZone: 0
     exclusionMode: ExclusionMode.Ignore
@@ -71,15 +72,13 @@ PanelWindow {
 
     function show() {
         OverlayHub.closeOthers(root)
+        closeAnim.stop()
         open = true
         selectedIndex = 0
         searchField.text = ""
         filterMenuOpen = false
         panelOpened()
         openAnim.play()
-        dimAnim.from = 0
-        dimAnim.to = 1
-        dimAnim.restart()
         Qt.callLater(() => {
             if (pendingOpenFilter && hasFilter) {
                 pendingOpenFilter = false
@@ -97,10 +96,12 @@ PanelWindow {
     function close() {
         if (!open)
             return
+        openAnim.stop()
         open = false
         searchField.text = ""
         filterMenuOpen = false
         pendingOpenFilter = false
+        closeAnim.play()
         panelClosed()
     }
 
@@ -284,19 +285,17 @@ PanelWindow {
         anchors.fill: parent
         color: Theme.backdrop
         z: -1
-        opacity: 1
+        opacity: root.open ? 1 : 0
+        Behavior on opacity {
+            NumberAnimation {
+                duration: root.open ? Theme.menuAnimMs : Theme.menuCloseMs
+                easing.type: root.open ? Easing.OutCubic : Easing.InCubic
+            }
+        }
         MouseArea {
             anchors.fill: parent
             onClicked: root.close()
         }
-    }
-
-    NumberAnimation {
-        id: dimAnim
-        target: dim
-        property: "opacity"
-        duration: Theme.menuAnimMs
-        easing.type: Easing.OutCubic
     }
 
     Rectangle {
@@ -305,8 +304,8 @@ PanelWindow {
         height: root.panelHeight
         anchors.centerIn: parent
         radius: Theme.radiusLg
-        color: Theme.surface
-        border.color: Theme.border
+        color: Theme.glassBackground
+        border.color: Theme.glassBorder
         border.width: 1
         transformOrigin: Item.Center
         opacity: 1
@@ -318,13 +317,20 @@ PanelWindow {
             fromScale: 0.97
         }
 
+        RiceCloseAnim {
+            id: closeAnim
+            target: panel
+            toScale: 0.97
+        }
+
+        // Soft inner highlight — Apple-like glass edge without heavy chrome
         Rectangle {
             anchors.fill: parent
             anchors.margins: 1
             radius: Theme.radiusLg - 1
             color: "transparent"
             border.width: 1
-            border.color: Theme.borderSubtle
+            border.color: Theme.glassBorderSubtle
         }
 
         MouseArea {
@@ -372,14 +378,26 @@ PanelWindow {
                     Layout.fillWidth: true
                     Layout.preferredHeight: 42
                     radius: Theme.radiusMd
-                    color: Theme.surfaceContainer
-                    border.color: searchField.activeFocus && !root.filterMenuOpen ? Theme.primary : Theme.borderSubtle
+                    color: Theme.glassSurface
+                    border.color: searchField.activeFocus && !root.filterMenuOpen ? Theme.primary : Theme.glassBorderSubtle
                     border.width: 1
+                    Behavior on border.color {
+                        ColorAnimation { duration: Theme.hoverMs; easing.type: Easing.OutCubic }
+                    }
+
+                    RiceIcon {
+                        anchors.left: parent.left
+                        anchors.leftMargin: 12
+                        anchors.verticalCenter: parent.verticalCenter
+                        customSource: Qt.resolvedUrl("assets/search.svg")
+                        tint: Theme.textMuted
+                        implicitSize: 15
+                    }
 
                     TextInput {
                         id: searchField
                         anchors.fill: parent
-                        anchors.leftMargin: 14
+                        anchors.leftMargin: 38
                         anchors.rightMargin: 14
                         verticalAlignment: TextInput.AlignVCenter
                         color: Theme.text
@@ -413,9 +431,15 @@ PanelWindow {
                     Layout.preferredWidth: Math.max(110, filterPillLabel.implicitWidth + 36)
                     Layout.preferredHeight: 42
                     radius: height / 2
-                    color: Theme.surfaceContainer
-                    border.color: root.filterMenuOpen ? Theme.primary : Theme.borderSubtle
+                    color: filterPillHover.containsMouse ? Theme.glassSurfaceHover : Theme.glassSurface
+                    border.color: root.filterMenuOpen ? Theme.primary : Theme.glassBorderSubtle
                     border.width: 1
+                    Behavior on color {
+                        ColorAnimation { duration: Theme.hoverMs; easing.type: Easing.OutCubic }
+                    }
+                    Behavior on border.color {
+                        ColorAnimation { duration: Theme.hoverMs; easing.type: Easing.OutCubic }
+                    }
 
                     RowLayout {
                         anchors.centerIn: parent
@@ -435,7 +459,10 @@ PanelWindow {
                     }
 
                     MouseArea {
+                        id: filterPillHover
                         anchors.fill: parent
+                        hoverEnabled: true
+                        cursorShape: Qt.PointingHandCursor
                         onClicked: root.toggleFilterMenu()
                     }
                 }
@@ -483,8 +510,8 @@ PanelWindow {
             anchors.topMargin: 72
             anchors.rightMargin: 14
             radius: Theme.radiusMd
-            color: Theme.surfaceContainer
-            border.color: Theme.border
+            color: Theme.glassBackground
+            border.color: Theme.glassBorder
             border.width: 1
             z: 30
 
@@ -507,10 +534,13 @@ PanelWindow {
                         radius: Theme.radiusSm
                         color: {
                             if (index === root.filterHighlight)
-                                return Theme.rowSelected
+                                return Theme.glassTileActiveHover
                             if (modelData.value === root.filterValue)
-                                return Theme.rowHover
+                                return Theme.glassSurfaceHover
                             return "transparent"
+                        }
+                        Behavior on color {
+                            ColorAnimation { duration: Theme.hoverMs; easing.type: Easing.OutCubic }
                         }
 
                         Text {
@@ -518,7 +548,7 @@ PanelWindow {
                             anchors.leftMargin: 12
                             anchors.verticalCenter: parent.verticalCenter
                             text: modelData.label
-                            color: index === root.filterHighlight ? Theme.textOnAccent : Theme.text
+                            color: Theme.text
                             font.family: Theme.fontFamily
                             font.pixelSize: Theme.fontSizeSm
                         }
@@ -526,6 +556,7 @@ PanelWindow {
                         MouseArea {
                             anchors.fill: parent
                             hoverEnabled: true
+                            cursorShape: Qt.PointingHandCursor
                             onEntered: root.filterHighlight = index
                             onClicked: {
                                 root.filterHighlight = index

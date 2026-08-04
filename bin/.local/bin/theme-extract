@@ -1,0 +1,30 @@
+#!/usr/bin/env python3
+"""Extract weighted colors from a wallpaper image → ~/.config/theme/extract.json"""
+from __future__ import annotations
+
+import json
+import sys
+from pathlib import Path
+
+# Allow importing sibling module when invoked via symlink
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from _theme_core import ensure_theme_dir, extract_colors  # noqa: E402
+
+
+def main() -> int:
+    if len(sys.argv) < 2:
+        print("usage: theme-extract <wallpaper>", file=sys.stderr)
+        return 2
+    path = Path(sys.argv[1])
+    if not path.is_file():
+        print(f"theme-extract: not a file: {path}", file=sys.stderr)
+        return 1
+    colors = extract_colors(path)
+    out = ensure_theme_dir() / "extract.json"
+    out.write_text(json.dumps({"wallpaper": str(path), "colors": colors}, indent=2) + "\n")
+    print(f"theme-extract: {len(colors)} colors → {out}")
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

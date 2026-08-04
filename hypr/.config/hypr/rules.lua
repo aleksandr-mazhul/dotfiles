@@ -11,6 +11,16 @@ hl.layer_rule({
     no_anim = true,
 })
 
+-- Rice liquid glass: frost wallpaper through translucent panels (alpha ~0.80).
+-- ignore_alpha skips fully/near-transparent pixels so blur hugs the rounded rect.
+-- Covers QuickSettings, Launcher/Clipboard/Wallpaper/Vpn (rice-panel), Calendar, Notifications.
+hl.layer_rule({
+    name = "rice-glass-blur",
+    match = { namespace = "^rice-(quicksettings|panel|calendar|notifications)$" },
+    blur = true,
+    ignore_alpha = 0.2,
+})
+
 hl.window_rule({
     name = "fix-xwayland-drags",
     match = {
@@ -43,144 +53,176 @@ hl.window_rule({
 -- =============================================================================
 -- App → workspace (ported from macos yabai scripts/rules.sh + spaces.sh)
 -- Labels/indices: W=1 C=2 V=3 D=4 G=5 X=6 Z=7 E=8 T=9 I=10 P=11 Q=12 U=13 Y=14 R=15 A=16
--- Bound apps switch focus to their workspace (no silent), matching yabai follow-on-create.
+--
+-- Only TILE the first/main window to the home workspace. Floating children
+-- (Telegram RMB menus, media viewer, dialogs) stay on the current workspace.
+-- If the app was moved off its home, new windows follow the existing instance
+-- (see window.open handler below) — so popups never "fly" to the home letter.
 -- =============================================================================
 
--- W (1): WebStorm
-hl.window_rule({
-    name = "webstorm-to-W",
-    match = { class = "^jetbrains-webstorm$" },
-    workspace = "1",
-})
+local APP_HOME = {
+    -- name, class regex (Hyprland PCRE), workspace id, exact classes for Lua follow-handler
+    { "webstorm", "^jetbrains-webstorm$", "1", { "jetbrains-webstorm" } },
+    { "clion", "^jetbrains-clion$", "2", { "jetbrains-clion" } },
+    { "cursor", "^(cursor|Cursor)$", "2", { "cursor", "Cursor" } },
+    { "firefox", "^(firefox|Firefox)$", "3", { "firefox", "Firefox" } },
+    { "zen", "^(zen|zen-browser|Zen|Zen-browser)$", "3", { "zen", "zen-browser", "Zen", "Zen-browser" } },
+    { "yandex", "^[Yy]andex.?[Bb]rowser$", "4", { "yandex-browser", "Yandex-browser" } },
+    {
+        "chrome",
+        "^(google-chrome|Google-chrome|chromium|Chromium|brave-browser|Brave-browser)$",
+        "5",
+        { "google-chrome", "Google-chrome", "chromium", "Chromium", "brave-browser", "Brave-browser" },
+    },
+    { "claude", "^com\\.anthropic\\.Claude$", "6", { "com.anthropic.Claude" } },
+    { "kitty", "^kitty$", "7", { "kitty" } },
+    {
+        "nautilus",
+        "^(org\\.gnome\\.Nautilus|Nautilus|nautilus)$",
+        "8",
+        { "org.gnome.Nautilus", "Nautilus", "nautilus" },
+    },
+    { "thunar", "^(Thunar|thunar)$", "8", { "Thunar", "thunar" } },
+    {
+        "telegram",
+        "^(org\\.telegram\\.desktop|TelegramDesktop)$",
+        "9",
+        { "org.telegram.desktop", "TelegramDesktop" },
+    },
+    { "discord", "^(discord|Discord)$", "10", { "discord", "Discord" } },
+    {
+        "preview",
+        "^(org\\.gnome\\.Evince|evince|org\\.gnome\\.Loupe|loupe|eog|org\\.kde\\.okular|okular|imv)$",
+        "11",
+        { "org.gnome.Evince", "evince", "org.gnome.Loupe", "loupe", "eog", "org.kde.okular", "okular", "imv" },
+    },
+    { "spotify", "^(spotify|Spotify)$", "13", { "spotify", "Spotify" } },
+    { "zoom", "^(zoom|Zoom)$", "14", { "zoom", "Zoom" } },
+    { "obs", "^(com\\.obsproject\\.Studio|obs)$", "14", { "com.obsproject.Studio", "obs" } },
+    { "obsidian", "^(obsidian|Obsidian)$", "15", { "obsidian", "Obsidian" } },
+    {
+        "thunderbird",
+        "^(thunderbird|Thunderbird|org\\.mozilla\\.Thunderbird)$",
+        "16",
+        { "thunderbird", "Thunderbird", "org.mozilla.Thunderbird" },
+    },
+}
 
--- C (2): CLion + Cursor (Linux IDE stand-in)
-hl.window_rule({
-    name = "clion-to-C",
-    match = { class = "^jetbrains-clion$" },
-    workspace = "2",
-})
-hl.window_rule({
-    name = "cursor-to-C",
-    match = { class = "^(cursor|Cursor)$" },
-    workspace = "2",
-})
+local BOUND_CLASS = {}
+for _, app in ipairs(APP_HOME) do
+    local name, class_re, ws, classes = app[1], app[2], app[3], app[4]
+    hl.window_rule({
+        name = name .. "-to-" .. ws,
+        match = { class = class_re, float = false },
+        workspace = ws,
+    })
+    hl.window_rule({
+        name = name .. "-float-stay",
+        match = { class = class_re, float = true },
+        workspace = "unset",
+    })
+    for _, c in ipairs(classes) do
+        BOUND_CLASS[c] = true
+    end
+end
 
--- V (3): Arc/Safari → Firefox / Zen
+-- Telegram RMB menus / media viewer already have their own chrome — Hypr's
+-- active border shows up as a weird outline (side effect of float-stay rules).
 hl.window_rule({
-    name = "firefox-to-V",
-    match = { class = "^(firefox|Firefox)$" },
-    workspace = "3",
-})
-hl.window_rule({
-    name = "zen-to-V",
-    match = { class = "^(zen|zen-browser|Zen|Zen-browser)$" },
-    workspace = "3",
-})
-
--- D (4): Yandex Browser (yabai APP_WORKSPACE; aerospace used B — we follow yabai)
-hl.window_rule({
-    name = "yandex-to-D",
-    match = { class = "^[Yy]andex.?[Bb]rowser$" },
-    workspace = "4",
-})
-
--- G (5): Google Chrome / Chromium
-hl.window_rule({
-    name = "chrome-to-G",
-    match = { class = "^(google-chrome|Google-chrome|chromium|Chromium|brave-browser|Brave-browser)$" },
-    workspace = "5",
-})
-
--- X (6): ChatGPT → Claude (AI chat); ChatGPT desktop is a Zen URL shortcut (no class)
-hl.window_rule({
-    name = "claude-to-X",
-    match = { class = "^com\\.anthropic\\.Claude$" },
-    workspace = "6",
-})
-
--- Z (7): WezTerm → kitty
-hl.window_rule({
-    name = "kitty-to-Z",
-    match = { class = "^kitty$" },
-    workspace = "7",
-})
-
--- E (8): Finder → Nautilus / Thunar
-hl.window_rule({
-    name = "nautilus-to-E",
-    match = { class = "^(org\\.gnome\\.Nautilus|Nautilus|nautilus)$" },
-    workspace = "8",
-})
-hl.window_rule({
-    name = "thunar-to-E",
-    match = { class = "^(Thunar|thunar)$" },
-    workspace = "8",
-})
-
--- T (9): Telegram
-hl.window_rule({
-    name = "telegram-to-T",
-    match = { class = "^(org\\.telegram\\.desktop|TelegramDesktop)$" },
-    workspace = "9",
-})
-
--- Media viewer shares Telegram's class; keep it on the current workspace
-hl.window_rule({
-    name = "telegram-media-stay",
+    name = "telegram-float-no-border",
     match = {
         class = "^(org\\.telegram\\.desktop|TelegramDesktop)$",
-        title = "^Media viewer$",
+        float = true,
     },
-    workspace = "unset",
+    border_size = 0,
 })
 
--- I (10): Discord
-hl.window_rule({
-    name = "discord-to-I",
-    match = { class = "^(discord|Discord)$" },
-    workspace = "10",
-})
-
--- P (11): Preview → common Linux image/PDF viewers (if installed)
-hl.window_rule({
-    name = "preview-to-P",
-    match = { class = "^(org\\.gnome\\.Evince|evince|org\\.gnome\\.Loupe|loupe|eog|org\\.kde\\.okular|okular|imv)$" },
-    workspace = "11",
-})
+-- Kitty glass: leave Hyprland window opacity at 1 — kitty owns alpha via
+-- background_opacity; decoration.blur (hyprland.lua) frosts the wallpaper behind it.
 
 -- Q (12): Wolfram — Mac-only; no Linux rule
 
--- U (13): Spotify
-hl.window_rule({
-    name = "spotify-to-U",
-    match = { class = "^(spotify|Spotify)$" },
-    workspace = "13",
-})
+-- If an app instance already exists (possibly moved off its home), keep new
+-- windows of that class on the same workspace as the existing one.
+hl.on("window.open", function(win)
+    -- Event may pass the window directly or a table with .window
+    if type(win) == "table" and win.window then
+        win = win.window
+    end
+    if type(win) ~= "userdata" and type(win) ~= "table" then
+        return
+    end
+    local class = win.class
+    if not class or not BOUND_CLASS[class] then
+        return
+    end
 
--- Y (14): Zoom
-hl.window_rule({
-    name = "zoom-to-Y",
-    match = { class = "^(zoom|Zoom)$" },
-    workspace = "14",
-})
+    local best = nil
+    local best_hist = nil
+    for _, other in ipairs(hl.get_windows()) do
+        if other.address ~= win.address and other.class == class and other.workspace then
+            local hist = other.focus_history_id or 999999
+            if best == nil or hist < best_hist then
+                best = other
+                best_hist = hist
+            end
+        end
+    end
+    if not best or not best.workspace then
+        return
+    end
 
--- R (15): Notes → Obsidian
-hl.window_rule({
-    name = "obsidian-to-R",
-    match = { class = "^(obsidian|Obsidian)$" },
-    workspace = "15",
-})
+    local target = best.workspace
+    local cur = win.workspace
+    if cur and target and cur.id == target.id then
+        return
+    end
 
--- A (16): Mail → Thunderbird
-hl.window_rule({
-    name = "thunderbird-to-A",
-    match = { class = "^(thunderbird|Thunderbird|org\\.mozilla\\.Thunderbird)$" },
-    workspace = "16",
-})
+    -- Silent: don't yank the view when a popup/dialog follows the parent app.
+    local ok = pcall(function()
+        hl.dispatch(hl.dsp.window.move({
+            window = win,
+            workspace = target.id,
+            silent = true,
+        }))
+    end)
+    if not ok then
+        pcall(function()
+            hl.dispatch(hl.dsp.window.move({
+                window = win,
+                workspace = target.id,
+            }))
+        end)
+    end
+end)
 
 -- =============================================================================
 -- Float / unmanaged (yabai manage=off + dialogs + Windscribe from aerospace)
 -- =============================================================================
+
+-- Let Hyprland binds (e.g. Ctrl+Shift+C → copy URL) override Chromium shortcut inhibit
+hl.window_rule({
+    name = "yandex-no-shortcuts-inhibit",
+    match = { class = "^[Yy]andex.?[Bb]rowser$" },
+    no_shortcuts_inhibit = true,
+})
+
+-- Zoom: don't block Ctrl+Tab tab switching
+hl.window_rule({
+    name = "zoom-no-shortcuts-inhibit",
+    match = { class = "^(zoom|Zoom)$" },
+    no_shortcuts_inhibit = true,
+})
+
+-- Gromit-MPX overlay: stay above everything, never steal focus permanently
+hl.window_rule({
+    name = "gromit-overlay",
+    match = { class = "^(Gromit-mpx|gromit-mpx|net\\.christianbeier\\.Gromit-MPX)$" },
+    float = true,
+    pin = true,
+    no_anim = true,
+    opacity = "1.0 override",
+})
 
 hl.window_rule({
     name = "windscribe-float",

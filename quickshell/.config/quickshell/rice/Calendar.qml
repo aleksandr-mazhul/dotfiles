@@ -276,6 +276,7 @@ PanelWindow {
 
     onOpenChanged: {
         if (open) {
+            closeAnim.stop()
             OverlayHub.closeAll()
             refreshColors()
             // Local markers first, then sync pulls remote updates.
@@ -285,9 +286,11 @@ PanelWindow {
             openAnim.play()
             Qt.callLater(() => panel.forceActiveFocus())
         } else {
+            openAnim.stop()
             closeForm()
             statusText = ""
             watchProc.running = false
+            closeAnim.play()
         }
     }
 
@@ -296,7 +299,8 @@ PanelWindow {
             refreshEvents()
     }
 
-    visible: open
+    // Stay visible through the close animation so it doesn't vanish mid-fade.
+    visible: open || closeAnim.running
     color: "transparent"
     exclusiveZone: 0
     exclusionMode: ExclusionMode.Ignore
@@ -320,10 +324,10 @@ PanelWindow {
     Rectangle {
         id: panel
         anchors.fill: parent
-        color: Theme.background
+        color: Theme.glassBackground
         radius: Theme.radiusLg
         border.width: 1
-        border.color: Theme.borderSubtle
+        border.color: Theme.glassBorder
         focus: root.open
         transformOrigin: Item.TopRight
         opacity: 1
@@ -338,10 +342,26 @@ PanelWindow {
             }
         }
 
+        // Soft inner highlight — Apple-like glass edge without heavy chrome
+        Rectangle {
+            anchors.fill: parent
+            anchors.margins: 1
+            radius: Theme.radiusLg - 1
+            color: "transparent"
+            border.width: 1
+            border.color: Theme.glassBorderSubtle
+        }
+
         RiceOpenAnim {
             id: openAnim
             target: panel
             fromScale: 0.96
+        }
+
+        RiceCloseAnim {
+            id: closeAnim
+            target: panel
+            toScale: 0.96
         }
 
         ColumnLayout {
@@ -355,18 +375,32 @@ PanelWindow {
 
                 // Month pager — arrows glued to the title
                 RowLayout {
-                    spacing: 6
+                    spacing: 2
                     Layout.alignment: Qt.AlignVCenter
 
-                    RiceIcon {
-                        name: "go-previous"
-                        fallback: "arrow-left"
-                        implicitSize: 16
-                        Layout.preferredWidth: 16
-                        Layout.preferredHeight: 16
+                    Rectangle {
+                        Layout.preferredWidth: 24
+                        Layout.preferredHeight: 24
+                        radius: 8
+                        color: prevMouse.containsMouse ? Theme.glassSurfaceHover : "transparent"
+                        Behavior on color {
+                            ColorAnimation { duration: Theme.hoverMs; easing.type: Easing.OutCubic }
+                        }
+
+                        RiceIcon {
+                            anchors.centerIn: parent
+                            customSource: Qt.resolvedUrl("assets/chevron-left.svg")
+                            tint: prevMouse.containsMouse ? Theme.text : Theme.textMuted
+                            implicitSize: 14
+                            scale: prevMouse.containsMouse ? 1.1 : 1.0
+                            Behavior on scale {
+                                NumberAnimation { duration: 90; easing.type: Easing.OutCubic }
+                            }
+                        }
                         MouseArea {
+                            id: prevMouse
                             anchors.fill: parent
-                            anchors.margins: -8
+                            hoverEnabled: true
                             cursorShape: Qt.PointingHandCursor
                             onClicked: root.shiftMonth(-1)
                         }
@@ -378,17 +412,33 @@ PanelWindow {
                         font.family: Theme.fontFamily
                         font.pixelSize: Theme.fontSizeLg
                         font.bold: true
+                        Layout.leftMargin: 4
+                        Layout.rightMargin: 4
                     }
 
-                    RiceIcon {
-                        name: "go-next"
-                        fallback: "arrow-right"
-                        implicitSize: 16
-                        Layout.preferredWidth: 16
-                        Layout.preferredHeight: 16
+                    Rectangle {
+                        Layout.preferredWidth: 24
+                        Layout.preferredHeight: 24
+                        radius: 8
+                        color: nextMouse.containsMouse ? Theme.glassSurfaceHover : "transparent"
+                        Behavior on color {
+                            ColorAnimation { duration: Theme.hoverMs; easing.type: Easing.OutCubic }
+                        }
+
+                        RiceIcon {
+                            anchors.centerIn: parent
+                            customSource: Qt.resolvedUrl("assets/chevron-right.svg")
+                            tint: nextMouse.containsMouse ? Theme.text : Theme.textMuted
+                            implicitSize: 14
+                            scale: nextMouse.containsMouse ? 1.1 : 1.0
+                            Behavior on scale {
+                                NumberAnimation { duration: 90; easing.type: Easing.OutCubic }
+                            }
+                        }
                         MouseArea {
+                            id: nextMouse
                             anchors.fill: parent
-                            anchors.margins: -8
+                            hoverEnabled: true
                             cursorShape: Qt.PointingHandCursor
                             onClicked: root.shiftMonth(1)
                         }
@@ -398,7 +448,7 @@ PanelWindow {
                 Item { Layout.fillWidth: true }
 
                 RowLayout {
-                    spacing: 4
+                    spacing: 2
                     Layout.alignment: Qt.AlignVCenter
 
                     // Identical hit-boxes + glyph size so refresh / add / close match.
@@ -406,32 +456,54 @@ PanelWindow {
                         model: [
                             { glyph: "↻", action: "sync" },
                             { glyph: "+", action: "add" },
-                            { glyph: "×", action: "close" }
+                            { glyph: "", action: "close" }
                         ]
 
-                        Item {
+                        Rectangle {
+                            id: hdrBtn
                             required property var modelData
+                            property bool hovered: hdrMouse.containsMouse
                             Layout.preferredWidth: 28
                             Layout.preferredHeight: 28
-                            opacity: modelData.action === "sync" && root.busy ? 0.4 : 1
+                            radius: 8
+                            color: hdrBtn.hovered ? Theme.glassSurfaceHover : "transparent"
+                            opacity: hdrBtn.modelData.action === "sync" && root.busy ? 0.4 : 1
+                            Behavior on color {
+                                ColorAnimation { duration: Theme.hoverMs; easing.type: Easing.OutCubic }
+                            }
 
                             Text {
                                 anchors.centerIn: parent
-                                text: modelData.glyph
+                                visible: hdrBtn.modelData.action !== "close"
+                                text: hdrBtn.modelData.glyph
                                 color: Theme.text
                                 font.family: Theme.fontFamily
                                 font.pixelSize: 18
                                 font.bold: true
                             }
 
+                            RiceIcon {
+                                anchors.centerIn: parent
+                                visible: hdrBtn.modelData.action === "close"
+                                customSource: Qt.resolvedUrl("assets/close.svg")
+                                tint: hdrBtn.hovered ? Theme.text : Theme.textMuted
+                                implicitSize: 14
+                                scale: hdrBtn.hovered ? 1.1 : 1.0
+                                Behavior on scale {
+                                    NumberAnimation { duration: 90; easing.type: Easing.OutCubic }
+                                }
+                            }
+
                             MouseArea {
+                                id: hdrMouse
                                 anchors.fill: parent
-                                enabled: !(modelData.action === "sync" && root.busy)
+                                hoverEnabled: true
+                                enabled: !(hdrBtn.modelData.action === "sync" && root.busy)
                                 cursorShape: Qt.PointingHandCursor
                                 onClicked: {
-                                    if (modelData.action === "sync")
+                                    if (hdrBtn.modelData.action === "sync")
                                         root.syncAndRefresh()
-                                    else if (modelData.action === "add")
+                                    else if (hdrBtn.modelData.action === "add")
                                         root.openAdd()
                                     else
                                         root.close()
@@ -474,6 +546,7 @@ PanelWindow {
                         visible: modelData.day > 0
 
                         readonly property bool selected: modelData.day === root.selectedDay
+                        readonly property bool hovered: dayMouse.containsMouse
                         readonly property var cals: {
                             // Prefer baked-in model data; fall back to live map.
                             const baked = modelData.cals
@@ -489,14 +562,25 @@ PanelWindow {
                             width: 28
                             height: 28
                             radius: 14
-                            color: cell.selected ? Theme.text : (modelData.today ? Theme.primary : "transparent")
+                            color: {
+                                if (cell.selected)
+                                    return Theme.text
+                                if (modelData.today)
+                                    return cell.hovered ? Theme.glassTileActiveHover : Theme.glassTileActive
+                                return cell.hovered ? Theme.glassSurfaceHover : "transparent"
+                            }
+                            border.width: modelData.today && !cell.selected ? 1 : 0
+                            border.color: Theme.glassTileBorder
+                            Behavior on color {
+                                ColorAnimation { duration: Theme.hoverMs; easing.type: Easing.OutCubic }
+                            }
 
                             Text {
                                 anchors.centerIn: parent
                                 text: cell.modelData.day > 0 ? String(cell.modelData.day) : ""
                                 color: cell.selected
                                     ? Theme.background
-                                    : (cell.modelData.today ? Theme.textOnAccent : Theme.text)
+                                    : (cell.modelData.today ? Theme.primary : Theme.text)
                                 font.family: Theme.fontFamily
                                 font.pixelSize: Theme.fontSizeSm
                                 font.bold: cell.selected || cell.modelData.today
@@ -527,7 +611,9 @@ PanelWindow {
                         }
 
                         MouseArea {
+                            id: dayMouse
                             anchors.fill: parent
+                            hoverEnabled: true
                             cursorShape: Qt.PointingHandCursor
                             onClicked: {
                                 root.selectedDay = cell.modelData.day
@@ -543,7 +629,7 @@ PanelWindow {
                 visible: !root.formOpen
                 Layout.fillWidth: true
                 height: 1
-                color: Theme.borderSubtle
+                color: Theme.glassBorderSubtle
             }
 
             RowLayout {
@@ -563,13 +649,18 @@ PanelWindow {
                 }
 
                 Rectangle {
+                    id: todayBtn
                     visible: !root.formOpen
+                    property bool hovered: todayMouse.containsMouse
                     radius: Theme.radiusSm
-                    color: Theme.surfaceContainer
+                    color: todayBtn.hovered ? Theme.glassSurfaceHover : Theme.glassSurface
                     border.width: 1
-                    border.color: Theme.borderSubtle
+                    border.color: Theme.glassBorderSubtle
                     implicitWidth: todayLbl.implicitWidth + 16
                     implicitHeight: 24
+                    Behavior on color {
+                        ColorAnimation { duration: Theme.hoverMs; easing.type: Easing.OutCubic }
+                    }
 
                     Text {
                         id: todayLbl
@@ -581,7 +672,9 @@ PanelWindow {
                     }
 
                     MouseArea {
+                        id: todayMouse
                         anchors.fill: parent
+                        hoverEnabled: true
                         cursorShape: Qt.PointingHandCursor
                         onClicked: root.goToday()
                     }
@@ -621,9 +714,12 @@ PanelWindow {
                             Layout.fillWidth: true
                             Layout.preferredHeight: 34
                             radius: Theme.radiusSm
-                            color: Theme.surfaceContainer
+                            color: Theme.glassSurface
                             border.width: 1
-                            border.color: titleInput.activeFocus ? Theme.primary : Theme.borderSubtle
+                            border.color: titleInput.activeFocus ? Theme.primary : Theme.glassBorderSubtle
+                            Behavior on border.color {
+                                ColorAnimation { duration: Theme.hoverMs; easing.type: Easing.OutCubic }
+                            }
 
                             TextInput {
                                 id: titleInput
@@ -665,9 +761,15 @@ PanelWindow {
                                 width: 42
                                 height: 24
                                 radius: 12
-                                color: root.draftAllDay ? Theme.primary : Theme.surfaceContainer
+                                color: root.draftAllDay ? Theme.primary : Theme.glassSurface
                                 border.width: 1
-                                border.color: root.draftAllDay ? Theme.primary : Theme.borderSubtle
+                                border.color: root.draftAllDay ? Theme.primary : Theme.glassBorderSubtle
+                                Behavior on color {
+                                    ColorAnimation { duration: Theme.hoverMs; easing.type: Easing.OutCubic }
+                                }
+                                Behavior on border.color {
+                                    ColorAnimation { duration: Theme.hoverMs; easing.type: Easing.OutCubic }
+                                }
 
                                 Rectangle {
                                     width: 18
@@ -676,6 +778,9 @@ PanelWindow {
                                     anchors.verticalCenter: parent.verticalCenter
                                     x: root.draftAllDay ? parent.width - width - 3 : 3
                                     color: Theme.text
+                                    Behavior on x {
+                                        NumberAnimation { duration: Theme.hoverMs; easing.type: Easing.OutCubic }
+                                    }
                                 }
 
                                 MouseArea {
@@ -710,11 +815,15 @@ PanelWindow {
                             Layout.fillWidth: true
                             Layout.preferredHeight: 34
                             radius: Theme.radiusSm
-                            color: Theme.surfaceContainer
+                            color: Theme.glassSurface
                             border.width: 1
-                            border.color: Theme.borderSubtle
+                            border.color: locationInput.activeFocus ? Theme.primary : Theme.glassBorderSubtle
+                            Behavior on border.color {
+                                ColorAnimation { duration: Theme.hoverMs; easing.type: Easing.OutCubic }
+                            }
 
                             TextInput {
+                                id: locationInput
                                 anchors.fill: parent
                                 anchors.margins: 10
                                 verticalAlignment: TextInput.AlignVCenter
@@ -747,15 +856,26 @@ PanelWindow {
                                 ]
 
                                 Rectangle {
+                                    id: calChip
                                     required property var modelData
+                                    property bool hovered: chipMouse.containsMouse
+                                    readonly property bool active: root.draftCalendar === calChip.modelData.id
                                     Layout.fillWidth: true
                                     Layout.preferredHeight: 28
                                     radius: Theme.radiusSm
-                                    color: root.draftCalendar === modelData.id
-                                        ? Qt.rgba(Theme.primary.r, Theme.primary.g, Theme.primary.b, 0.22)
-                                        : Theme.surfaceContainer
+                                    color: {
+                                        if (calChip.active)
+                                            return calChip.hovered ? Theme.glassTileActiveHover : Theme.glassTileActive
+                                        return calChip.hovered ? Theme.glassSurfaceHover : Theme.glassSurface
+                                    }
                                     border.width: 1
-                                    border.color: root.draftCalendar === modelData.id ? Theme.primary : Theme.borderSubtle
+                                    border.color: calChip.active ? Theme.glassTileBorder : Theme.glassBorderSubtle
+                                    Behavior on color {
+                                        ColorAnimation { duration: Theme.hoverMs; easing.type: Easing.OutCubic }
+                                    }
+                                    Behavior on border.color {
+                                        ColorAnimation { duration: Theme.hoverMs; easing.type: Easing.OutCubic }
+                                    }
 
                                     RowLayout {
                                         anchors.centerIn: parent
@@ -775,7 +895,9 @@ PanelWindow {
                                     }
 
                                     MouseArea {
+                                        id: chipMouse
                                         anchors.fill: parent
+                                        hoverEnabled: true
                                         cursorShape: Qt.PointingHandCursor
                                         onClicked: root.draftCalendar = modelData.id
                                     }
@@ -787,14 +909,19 @@ PanelWindow {
 
                 // Sticky footer — always visible
                 Rectangle {
+                    id: deleteBtn
                     visible: root.formEditing
+                    property bool hovered: deleteMouse.containsMouse
                     Layout.fillWidth: true
                     Layout.preferredHeight: 34
                     radius: Theme.radiusSm
-                    color: Qt.rgba(Theme.error.r, Theme.error.g, Theme.error.b, 0.15)
+                    color: Qt.rgba(Theme.error.r, Theme.error.g, Theme.error.b, deleteBtn.hovered ? 0.22 : 0.15)
                     border.width: 1
                     border.color: Theme.error
                     opacity: root.busy ? 0.5 : 1
+                    Behavior on color {
+                        ColorAnimation { duration: Theme.hoverMs; easing.type: Easing.OutCubic }
+                    }
 
                     RowLayout {
                         anchors.centerIn: parent
@@ -816,7 +943,9 @@ PanelWindow {
                     }
 
                     MouseArea {
+                        id: deleteMouse
                         anchors.fill: parent
+                        hoverEnabled: true
                         enabled: !root.busy
                         cursorShape: Qt.PointingHandCursor
                         onClicked: root.deleteCurrent()
@@ -828,12 +957,17 @@ PanelWindow {
                     spacing: 8
 
                     Rectangle {
+                        id: cancelBtn
+                        property bool hovered: cancelMouse.containsMouse
                         Layout.fillWidth: true
                         Layout.preferredHeight: 34
                         radius: Theme.radiusSm
-                        color: Theme.surfaceContainer
+                        color: cancelBtn.hovered ? Theme.glassSurfaceHover : Theme.glassSurface
                         border.width: 1
-                        border.color: Theme.borderSubtle
+                        border.color: Theme.glassBorderSubtle
+                        Behavior on color {
+                            ColorAnimation { duration: Theme.hoverMs; easing.type: Easing.OutCubic }
+                        }
 
                         Text {
                             anchors.centerIn: parent
@@ -844,18 +978,25 @@ PanelWindow {
                         }
 
                         MouseArea {
+                            id: cancelMouse
                             anchors.fill: parent
+                            hoverEnabled: true
                             cursorShape: Qt.PointingHandCursor
                             onClicked: root.closeForm()
                         }
                     }
 
                     Rectangle {
+                        id: submitBtn
+                        property bool hovered: submitMouse.containsMouse
                         Layout.fillWidth: true
                         Layout.preferredHeight: 34
                         radius: Theme.radiusSm
                         color: Theme.primary
-                        opacity: root.busy ? 0.5 : 1
+                        opacity: root.busy ? 0.5 : (submitBtn.hovered ? 0.88 : 1)
+                        Behavior on opacity {
+                            NumberAnimation { duration: Theme.hoverMs; easing.type: Easing.OutCubic }
+                        }
 
                         Text {
                             anchors.centerIn: parent
@@ -867,7 +1008,9 @@ PanelWindow {
                         }
 
                         MouseArea {
+                            id: submitMouse
                             anchors.fill: parent
+                            hoverEnabled: true
                             enabled: !root.busy
                             cursorShape: Qt.PointingHandCursor
                             onClicked: root.submitForm()
@@ -890,13 +1033,17 @@ PanelWindow {
                     id: ev
                     required property var modelData
                     readonly property bool past: root.isEventPast(modelData)
+                    readonly property bool hovered: evMouse.containsMouse
                     width: ListView.view.width
                     height: Math.max(evCol.implicitHeight + 14, 44)
                     radius: Theme.radiusMd
-                    color: Theme.surface
+                    color: ev.hovered ? Theme.glassSurfaceHover : Theme.glassSurface
                     border.width: 1
-                    border.color: Theme.borderSubtle
+                    border.color: Theme.glassBorderSubtle
                     opacity: past ? 0.42 : 1.0
+                    Behavior on color {
+                        ColorAnimation { duration: Theme.hoverMs; easing.type: Easing.OutCubic }
+                    }
 
                     Rectangle {
                         anchors.left: parent.left
@@ -984,10 +1131,20 @@ PanelWindow {
                         anchors.right: parent.right
                         anchors.rightMargin: 10
                         anchors.verticalCenter: parent.verticalCenter
-                        opacity: 0.55
+                        tint: trashMouse.containsMouse ? Theme.error : Theme.textMuted
+                        opacity: trashMouse.containsMouse ? 1.0 : 0.55
+                        scale: trashMouse.containsMouse ? 1.12 : 1.0
+                        Behavior on scale {
+                            NumberAnimation { duration: 90; easing.type: Easing.OutCubic }
+                        }
+                        Behavior on opacity {
+                            NumberAnimation { duration: Theme.hoverMs; easing.type: Easing.OutCubic }
+                        }
                         MouseArea {
+                            id: trashMouse
                             anchors.fill: parent
                             anchors.margins: -8
+                            hoverEnabled: true
                             cursorShape: Qt.PointingHandCursor
                             enabled: !root.busy
                             onClicked: root.deleteEvent(ev.modelData.uid || "")
@@ -995,8 +1152,10 @@ PanelWindow {
                     }
 
                     MouseArea {
+                        id: evMouse
                         anchors.fill: parent
                         anchors.rightMargin: 36
+                        hoverEnabled: true
                         cursorShape: Qt.PointingHandCursor
                         onClicked: root.openEdit(ev.modelData)
                     }

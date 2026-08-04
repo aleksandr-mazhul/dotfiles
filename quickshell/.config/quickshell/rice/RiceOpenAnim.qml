@@ -22,7 +22,8 @@ ParallelAnimation {
         from: root.fromScale
         to: 1
         duration: root.duration
-        easing.type: Easing.OutCubic
+        easing.type: Easing.OutBack
+        easing.overshoot: Theme.menuOvershoot
     }
 
     function play() {

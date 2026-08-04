@@ -89,10 +89,100 @@ hl.bind("CTRL + Q", function()
         hl.dispatch(hl.dsp.window.close({ window = win }))
     end
 end)
+
+-- Telegram Linux has no Mac Cmd+K "Jump to chat" UI. Native `search` = in-chat
+-- messages. Esc leaves the current chat and focuses the left chat-list search.
+hl.bind("CTRL + K", function()
+    local focused = hl.get_active_window()
+    if not focused then
+        return
+    end
+    local class = focused.class or ""
+    if class == "TelegramDesktop" or class == "org.telegram.desktop" then
+        hl.dispatch(hl.dsp.exec_cmd("wtype -k Escape"))
+        return
+    end
+    hl.dispatch(hl.dsp.pass({ window = focused }))
+end)
+
+-- Yandex Browser: Ctrl+Shift+C → copy current page URL (elsewhere: pass through).
+-- Chromium inhibits compositor shortcuts; dont_inhibit makes the bind win anyway.
+hl.bind("CTRL + SHIFT + C", function()
+    local focused = hl.get_active_window()
+    if not focused then
+        return
+    end
+    local class = string.lower(focused.class or "")
+    if class:find("yandex", 1, true) then
+        hl.dispatch(hl.dsp.exec_cmd("~/.config/hypr/scripts/copy-browser-url.sh"))
+        return
+    end
+    hl.dispatch(hl.dsp.pass({ window = focused }))
+end, { dont_inhibit = true })
+
+-- Zoom tabs (Meeting / shared screen), same muscle memory as Zen/Arc:
+--   Physical: Super+Shift+[ ] (mouse side buttons) → kanata → Ctrl+Page_Up/Down
+--   Keyboard: Ctrl+Shift+[ ] also works.
+-- IMPORTANT: do NOT also bind Prior/Next — they are aliases of Page_Up/Down and
+-- would fire twice (skip every other tab/window).
+local function is_zoom(class)
+    class = string.lower(class or "")
+    return class == "zoom" or class:find("zoom", 1, true) ~= nil
+end
+
+local function zoom_tab_or_pass(dir)
+    local focused = hl.get_active_window()
+    if not focused then
+        return
+    end
+    if is_zoom(focused.class) then
+        hl.dispatch(hl.dsp.exec_cmd("~/.config/hypr/scripts/zoom-tab.sh " .. dir))
+        return
+    end
+    -- One pass only — apps (Zen) / kitty handle Ctrl+PgUp themselves
+    hl.dispatch(hl.dsp.pass({ window = focused }))
+end
+
+-- After kanata: Super+Shift+[ ] arrives as Ctrl+Page_Up/Down
+hl.bind("CTRL + Page_Up", function()
+    zoom_tab_or_pass("prev")
+end, { dont_inhibit = true })
+hl.bind("CTRL + Page_Down", function()
+    zoom_tab_or_pass("next")
+end, { dont_inhibit = true })
+
+-- Direct Ctrl+Shift+[ ] (keyboard, no kanata)
+hl.bind("CTRL + SHIFT + bracketleft", function()
+    zoom_tab_or_pass("prev")
+end, { dont_inhibit = true })
+hl.bind("CTRL + SHIFT + bracketright", function()
+    zoom_tab_or_pass("next")
+end, { dont_inhibit = true })
+
+-- Do NOT bind SUPER+SHIFT+bracket*: kanata already remaps those to Ctrl+PgUp/Dn.
+-- Binding both caused a second pass → skipped tabs in Zen and windows in tmux.
+-- Do NOT bind CTRL+TAB here: Firefox/Zen uses MRU order (feels like "skipping").
+-- Zoom gets Ctrl+Tab via zoom-tab.sh wtype, not via these binds.
+
 -- Force-kill focused window (escape hatch)
 hl.bind(secondMod .. " + SHIFT + Q", hl.dsp.window.kill())
 -- Another window of the focused app
 hl.bind("CTRL + N", hl.dsp.exec_cmd("~/.config/hypr/scripts/new-window.sh"))
+
+-- Nautilus: Ctrl+Shift+. toggles hidden files (native shortcut is Ctrl+H; no custom accel API)
+hl.bind("CTRL + SHIFT + PERIOD", function()
+    local focused = hl.get_active_window()
+    if not focused then
+        return
+    end
+    local class = string.lower(focused.class or "")
+    if class:find("nautilus", 1, true) then
+        hl.dispatch(hl.dsp.exec_cmd("~/.config/hypr/scripts/nautilus-toggle-hidden.sh"))
+        return
+    end
+    -- Leave other apps alone (e.g. kitty_mod+. = move_tab_forward)
+    hl.dispatch(hl.dsp.pass({ window = focused }))
+end)
 
 -- Float: was Alt+V (taken by skhd workspace V) → Super+Shift+V; also service-mode `f`
 hl.bind(secondMod .. " + SHIFT + V", hl.dsp.window.float({ action = "toggle" }))
@@ -183,7 +273,7 @@ hl.bind(secondMod .. " + Q", hl.dsp.exec_cmd("qs -c rice ipc call clipboard togg
 hl.bind(mainMod .. " + O", hl.dsp.exec_cmd(p.menu))
 -- Alt+J is movefocus down only (legacy togglesplit conflicted with the same key)
 
-hl.bind(secondMod .. " + L", hl.dsp.exec_cmd("pidof hyprlock || hyprlock"))
+hl.bind(secondMod .. " + SHIFT + L", hl.dsp.exec_cmd("pidof hyprlock || hyprlock"))
 hl.bind(secondMod .. " + W", hl.dsp.exec_cmd("qs -c rice ipc call wallpaper toggle"))
 hl.bind(secondMod .. " + P", hl.dsp.exec_cmd("qs -c rice ipc call overlay filter"))
 hl.bind(secondMod .. " + SHIFT + W", hl.dsp.exec_cmd("~/.local/bin/wallpaper-random"))
@@ -192,6 +282,14 @@ hl.bind(secondMod .. " + V", hl.dsp.exec_cmd("qs -c rice ipc call vpn toggle"))
 
 hl.bind(secondMod .. " + SHIFT + CTRL + 4", hl.dsp.exec_cmd("~/.config/hypr/scripts/screenshot-region.sh"))
 hl.bind(secondMod .. " + T", hl.dsp.exec_cmd("~/.config/hypr/scripts/ocr-region.sh"))
+
+-- Screen record (OBS) + on-screen draw (Gromit-MPX)
+hl.bind(secondMod .. " + SHIFT + R", hl.dsp.exec_cmd("~/.local/bin/obs-record-toggle toggle"))
+hl.bind(secondMod .. " + ALT + R", hl.dsp.exec_cmd("obs --disable-shutdown-check"))
+hl.bind(secondMod .. " + D", hl.dsp.exec_cmd("~/.config/hypr/scripts/gromit-ctl.sh toggle"))
+hl.bind(secondMod .. " + SHIFT + D", hl.dsp.exec_cmd("~/.config/hypr/scripts/gromit-ctl.sh clear"))
+hl.bind(secondMod .. " + CTRL + D", hl.dsp.exec_cmd("~/.config/hypr/scripts/gromit-ctl.sh undo"))
+hl.bind(secondMod .. " + ALT + D", hl.dsp.exec_cmd("~/.config/hypr/scripts/gromit-ctl.sh visibility"))
 
 -- Focus windows (skhd alt - hjkl)
 hl.bind(mainMod .. " + H", hl.dsp.focus({ direction = "left" }))

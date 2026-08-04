@@ -1,0 +1,48 @@
+#!/usr/bin/env python3
+"""Build full desktop palette → ~/.config/theme/palette.toml (SSOT)."""
+from __future__ import annotations
+
+import json
+import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from _theme_core import (  # noqa: E402
+    build_palette,
+    ensure_theme_dir,
+    load_harmonies,
+    match_harmony,
+    palette_to_toml,
+)
+
+
+def main() -> int:
+    theme = ensure_theme_dir()
+    extract_path = theme / "extract.json"
+    if not extract_path.is_file():
+        print("theme-build: missing extract.json", file=sys.stderr)
+        return 1
+    data = json.loads(extract_path.read_text())
+    wallpaper = Path(data["wallpaper"])
+    colors = data.get("colors") or []
+    match_path = theme / "match.json"
+    if match_path.is_file():
+        m = json.loads(match_path.read_text())
+        hid = m["harmony_id"]
+        delta = float(m.get("hue_shift", 0))
+        harmonies = load_harmonies()
+        harmony = harmonies[hid]
+    else:
+        hid, harmony, delta = match_harmony(colors)
+    pal = build_palette(wallpaper, colors, hid, harmony, delta)
+    out = theme / "palette.toml"
+    out.write_text(palette_to_toml(pal))
+    print(
+        f"theme-build: {hid} primary={pal['accent']['primary']} "
+        f"surface={pal['surface']['surface']} → {out}"
+    )
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

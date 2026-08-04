@@ -1,12 +1,9 @@
 #!/usr/bin/env bash
-# Apply wallpaper theme colors via matugen after Waypaper changes wallpaper.
-#
-# Pipeline: matugen (surfaces from wallpaper) → theme-warm-accents (sand UI chrome)
-#           → theme-ensure-contrast (text readability only; accents stay sand).
+# Apply wallpaper theme via SSOT pipeline:
+#   extract → match → build (palette.toml) → render (all consumers) → reload
 set -euo pipefail
 
 wallpaper="${1:-}"
-# Waypaper may pass escaped paths — unquote
 wallpaper="${wallpaper//\\/}"
 
 if [[ -z "$wallpaper" || ! -f "$wallpaper" ]]; then
@@ -17,69 +14,84 @@ fi
 cfg="${XDG_CONFIG_HOME:-$HOME/.config}"
 sddm_theme="/usr/share/sddm/themes/adaptive"
 sddm_cache="$cfg/sddm-adaptive"
-# Resolve next to this script (works via symlink from ~/.local/bin)
 self_dir="$(cd "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")" && pwd)"
-ensure_contrast="${self_dir}/theme-ensure-contrast"
-warm_accents="${self_dir}/theme-warm-accents"
 
-mkdir -p "$sddm_cache"
+extract="${self_dir}/theme-extract"
+match="${self_dir}/theme-match"
+build="${self_dir}/theme-build"
+render="${self_dir}/theme-render"
 
-# Keep hyprlock background in sync with desktop wallpaper
+mkdir -p "$sddm_cache" "$cfg/theme"
+
+# Keep hyprlock background in sync
 ln -sfn "$wallpaper" "$cfg/hypr/lock-wallpaper"
 
-# Higher matugen contrast → safer Material roles out of the box; post-pass
-# still hardens Kitty/Quickshell against translucent terminals + wild wallpapers.
-matugen image "$wallpaper" \
-  --mode dark \
-  --type scheme-tonal-spot \
-  --contrast 0.35 \
-  --prefer saturation
-
-# Pin warm sand/beige accents (wallpaper hue must not drive primary/secondary)
-if [[ -x "$warm_accents" ]]; then
-  "$warm_accents" || true
+# Ensure harmonies.toml is available under ~/.config/theme
+if [[ ! -f "$cfg/theme/harmonies.toml" ]]; then
+  if [[ -f /home/stranger/dotfiles/theme/.config/theme/harmonies.toml ]]; then
+    ln -sfn /home/stranger/dotfiles/theme/.config/theme/harmonies.toml "$cfg/theme/harmonies.toml" 2>/dev/null \
+      || cp -f /home/stranger/dotfiles/theme/.config/theme/harmonies.toml "$cfg/theme/harmonies.toml"
+  fi
 fi
-
-# Auto-fix fg/dim/ANSI contrast (no per-wallpaper cfg edits)
-if [[ -x "$ensure_contrast" ]]; then
-  "$ensure_contrast" || true
-fi
-
-# SDDM cache is best-effort — must not abort the theme pipeline above
-cp -f "$wallpaper" "$sddm_cache/background.jpg" 2>/dev/null || true
-
-if [[ -d "$sddm_theme" && -w "$sddm_theme" ]]; then
-  cp -f "$sddm_cache/background.jpg" "$sddm_theme/background.jpg"
-  if [[ -f "$sddm_cache/colors.conf" ]]; then
-    cp -f "$sddm_cache/colors.conf" "$sddm_theme/colors.conf"
+if [[ ! -d "$cfg/theme/templates" ]]; then
+  if [[ -d /home/stranger/dotfiles/theme/.config/theme/templates ]]; then
+    ln -sfn /home/stranger/dotfiles/theme/.config/theme/templates "$cfg/theme/templates" 2>/dev/null \
+      || cp -a /home/stranger/dotfiles/theme/.config/theme/templates "$cfg/theme/templates"
   fi
 fi
 
-# Reload Hyprland colors without full restart of apps
-hyprctl reload >/dev/null 2>&1 || true
+"$extract" "$wallpaper"
+"$match"
+"$build"
+"$render"
 
-# Reload kitty colors in live instances
-if command -v kitten >/dev/null 2>&1; then
-  kitten @ set-colors --all --configured ~/.config/kitty/colors-matugen.conf 2>/dev/null || true
+# SDDM cache is best-effort
+cp -f "$wallpaper" "$sddm_cache/background.jpg" 2>/dev/null || true
+if [[ -d "$sddm_theme" && -w "$sddm_theme" ]]; then
+  cp -f "$sddm_cache/background.jpg" "$sddm_theme/background.jpg" 2>/dev/null || true
+  if [[ -f "$sddm_cache/colors.conf" ]]; then
+    cp -f "$sddm_cache/colors.conf" "$sddm_theme/colors.conf" 2>/dev/null || true
+  fi
 fi
 
-# Reload Quickshell rice colors (clipboard / launcher)
+hyprctl reload >/dev/null 2>&1 || true
+
+if command -v kitten >/dev/null 2>&1; then
+  kitten @ set-colors --all --configured "$cfg/kitty/colors-matugen.conf" 2>/dev/null || true
+  # Reload full kitty config for tab colors
+  pkill -USR1 kitty 2>/dev/null || true
+fi
+
 if command -v qs >/dev/null 2>&1; then
   qs -c rice ipc call theme reload 2>/dev/null \
     || { qs -c rice kill 2>/dev/null || true; qs -c rice -n -d 2>/dev/null || true; }
 fi
 
-# Reload Herdr UI colors (sand accents + wallpaper surfaces)
 if command -v herdr >/dev/null 2>&1; then
   herdr server reload-config 2>/dev/null || true
 fi
 
-# Refresh hyprpolkitagent so Qt/hyprtoolkit palette picks up new colors
-# (skip restart while an auth dialog is visible)
 if command -v hyprctl >/dev/null 2>&1; then
   if ! hyprctl clients -j 2>/dev/null | grep -q '"class": "hyprpolkitagent"'; then
     systemctl --user try-restart hyprpolkitagent.service 2>/dev/null || true
   fi
 fi
 
-notify-send -a Waypaper "Theme updated" "$(basename "$wallpaper")" 2>/dev/null || true
+# Refresh tmux status theme if running (bust PowerKit color cache so SSOT applies)
+if command -v tmux >/dev/null 2>&1 && tmux list-sessions >/dev/null 2>&1; then
+  rm -f "${XDG_CACHE_HOME:-$HOME/.cache}/tmux-powerkit/data/theme_colors__"* \
+        "${XDG_CACHE_HOME:-$HOME/.cache}/tmux-powerkit/data/current_theme" 2>/dev/null || true
+  tmux source-file "$HOME/.tmux.conf" >/dev/null 2>&1 || true
+fi
+
+# Rebuild bat theme cache
+if command -v bat >/dev/null 2>&1; then
+  bat cache --build >/dev/null 2>&1 || true
+fi
+
+harmony="$(grep -E '^harmony_id' "$cfg/theme/palette.toml" 2>/dev/null | head -1 | cut -d'"' -f2 || echo theme)"
+vimium_note=""
+if pgrep -f '[z]en-bin|[z]en-browser|/zen$' >/dev/null 2>&1; then
+  vimium_note=" · restart Zen for Vimium"
+fi
+notify-send -a Waypaper "Theme updated" "$(basename "$wallpaper") · ${harmony}${vimium_note}" 2>/dev/null || true
