@@ -1,12 +1,13 @@
 import QtQuick
 
-// Short open-only reveal for rice menus (no layer resize — keeps 165Hz smooth).
+// Smooth open reveal — fade + soft scale (no overshoot; OutBack feels jerky on 165Hz).
 ParallelAnimation {
     id: root
 
     property Item target
+    property Item dimTarget
     property int duration: Theme.menuAnimMs
-    property real fromScale: 0.97
+    property real fromScale: 0.98
 
     NumberAnimation {
         target: root.target
@@ -22,8 +23,15 @@ ParallelAnimation {
         from: root.fromScale
         to: 1
         duration: root.duration
-        easing.type: Easing.OutBack
-        easing.overshoot: Theme.menuOvershoot
+        easing.type: Easing.OutCubic
+    }
+    NumberAnimation {
+        target: root.dimTarget
+        property: "opacity"
+        from: 0
+        to: 1
+        duration: root.duration
+        easing.type: Easing.OutCubic
     }
 
     function play() {
@@ -32,6 +40,8 @@ ParallelAnimation {
         root.stop()
         root.target.opacity = 0
         root.target.scale = root.fromScale
+        if (root.dimTarget)
+            root.dimTarget.opacity = 0
         root.restart()
     }
 }

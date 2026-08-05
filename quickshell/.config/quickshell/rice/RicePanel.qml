@@ -44,13 +44,18 @@ PanelWindow {
     signal queryChanged(string text)
     signal filterChanged(string value)
 
-    // Stay visible through the close animation so it doesn't vanish mid-fade.
-    visible: open || closeAnim.running
+    // Stay visible only while open — match Clipboard (no linger mid-close).
+    visible: open
+    // True while the overlay is on-screen — bar/layer logic uses this.
+    readonly property bool surfaceActive: open
     color: "transparent"
-    exclusiveZone: 0
+    // -1 = own the whole output; Ignore alone still got cropped by the bar's zone (y+52).
+    exclusiveZone: -1
     exclusionMode: ExclusionMode.Ignore
     focusable: true
+    WlrLayershell.layer: WlrLayer.Overlay
     WlrLayershell.namespace: "rice-panel"
+    WlrLayershell.keyboardFocus: open ? WlrKeyboardFocus.OnDemand : WlrKeyboardFocus.None
     anchors {
         left: true
         right: true
@@ -72,7 +77,6 @@ PanelWindow {
 
     function show() {
         OverlayHub.closeOthers(root)
-        closeAnim.stop()
         open = true
         selectedIndex = 0
         searchField.text = ""
@@ -101,7 +105,9 @@ PanelWindow {
         searchField.text = ""
         filterMenuOpen = false
         pendingOpenFilter = false
-        closeAnim.play()
+        dim.opacity = 0
+        panel.opacity = 1
+        panel.scale = 1
         panelClosed()
     }
 
@@ -285,13 +291,7 @@ PanelWindow {
         anchors.fill: parent
         color: Theme.backdrop
         z: -1
-        opacity: root.open ? 1 : 0
-        Behavior on opacity {
-            NumberAnimation {
-                duration: root.open ? Theme.menuAnimMs : Theme.menuCloseMs
-                easing.type: root.open ? Easing.OutCubic : Easing.InCubic
-            }
-        }
+        opacity: 0
         MouseArea {
             anchors.fill: parent
             onClicked: root.close()
@@ -304,9 +304,11 @@ PanelWindow {
         height: root.panelHeight
         anchors.centerIn: parent
         radius: Theme.radiusLg
-        color: Theme.glassBackground
-        border.color: Theme.glassBorder
+        // Match Clipboard: opaque surface (not translucent glass — that looked like gray fog).
+        color: Theme.surface
+        border.color: Theme.border
         border.width: 1
+        clip: true
         transformOrigin: Item.Center
         opacity: 1
         scale: 1
@@ -314,13 +316,8 @@ PanelWindow {
         RiceOpenAnim {
             id: openAnim
             target: panel
-            fromScale: 0.97
-        }
-
-        RiceCloseAnim {
-            id: closeAnim
-            target: panel
-            toScale: 0.97
+            dimTarget: dim
+            fromScale: 0.98
         }
 
         // Soft inner highlight — Apple-like glass edge without heavy chrome
@@ -330,7 +327,7 @@ PanelWindow {
             radius: Theme.radiusLg - 1
             color: "transparent"
             border.width: 1
-            border.color: Theme.glassBorderSubtle
+            border.color: Theme.outlineSubtle
         }
 
         MouseArea {
@@ -468,24 +465,96 @@ PanelWindow {
                 }
             }
 
-            ListView {
-                id: listView
+            Item {
                 Layout.fillWidth: true
                 Layout.fillHeight: true
-                clip: true
-                spacing: 4
-                model: root.model
-                currentIndex: root.selectedIndex
-                boundsBehavior: Flickable.StopAtBounds
-                delegate: root.rowDelegate
 
-                Text {
-                    anchors.centerIn: parent
-                    visible: !root.model || root.model.length === 0
-                    text: "Nothing found"
-                    color: Theme.textMuted
-                    font.family: Theme.fontFamily
-                    font.pixelSize: Theme.fontSize
+                ListView {
+                    id: listView
+                    anchors.fill: parent
+                    anchors.rightMargin: scrollBar.visible ? 10 : 0
+                    clip: true
+                    spacing: 4
+                    model: root.model
+                    currentIndex: root.selectedIndex
+                    boundsBehavior: Flickable.StopAtBounds
+                    delegate: root.rowDelegate
+
+                    Text {
+                        anchors.centerIn: parent
+                        visible: !root.model || root.model.length === 0
+                        text: "Nothing found"
+                        color: Theme.textMuted
+                        font.family: Theme.fontFamily
+                        font.pixelSize: Theme.fontSize
+                    }
+                }
+
+                // Minimal scroll position indicator (track + thumb).
+                Item {
+                    id: scrollBar
+                    readonly property bool needed: listView.contentHeight > listView.height + 2
+                    readonly property real ratio: listView.height / Math.max(1, listView.contentHeight)
+                    readonly property real thumbH: Math.max(28, height * ratio)
+                    readonly property real maxThumbY: Math.max(0, height - thumbH)
+                    readonly property real maxContentY: Math.max(1, listView.contentHeight - listView.height)
+                    readonly property real thumbY: maxThumbY * (listView.contentY / maxContentY)
+
+                    visible: needed
+                    anchors.right: parent.right
+                    anchors.top: parent.top
+                    anchors.bottom: parent.bottom
+                    width: 6
+
+                    Rectangle {
+                        anchors.fill: parent
+                        radius: 3
+                        color: Theme.borderSubtle
+                        opacity: 0.35
+                    }
+
+                    Rectangle {
+                        id: scrollThumb
+                        x: 0
+                        width: parent.width
+                        height: scrollBar.thumbH
+                        y: scrollBar.thumbY
+                        radius: 3
+                        color: Theme.primary
+                        opacity: scrollDrag.active ? 0.95 : 0.65
+
+                        MouseArea {
+                            id: scrollDrag
+                            anchors.fill: parent
+                            anchors.margins: -4
+                            cursorShape: Qt.PointingHandCursor
+                            preventStealing: true
+                            property real grabOffset: 0
+
+                            onPressed: mouse => {
+                                grabOffset = mouse.y
+                            }
+                            onPositionChanged: mouse => {
+                                if (!pressed)
+                                    return
+                                const localY = scrollThumb.y + mouse.y - grabOffset
+                                const clamped = Math.max(0, Math.min(scrollBar.maxThumbY, localY))
+                                listView.contentY = (clamped / Math.max(1, scrollBar.maxThumbY)) * scrollBar.maxContentY
+                            }
+                        }
+                    }
+
+                    // Click track to jump
+                    MouseArea {
+                        anchors.fill: parent
+                        z: -1
+                        cursorShape: Qt.PointingHandCursor
+                        onClicked: mouse => {
+                            const target = mouse.y - scrollBar.thumbH / 2
+                            const clamped = Math.max(0, Math.min(scrollBar.maxThumbY, target))
+                            listView.contentY = (clamped / Math.max(1, scrollBar.maxThumbY)) * scrollBar.maxContentY
+                        }
+                    }
                 }
             }
 
@@ -510,8 +579,8 @@ PanelWindow {
             anchors.topMargin: 72
             anchors.rightMargin: 14
             radius: Theme.radiusMd
-            color: Theme.glassBackground
-            border.color: Theme.glassBorder
+            color: Theme.surface
+            border.color: Theme.border
             border.width: 1
             z: 30
 

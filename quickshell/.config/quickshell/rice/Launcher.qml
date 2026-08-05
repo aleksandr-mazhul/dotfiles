@@ -62,9 +62,10 @@ RicePanel {
             action = item.action
         else if (item)
             action = () => focusOrLaunch(item)
+        // Instant close like Clipboard, then run action (no close-anim wait).
         close()
-        if (action)
-            Qt.callLater(action)
+        if (typeof action === "function")
+            action()
     }
 
     // One-shot: drop entries whose Exec binary is missing from PATH / disk.

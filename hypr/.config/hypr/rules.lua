@@ -13,10 +13,11 @@ hl.layer_rule({
 
 -- Rice liquid glass: frost wallpaper through translucent panels (alpha ~0.80).
 -- ignore_alpha skips fully/near-transparent pixels so blur hugs the rounded rect.
--- Covers QuickSettings, Launcher/Clipboard/Wallpaper/Vpn (rice-panel), Calendar, Notifications.
+-- NOT on rice-panel: that layer is fullscreen + dim scrim; blur on it paints a gray
+-- fog/band under the bar. Anchored hubs (QS/calendar/notifs) stay frosted.
 hl.layer_rule({
     name = "rice-glass-blur",
-    match = { namespace = "^rice-(quicksettings|panel|calendar|notifications)$" },
+    match = { namespace = "^rice-(quicksettings|calendar|notifications)$" },
     blur = true,
     ignore_alpha = 0.2,
 })

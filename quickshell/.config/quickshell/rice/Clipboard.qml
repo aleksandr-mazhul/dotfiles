@@ -35,10 +35,12 @@ PanelWindow {
 
     visible: open
     color: "transparent"
-    exclusiveZone: 0
+    exclusiveZone: -1
     exclusionMode: ExclusionMode.Ignore
     focusable: true
+    WlrLayershell.layer: WlrLayer.Overlay
     WlrLayershell.namespace: "rice-clipboard"
+    WlrLayershell.keyboardFocus: open ? WlrKeyboardFocus.OnDemand : WlrKeyboardFocus.None
     anchors {
         left: true
         right: true
@@ -65,9 +67,6 @@ PanelWindow {
         selectedIndex = 0
         refreshList()
         openAnim.play()
-        dimAnim.from = 0
-        dimAnim.to = 1
-        dimAnim.restart()
         Qt.callLater(() => {
             if (pendingOpenFilter) {
                 pendingOpenFilter = false
@@ -416,19 +415,11 @@ PanelWindow {
         anchors.fill: parent
         color: Theme.backdrop
         z: -1
-        opacity: 1
+        opacity: 0
         MouseArea {
             anchors.fill: parent
             onClicked: root.close()
         }
-    }
-
-    NumberAnimation {
-        id: dimAnim
-        target: dim
-        property: "opacity"
-        duration: Theme.menuAnimMs
-        easing.type: Easing.OutCubic
     }
 
     Rectangle {
@@ -448,7 +439,8 @@ PanelWindow {
         RiceOpenAnim {
             id: openAnim
             target: panel
-            fromScale: 0.97
+            dimTarget: dim
+            fromScale: 0.98
         }
 
         Rectangle {

@@ -25,11 +25,8 @@ QtObject {
     readonly property color outlineSubtle: Colors.outline_variant
     readonly property color border: Qt.rgba(primary.r, primary.g, primary.b, 0.35)
     readonly property color borderSubtle: Qt.rgba(outline.r, outline.g, outline.b, 0.45)
-    // Kept low: this sits BEHIND the glass panel inside the same window buffer,
-    // so its alpha stacks with glassBackground (0.80) before Hyprland ever blurs
-    // it — anything much higher makes the "glass" panel read as a flat opaque
-    // box. ~0.12 still dims the click-away area without smothering the glass.
-    readonly property color backdrop: Qt.rgba(0, 0, 0, 0.12)
+    // Low alpha sits under ignore_alpha blur threshold so only the glass card frosts.
+    readonly property color backdrop: Qt.rgba(0, 0, 0, 0.18)
 
     // Liquid glass — match kitty background_opacity 0.80; Hyprland blur frosts behind
     readonly property real glassOpacity: 0.80
@@ -89,12 +86,12 @@ QtObject {
     // Gap under the bar strip. When the bar pins an exclusive zone, only this
     // gap is needed (zone already clears the pills). Unpinned: clear full bar.
     readonly property int qsPanelGap: 4
-    // Spring-like open: long enough to read the overshoot, still snappy.
-    readonly property int menuAnimMs: 220
-    // Quick, no-overshoot close — panels should feel like they're dismissed, not bounced.
-    readonly property int menuCloseMs: 140
-    // Easing.OutBack overshoot factor for the open-scale animation.
-    readonly property real menuOvershoot: 1.4
+    // Spring-like open: long enough to read, still snappy — no overshoot.
+    readonly property int menuAnimMs: 180
+    // Quick close — panels should feel dismissed, not bounced.
+    readonly property int menuCloseMs: 120
+    // Kept for back-compat; open anim no longer uses OutBack.
+    readonly property real menuOvershoot: 1.0
     // Shared hover/press color-transition duration (SSOT for every Behavior on color).
     readonly property int hoverMs: 120
 }

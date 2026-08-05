@@ -22,11 +22,17 @@ PanelWindow {
     property bool fsPolled: false
     readonly property bool fullscreenActive: root.fsPolled
 
-    readonly property bool panelOpen: !!(
-        (quickSettings && quickSettings.open)
-        || (calendar && calendar.open)
-        || (notifCenter && notifCenter.open)
-    )
+    readonly property bool panelOpen: {
+        const active = (p) => !!(p && (p.open || p.surfaceActive || p.visible))
+        if (active(quickSettings) || active(calendar) || active(notifCenter))
+            return true
+        const hubPanels = OverlayHub.panels || []
+        for (let i = 0; i < hubPanels.length; i++) {
+            if (active(hubPanels[i]))
+                return true
+        }
+        return false
+    }
     property bool hovering: false
     property bool revealed: false
 

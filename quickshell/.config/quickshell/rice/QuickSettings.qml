@@ -145,16 +145,16 @@ PanelWindow {
             return
         root.vpnBusy = true
         if (action === "disconnect") {
-            root.vpnStatus = "○ Disconnecting…"
+            root.vpnStatus = "… Disconnecting"
             root.vpnConnected = false
             Quickshell.execDetached(["bash", "-lc", "~/.config/hypr/scripts/qs-vpn.sh disconnect"])
         } else if (action === "best" || loc === "best") {
-            root.vpnStatus = "● Connecting…"
-            root.vpnConnected = true
+            root.vpnStatus = "… Connecting"
+            root.vpnConnected = false // not ON until settled
             Quickshell.execDetached(["bash", "-lc", "~/.config/hypr/scripts/qs-vpn.sh best"])
         } else {
-            root.vpnStatus = "● Connecting…"
-            root.vpnConnected = true
+            root.vpnStatus = "… Connecting"
+            root.vpnConnected = false
             const safe = String(loc || "").replace(/'/g, "")
             Quickshell.execDetached([
                 "bash", "-lc",
@@ -839,7 +839,7 @@ PanelWindow {
             onStreamFinished: {
                 const t = text.trim() || "○ Disconnected"
                 root.vpnStatus = t
-                root.vpnConnected = t.indexOf("Connected") >= 0
+                root.vpnConnected = /^ON\b/.test(t) || /\bConnected\b/.test(t)
             }
         }
     }

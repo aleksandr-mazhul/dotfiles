@@ -1,14 +1,14 @@
 import QtQuick
 
-// Quick close-only dismiss for rice menus — fade + scale down, no overshoot.
-// Pair with RiceOpenAnim: keep `visible: open || closeAnim.running` on the
-// PanelWindow so the layer doesn't vanish mid-animation.
+// Smooth close dismiss — fade + slight scale down, synced with dim.
+// Keep `visible: open || closeAnim.running` on the PanelWindow.
 ParallelAnimation {
     id: root
 
     property Item target
+    property Item dimTarget
     property int duration: Theme.menuCloseMs
-    property real toScale: 0.96
+    property real toScale: 0.98
 
     NumberAnimation {
         target: root.target
@@ -21,6 +21,13 @@ ParallelAnimation {
         target: root.target
         property: "scale"
         to: root.toScale
+        duration: root.duration
+        easing.type: Easing.InCubic
+    }
+    NumberAnimation {
+        target: root.dimTarget
+        property: "opacity"
+        to: 0
         duration: root.duration
         easing.type: Easing.InCubic
     }
