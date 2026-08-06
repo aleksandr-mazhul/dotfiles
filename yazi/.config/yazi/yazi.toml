@@ -33,6 +33,10 @@ edit = [
 	{ run = "code %s",     desc = "code",         for = "windows", orphan = true },
 	{ run = "code -w %s",  desc = "code (block)", for = "windows", block = true },
 ]
+# Decompress Git zlib objects → nvim read-only (Enter / o)
+view-zlib = [
+	{ run = 'python3 "${XDG_CONFIG_HOME:-$HOME/.config}/yazi/plugins/zlib.yazi/view.py" "$@"', desc = "nvim (readonly)", for = "unix", block = true },
+]
 play = [
 	{ run = "xdg-open %s1",    desc = "Play", for = "linux", orphan = true },
 	{ run = "open %s",         desc = "Play", for = "macos" },
@@ -69,6 +73,8 @@ rules = [
 	# Text / code
 	{ mime = "text/*", use = [ "edit", "reveal" ] },
 	{ url = "*.{c,cpp,cc,cxx,h,hpp,hxx,rs,go,py,lua,js,jsx,ts,tsx,vue,svelte,java,kt,swift,rb,php,sh,bash,zsh,fish,toml,yaml,yml,md,mdx,css,scss,sass,html,xml,sql,zig,nim,ex,exs,clj,scala,hs,ml,mli,vim,conf,ini,cfg,env,dockerfile,Makefile,CMakeLists.txt}", use = [ "edit", "reveal" ] },
+	# Git loose objects (zlib) — view decoded content in nvim, read-only
+	{ mime = "application/zlib", use = [ "view-zlib", "reveal" ] },
 	# Image
 	{ mime = "image/*", use = [ "open", "reveal" ] },
 	# Media
@@ -143,6 +149,8 @@ previewers = [
 	{ mime = "application/{mbox,javascript,wine-extension-ini}", run = "code" },
 	# JSON
 	{ mime = "application/{json,ndjson}", run = "json" },
+	# Git loose objects / zlib (no git CLI)
+	{ mime = "application/zlib", run = "zlib" },
 	# Image
 	{ mime = "image/{avif,hei?,jxl}", run = "magick" },
 	{ mime = "image/svg+xml", run = "svg" },
