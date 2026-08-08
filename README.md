@@ -28,6 +28,7 @@ BOOTSTRAP_WALLPAPER=~/Pictures/Wallpapers/nature/foo.jpg ./bootstrap.sh
 
 Подробный scope восстановления: **[RESTORE.md](RESTORE.md)**.  
 Списки приложений: **[packages/](packages/)**.  
+Хоткеи (Hypr/kitty/nvim/kanata): **[KEYBINDS.md](KEYBINDS.md)**.  
 Правила для AI-агентов: **[AGENTS.md](AGENTS.md)**.
 
 ---

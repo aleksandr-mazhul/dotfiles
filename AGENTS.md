@@ -9,7 +9,8 @@ changes. Never commit secrets (tokens, passwords, browser profiles, SSH keys).
 ./bootstrap.sh
 ```
 
-Details: [`RESTORE.md`](RESTORE.md), package lists: [`packages/`](packages/).
+Details: [`RESTORE.md`](RESTORE.md), package lists: [`packages/`](packages/),
+keybinds: [`KEYBINDS.md`](KEYBINDS.md).
 
 ## When installing a NEW application
 

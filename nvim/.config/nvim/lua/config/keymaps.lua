@@ -28,6 +28,9 @@ map("n", "<D-l>", "<Cmd>nohlsearch<Bar>diffupdate<Bar>normal! <C-L><CR>", {
   desc = "Redraw screen",
 })
 
+-- Super+V = visual-block (Mac Ctrl+V; Linux Ctrl+V is terminal paste)
+map({ "n", "x" }, "<D-v>", "<C-v>", { desc = "Visual block", remap = true })
+
 -- Existing custom maps
 map("n", "<leader>gg", function()
   local Terminal = require("toggleterm.terminal").Terminal

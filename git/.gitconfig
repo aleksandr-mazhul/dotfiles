@@ -1,3 +1,54 @@
 [user]
 	name = Aleksandr Mazhul
 	email = map07102007@gmail.com
+[credential]
+	helper = /usr/lib/git-core/git-credential-libsecret
+[init]
+	defaultBranch = main
+[pull]
+	rebase = false
+	ff = false
+[fetch]
+	prune = true
+[rebase]
+	autoStash = true
+[color]
+	ui = auto
+[color "decorate"]
+	HEAD = bold cyan
+	branch = bold green
+	remoteBranch = bold red
+	tag = bold yellow
+[log]
+	# Distinct lane colors for `git log --graph` (like a GUI tree)
+	graphColors = bold blue,bold yellow,bold magenta,bold cyan,bold green,bold red,bold brightblue,bold brightyellow
+[diff]
+	colorMoved = zebra
+[merge]
+	ff = false
+	conflictstyle = zdiff3
+[core]
+	editor = nvim
+	pager = delta
+# delta is great for diffs; keep raw ANSI graph colors for log
+[pager]
+	log = less --tabs=4 -RFX
+	reflog = less --tabs=4 -RFX
+	show = delta
+	diff = delta
+[interactive]
+	diffFilter = delta --color-only
+[delta]
+	navigate = true
+	side-by-side = true
+	line-numbers = true
+[alias]
+	st = status
+	co = checkout
+	br = branch
+	ci = commit
+	# Colorful branch tree (all refs) — use: git lg
+	lg = log --graph --oneline --decorate --all -30
+	# Longer history when needed
+	lga = log --graph --oneline --decorate --all
+	last = log -1 HEAD
