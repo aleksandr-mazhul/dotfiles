@@ -8,3 +8,7 @@ end
 
 # No "Welcome to fish…" spam
 set -g fish_greeting
+
+
+# User-local bins (theme-*, zen-browser, …)
+fish_add_path -g "$HOME/.local/bin"

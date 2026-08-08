@@ -1,13 +1,15 @@
 -- Hyprland 0.56 Lua config (converted from hyprland.conf)
 
-hl.plugin.load("/home/stranger/.local/lib/hypr/gloview.so")
-hl.plugin.load("/home/stranger/.local/lib/hypr/dynamic-cursors.so")
+local home = os.getenv("HOME") or ""
+
+hl.plugin.load(home .. "/.local/lib/hypr/gloview.so")
+hl.plugin.load(home .. "/.local/lib/hypr/dynamic-cursors.so")
 
 require("monitors")
 require("workspaces")
 
 local terminal = "kitty"
-local fileManager = "/home/stranger/.local/bin/nautilus-dark --new-window"
+local fileManager = home .. "/.local/bin/nautilus-dark --new-window"
 local menu = "qs -c rice ipc call launcher toggle"
 local browser = "firefox"
 

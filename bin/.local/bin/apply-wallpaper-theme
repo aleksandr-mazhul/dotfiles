@@ -27,17 +27,18 @@ mkdir -p "$sddm_cache" "$cfg/theme"
 ln -sfn "$wallpaper" "$cfg/hypr/lock-wallpaper"
 
 # Ensure harmonies.toml is available under ~/.config/theme
-if [[ ! -f "$cfg/theme/harmonies.toml" ]]; then
-  if [[ -f /home/stranger/dotfiles/theme/.config/theme/harmonies.toml ]]; then
-    ln -sfn /home/stranger/dotfiles/theme/.config/theme/harmonies.toml "$cfg/theme/harmonies.toml" 2>/dev/null \
-      || cp -f /home/stranger/dotfiles/theme/.config/theme/harmonies.toml "$cfg/theme/harmonies.toml"
-  fi
+# Prefer repo next to this script (stow symlink → …/dotfiles/bin/.local/bin)
+repo_theme="$(cd "$self_dir/../../../theme/.config/theme" 2>/dev/null && pwd || true)"
+[[ -z "${repo_theme:-}" && -d "$HOME/dotfiles/theme/.config/theme" ]] \
+  && repo_theme="$HOME/dotfiles/theme/.config/theme"
+
+if [[ ! -f "$cfg/theme/harmonies.toml" && -n "${repo_theme:-}" && -f "$repo_theme/harmonies.toml" ]]; then
+  ln -sfn "$repo_theme/harmonies.toml" "$cfg/theme/harmonies.toml" 2>/dev/null \
+    || cp -f "$repo_theme/harmonies.toml" "$cfg/theme/harmonies.toml"
 fi
-if [[ ! -d "$cfg/theme/templates" ]]; then
-  if [[ -d /home/stranger/dotfiles/theme/.config/theme/templates ]]; then
-    ln -sfn /home/stranger/dotfiles/theme/.config/theme/templates "$cfg/theme/templates" 2>/dev/null \
-      || cp -a /home/stranger/dotfiles/theme/.config/theme/templates "$cfg/theme/templates"
-  fi
+if [[ ! -d "$cfg/theme/templates" && -n "${repo_theme:-}" && -d "$repo_theme/templates" ]]; then
+  ln -sfn "$repo_theme/templates" "$cfg/theme/templates" 2>/dev/null \
+    || cp -a "$repo_theme/templates" "$cfg/theme/templates"
 fi
 
 "$extract" "$wallpaper"

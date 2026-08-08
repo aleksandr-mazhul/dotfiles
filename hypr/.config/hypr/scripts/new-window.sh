@@ -28,13 +28,13 @@ case "${class,,}" in
     if command -v cursor >/dev/null; then
       exec cursor -n
     fi
-    exec /home/stranger/Applications/Cursor.AppImage -n
+    exec "$HOME/Applications/Cursor.AppImage" -n
     ;;
   firefox)
     exec firefox --new-window
     ;;
   org.gnome.nautilus|nautilus)
-    exec /home/stranger/.local/bin/nautilus-dark --new-window
+    exec "$HOME/.local/bin/nautilus-dark" --new-window
     ;;
   org.telegram.desktop|telegramdesktop)
     exec Telegram

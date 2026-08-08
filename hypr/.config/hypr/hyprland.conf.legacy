@@ -26,8 +26,9 @@ source = ~/.config/hypr/monitors.conf
 source = ~/.config/hypr/workspaces.conf
 # hyprexpo not installed — GloView used instead for Mission Control
 # source = ~/.config/hypr/hyprexpo.conf
-# Load plugin BEFORE sourcing binds (tilde ~ does not expand in plugin=)
-plugin = /home/stranger/.local/lib/hypr/gloview.so
+# Legacy conf — live config is hyprland.lua (uses $HOME).
+# plugin= does not expand ~; keep $HOME via envsubst only if you revive this file.
+plugin = $HOME/.local/lib/hypr/gloview.so
 source = ~/.config/hypr/gloview.conf
 source = ~/.config/hypr/colors-matugen.conf
 
@@ -47,7 +48,7 @@ monitor=,preferred,auto,auto
 
 # Set programs that you use
 $terminal = kitty
-$fileManager = /home/stranger/.local/bin/nautilus-dark --new-window
+$fileManager = $HOME/.local/bin/nautilus-dark --new-window
 #$menu = hyprlauncher
 $menu = wofi --show drun
 $browser = firefox

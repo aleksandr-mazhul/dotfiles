@@ -22,7 +22,7 @@ HARMONIES_PATHS = (
     THEME_DIR / "harmonies.toml",
     CFG / "theme" / "harmonies.toml",
     DOTFILES_HARMONIES,
-    Path("/home/stranger/dotfiles/theme/.config/theme/harmonies.toml"),
+    Path.home() / "dotfiles/theme/.config/theme/harmonies.toml",
 )
 
 
@@ -410,9 +410,9 @@ def build_chrome(
         # Muted/tertiary segment — time / inactive window index
         "muted_bg": surfaces["surface_container"],
         "muted_fg": accents["tertiary"],
-        # Fonts for bars/widgets
+        # Fonts for bars/widgets — DS typography: UI = modern sans, mono for terminals
         "font_mono": "JetBrains Mono",
-        "font_ui": "JetBrains Mono",
+        "font_ui": "Adwaita Sans",
     }
 
 
