@@ -1,10 +1,9 @@
+//@ pragma IconTheme Papirus-Dark
 import QtQuick
 import Quickshell
 import Quickshell.Io
 
 ShellRoot {
-    //@ pragma IconTheme Papirus-Dark
-
     Clipboard { id: clipboard }
     Launcher { id: launcher }
     Wallpaper { id: wallpaper }
@@ -26,6 +25,7 @@ ShellRoot {
             calendar: calendarPanel
             notifCenter: notifications
             pinned: OverlayHub.barPinned
+            forceHidden: !OverlayHub.barVisible
         }
     }
 
@@ -81,13 +81,18 @@ ShellRoot {
     IpcHandler {
         target: "bar"
         function toggle(): void {
-            // Pin / unpin: pinned = always visible; unpinned = autohide at top edge.
-            OverlayHub.barPinned = !OverlayHub.barPinned
-            OverlayHub.barVisible = true
-            if (!OverlayHub.barPinned) {
+            // Showing (pinned or peekable) → hide now.
+            // Hidden → pin and show.
+            const showing = OverlayHub.barPinned || OverlayHub.barVisible
+            if (showing) {
+                OverlayHub.barPinned = false
+                OverlayHub.barVisible = false
                 qsPanel.close()
                 calendarPanel.close()
                 notifications.close()
+            } else {
+                OverlayHub.barPinned = true
+                OverlayHub.barVisible = true
             }
         }
         function showBar(): void {
@@ -96,7 +101,7 @@ ShellRoot {
         }
         function hideBar(): void {
             OverlayHub.barPinned = false
-            OverlayHub.barVisible = true
+            OverlayHub.barVisible = false
             qsPanel.close()
             calendarPanel.close()
             notifications.close()

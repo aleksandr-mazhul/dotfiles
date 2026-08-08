@@ -23,7 +23,8 @@ const SECTIONS: Section[] = [
     title: "Bar / overlays",
     source: "hypr/binds.lua",
     rows: [
-      { keys: "Super+Shift+B", action: "Toggle top bar (quickshell rice)" },
+      { keys: "Super+B", action: "Toggle top bar (hide ↔ pinned show)" },
+      { keys: "Super+Shift+B", action: "Same as Super+B" },
       { keys: "Super+Q", action: "Clipboard history" },
       { keys: "Super+W", action: "Wallpaper picker" },
       { keys: "Super+Shift+W", action: "Random wallpaper" },
@@ -247,8 +248,8 @@ export default function KeybindsCheatsheet() {
 
       <Callout tone="info" title="Hide top bar">
         <Text>
-          <Text weight="semibold">Super+Shift+B</Text>
-          {" — toggles the quickshell rice bar."}
+          <Text weight="semibold">Super+B</Text>
+          {" (or Super+Shift+B) — hide / show the top bar."}
         </Text>
       </Callout>
 

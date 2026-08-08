@@ -169,26 +169,133 @@ hl.bind(secondMod .. " + SHIFT + Q", hl.dsp.window.kill())
 -- Another window of the focused app
 hl.bind("CTRL + N", hl.dsp.exec_cmd("~/.config/hypr/scripts/new-window.sh"))
 
--- Nautilus: Ctrl+Shift+. toggles hidden files (native shortcut is Ctrl+H; no custom accel API)
-hl.bind("CTRL + SHIFT + PERIOD", function()
+-- =============================================================================
+-- Nautilus = Mac Finder shortcuts (Cmd → Ctrl)
+--   Ctrl+Backspace / Ctrl+Delete  → Move to Trash
+--   Ctrl+Alt+Backspace/Delete     → Delete Immediately
+--   Ctrl+D                        → Duplicate (bookmark: Ctrl+Shift+D)
+--   Ctrl+↑ / Ctrl+↓               → Enclosing folder / Open
+--   Ctrl+[ / Ctrl+]               → Back / Forward
+--   Ctrl+Shift+G                  → Go to folder
+--   Ctrl+I                        → Get Info
+--   Ctrl+= / Ctrl+-               → Zoom icons
+--   Ctrl+Shift+.                  → Show hidden
+-- =============================================================================
+local function is_nautilus(win)
+    if not win then
+        return false
+    end
+    local class = string.lower(win.class or "")
+    return class:find("nautilus", 1, true) ~= nil
+end
+
+local function nautilus_or_pass(action)
     local focused = hl.get_active_window()
-    if not focused then
+    if is_nautilus(focused) then
+        hl.dispatch(hl.dsp.exec_cmd("~/.config/hypr/scripts/nautilus-mac.sh " .. action))
         return
     end
-    local class = string.lower(focused.class or "")
-    if class:find("nautilus", 1, true) then
+    if focused then
+        hl.dispatch(hl.dsp.pass({ window = focused }))
+    end
+end
+
+hl.bind("CTRL + BACKSPACE", function()
+    nautilus_or_pass("trash")
+end)
+
+hl.bind("CTRL + DELETE", function()
+    nautilus_or_pass("trash")
+end)
+
+hl.bind("CTRL + ALT + BACKSPACE", function()
+    nautilus_or_pass("purge")
+end)
+
+hl.bind("CTRL + ALT + DELETE", function()
+    nautilus_or_pass("purge")
+end)
+
+hl.bind("CTRL + D", function()
+    nautilus_or_pass("duplicate")
+end)
+
+hl.bind("CTRL + SHIFT + D", function()
+    nautilus_or_pass("bookmark")
+end)
+
+hl.bind("CTRL + UP", function()
+    nautilus_or_pass("up")
+end)
+
+hl.bind("CTRL + DOWN", function()
+    nautilus_or_pass("open")
+end)
+
+hl.bind("CTRL + bracketleft", function()
+    nautilus_or_pass("back")
+end)
+
+hl.bind("CTRL + bracketright", function()
+    nautilus_or_pass("forward")
+end)
+
+hl.bind("CTRL + SHIFT + G", function()
+    nautilus_or_pass("goto")
+end)
+
+hl.bind("CTRL + I", function()
+    nautilus_or_pass("info")
+end)
+
+-- Nautilus: Ctrl+Shift+. toggles hidden files (native shortcut is Ctrl+H)
+hl.bind("CTRL + SHIFT + PERIOD", function()
+    local focused = hl.get_active_window()
+    if is_nautilus(focused) then
         hl.dispatch(hl.dsp.exec_cmd("~/.config/hypr/scripts/nautilus-toggle-hidden.sh"))
         return
     end
-    -- Leave other apps alone (e.g. kitty_mod+. = move_tab_forward)
-    hl.dispatch(hl.dsp.pass({ window = focused }))
+    if focused then
+        hl.dispatch(hl.dsp.pass({ window = focused }))
+    end
+end)
+
+-- Nautilus icon zoom: Ctrl+= / Ctrl+-
+local function nautilus_zoom(dir)
+    local focused = hl.get_active_window()
+    if is_nautilus(focused) then
+        hl.dispatch(hl.dsp.exec_cmd("~/.config/hypr/scripts/nautilus-zoom.sh " .. dir))
+        return true
+    end
+    return false
+end
+
+hl.bind("CTRL + equal", function()
+    local focused = hl.get_active_window()
+    if nautilus_zoom("in") then
+        return
+    end
+    if focused then
+        hl.dispatch(hl.dsp.pass({ window = focused }))
+    end
+end)
+
+hl.bind("CTRL + minus", function()
+    local focused = hl.get_active_window()
+    if nautilus_zoom("out") then
+        return
+    end
+    if focused then
+        hl.dispatch(hl.dsp.pass({ window = focused }))
+    end
 end)
 
 -- Float: was Alt+V (taken by skhd workspace V) → Super+Shift+V; also service-mode `f`
 hl.bind(secondMod .. " + SHIFT + V", hl.dsp.window.float({ action = "toggle" }))
 hl.bind(mainMod .. " + F", hl.dsp.window.fullscreen())
--- Zoom-fullscreen (skhd Alt+Shift+F); bar toggle remapped to Super+Shift+B
+-- Zoom-fullscreen (skhd Alt+Shift+F); bar hide/show → Super+B (Shift+B alias)
 hl.bind(mainMod .. " + SHIFT + F", hl.dsp.window.fullscreen())
+hl.bind(secondMod .. " + B", hl.dsp.exec_cmd("qs -c rice ipc call bar toggle"))
 hl.bind(secondMod .. " + SHIFT + B", hl.dsp.exec_cmd("qs -c rice ipc call bar toggle"))
 -- Pin: was Alt+Shift+P (taken by move→P) → Super+Shift+P
 hl.bind(secondMod .. " + SHIFT + P", hl.dsp.window.pin({ action = "toggle" }))
@@ -275,10 +382,11 @@ hl.bind(mainMod .. " + O", hl.dsp.exec_cmd(p.menu))
 
 hl.bind(secondMod .. " + SHIFT + L", hl.dsp.exec_cmd("pidof hyprlock || hyprlock"))
 hl.bind(secondMod .. " + W", hl.dsp.exec_cmd("qs -c rice ipc call wallpaper toggle"))
-hl.bind(secondMod .. " + P", hl.dsp.exec_cmd("qs -c rice ipc call overlay filter"))
+-- Overlay type filter: was Super+P, now Ctrl+P (shown in panel footers)
+hl.bind("CTRL + P", hl.dsp.exec_cmd("qs -c rice ipc call overlay filter"))
 hl.bind(secondMod .. " + SHIFT + W", hl.dsp.exec_cmd("~/.local/bin/wallpaper-random"))
 hl.bind(secondMod .. " + ALT + W", hl.dsp.exec_cmd("~/.local/bin/waypaper"))
-hl.bind(secondMod .. " + V", hl.dsp.exec_cmd("qs -c rice ipc call vpn toggle"))
+-- Super+V free for apps (nvim visual-block; Mac Ctrl+V → Super). VPN: launcher / QuickSettings.
 
 hl.bind(secondMod .. " + SHIFT + CTRL + 4", hl.dsp.exec_cmd("~/.config/hypr/scripts/screenshot-region.sh"))
 hl.bind(secondMod .. " + T", hl.dsp.exec_cmd("~/.config/hypr/scripts/ocr-region.sh"))

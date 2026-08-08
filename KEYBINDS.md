@@ -6,7 +6,7 @@ Sources: `hypr/.../binds.lua`, `kitty.conf`, `nvim/.../keymaps.lua`, `kanata.kbd
 Kitty also keeps default **Ctrl+Shift** (`kitty_mod`) shortcuts unless overridden below.  
 VPN has no hotkey — use launcher (`vpn`) or QuickSettings.
 
-> **Hide top bar:** `Super+Shift+B`
+> **Hide / show top bar:** `Super+B` (also `Super+Shift+B`)
 
 ---
 
@@ -14,7 +14,8 @@ VPN has no hotkey — use launcher (`vpn`) or QuickSettings.
 
 | Keys | Action |
 | --- | --- |
-| Super+Shift+B | Toggle top bar (quickshell rice) |
+| Super+B | Toggle top bar (hide ↔ pinned show) |
+| Super+Shift+B | Same as Super+B |
 | Super+Q | Clipboard history |
 | Super+W | Wallpaper picker |
 | Super+Shift+W | Random wallpaper |

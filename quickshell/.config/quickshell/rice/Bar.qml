@@ -14,6 +14,8 @@ PanelWindow {
     property var notifCenter
     // Alt+Shift+F: keep bar visible in normal mode (ignored while fullscreen).
     property bool pinned: false
+    // Super+B / Super+Shift+B hide: no pin and no top-edge peek until shown again.
+    property bool forceHidden: false
 
     readonly property var hyprMonitor: Hyprland.monitorFor(modelData)
     readonly property int monitorId: hyprMonitor ? hyprMonitor.id : -1
@@ -36,11 +38,20 @@ PanelWindow {
     property bool hovering: false
     property bool revealed: false
 
+    onForceHiddenChanged: {
+        if (forceHidden)
+            forceHideForFullscreen()
+    }
+
     // Fullscreen: only hover / open panel can show the bar (pin does NOT keep it).
-    // Normal: pin OR hover OR panel.
-    readonly property bool showContent: root.fullscreenActive
-        ? (root.panelOpen || root.revealed)
-        : (root.pinned || root.revealed || root.panelOpen)
+    // Normal: pin OR hover OR panel — unless Super+B hid the bar completely.
+    readonly property bool showContent: {
+        if (root.forceHidden && !root.panelOpen)
+            return false
+        if (root.fullscreenActive)
+            return root.panelOpen || root.revealed
+        return root.pinned || root.revealed || root.panelOpen
+    }
 
     readonly property int fullHeight: Theme.barHeight + Theme.barMargin * 2
     // Tall enough to catch the cursor at the physical screen edge.

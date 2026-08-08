@@ -72,8 +72,14 @@ QtObject {
     }
 
     function toggleBar() {
-        barPinned = !barPinned
-        barVisible = true
+        const showing = barPinned || barVisible
+        if (showing) {
+            barPinned = false
+            barVisible = false
+        } else {
+            barPinned = true
+            barVisible = true
+        }
     }
 
     function toggleQuickSettings() {
