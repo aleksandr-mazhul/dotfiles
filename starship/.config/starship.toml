@@ -9,8 +9,8 @@ $character"""
 add_newline = true
 
 [directory]
-style = "fg:#1a1008 bg:#90c6c2"
-format = "[](fg:#90c6c2)[ $path ]($style)[](fg:#90c6c2 bg:#37443c)"
+style = "fg:#1a1008 bg:#ffb688"
+format = "[](fg:#ffb688)[ $path ]($style)[](fg:#ffb688 bg:#342931)"
 truncation_length = 0
 truncate_to_repo = false
 fish_style_pwd_dir_length = 0
@@ -18,17 +18,17 @@ home_symbol = "~"
 read_only = " 󰌾"
 
 [git_branch]
-style = "fg:#b1c7c5 bg:#37443c"
+style = "fg:#e5bfa9 bg:#342931"
 format = "[ $branch ]($style)"
 symbol = ""
 
 [time]
 disabled = false
-style = "fg:#c2ba9c bg:#2e3832"
-format = "[](fg:#37443c bg:#2e3832)[ $time ]($style)[](fg:#2e3832)"
+style = "fg:#cac993 bg:#292126"
+format = "[](fg:#342931 bg:#292126)[ $time ]($style)[](fg:#292126)"
 time_format = "%H:%M"
 
 [character]
-success_symbol = "[❯](bold #90c6c2)"
+success_symbol = "[❯](bold #ffb688)"
 error_symbol = "[❯](bold #ffb4ab)"
-vimcmd_symbol = "[❮](bold #b1c7c5)"
+vimcmd_symbol = "[❮](bold #e5bfa9)"

@@ -11,6 +11,11 @@ if ! command -v gromit-mpx >/dev/null 2>&1; then
 fi
 
 if ! pgrep -x gromit-mpx >/dev/null 2>&1; then
+  # Ensure intro is off (also stowed as ~/.config/gromit-mpx.ini).
+  ini="${XDG_CONFIG_HOME:-$HOME/.config}/gromit-mpx.ini"
+  if [[ ! -f "$ini" ]]; then
+    printf '%s\n' '[General]' 'ShowIntroOnStartup=false' '[Drawing]' 'Opacity=0.85' >"$ini"
+  fi
   # opacity ~0.85 keeps UI readable under annotations
   gromit-mpx -o 0.85 >/dev/null 2>&1 &
   # give the daemon a moment before the client command

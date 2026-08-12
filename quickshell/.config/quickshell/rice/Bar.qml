@@ -13,9 +13,8 @@ PanelWindow {
     property var calendar
     property var notifCenter
     // Alt+Shift+F: keep bar visible in normal mode (ignored while fullscreen).
+    // Persisted: OverlayHub.barPinned → ~/.local/state/quickshell/rice.json
     property bool pinned: false
-    // Super+B / Super+Shift+B hide: no pin and no top-edge peek until shown again.
-    property bool forceHidden: false
 
     readonly property var hyprMonitor: Hyprland.monitorFor(modelData)
     readonly property int monitorId: hyprMonitor ? hyprMonitor.id : -1
@@ -38,20 +37,11 @@ PanelWindow {
     property bool hovering: false
     property bool revealed: false
 
-    onForceHiddenChanged: {
-        if (forceHidden)
-            forceHideForFullscreen()
-    }
-
-    // Fullscreen: only hover / open panel can show the bar (pin does NOT keep it).
-    // Normal: pin OR hover OR panel — unless Super+B hid the bar completely.
-    readonly property bool showContent: {
-        if (root.forceHidden && !root.panelOpen)
-            return false
-        if (root.fullscreenActive)
-            return root.panelOpen || root.revealed
-        return root.pinned || root.revealed || root.panelOpen
-    }
+    // Pinned + not fullscreen → always on.
+    // Else (autohide or fullscreen) → only hover peek / open panel.
+    readonly property bool showContent: (root.pinned && !root.fullscreenActive)
+        || root.panelOpen
+        || root.revealed
 
     readonly property int fullHeight: Theme.barHeight + Theme.barMargin * 2
     // Tall enough to catch the cursor at the physical screen edge.
@@ -235,12 +225,14 @@ PanelWindow {
     }
 
     onPinnedChanged: {
-        // Pin only applies outside fullscreen.
-        if (root.pinned && !root.fullscreenActive) {
-            keepOpen()
-        } else if (!root.pinned && !root.hovering && !root.panelOpen) {
-            hideTimer.restart()
+        // Super+B unpin → slide away now; top-edge hover still peeks (like fullscreen).
+        if (!root.pinned) {
+            forceHideForFullscreen()
+            return
         }
+        // Pin only applies outside fullscreen.
+        if (!root.fullscreenActive)
+            keepOpen()
     }
 
     Timer {

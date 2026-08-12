@@ -15,7 +15,7 @@ QtObject {
     property var calendar: null
     property var notifications: null
     property bool barVisible: true
-    // When false, bar autohides and reveals on top-edge hover hold.
+    // false = autohide + top-edge peek (like fullscreen); true = always on.
     // Persisted across reboots via stateFile below.
     property bool barPinned: false
     // Notifications mute / DND — also persisted.
@@ -72,14 +72,8 @@ QtObject {
     }
 
     function toggleBar() {
-        const showing = barPinned || barVisible
-        if (showing) {
-            barPinned = false
-            barVisible = false
-        } else {
-            barPinned = true
-            barVisible = true
-        }
+        barPinned = !barPinned
+        barVisible = true
     }
 
     function toggleQuickSettings() {

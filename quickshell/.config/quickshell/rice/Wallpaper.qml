@@ -14,7 +14,7 @@ RicePanel {
 
     title: "Wallpapers"
     searchPlaceholder: "Search wallpapers…"
-    footerText: "↑↓ move  ·  ⇧↵ mark  ·  ↵ apply  ·  esc close"
+    footerText: "↑↓ move  ·  ⇧↵ mark  ·  ↵ apply  ·  ⌃P filter  ·  esc close"
     model: filtered
     countText: countLabel()
     itemHeight: 76

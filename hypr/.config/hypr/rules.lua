@@ -22,6 +22,16 @@ hl.layer_rule({
     ignore_alpha = 0.2,
 })
 
+-- DS popup surfaces (launcher & future popups): one glass pane, NO fullscreen
+-- dim (design-system anti-pattern #6 — dim kills the material). The layer is
+-- fully transparent outside the pane, so ignore_alpha frosts only the glass.
+hl.layer_rule({
+    name = "rice-popup-glass",
+    match = { namespace = "^rice-popup$" },
+    blur = true,
+    ignore_alpha = 0.2,
+})
+
 hl.window_rule({
     name = "fix-xwayland-drags",
     match = {
@@ -127,8 +137,18 @@ for _, app in ipairs(APP_HOME) do
     end
 end
 
+-- Nautilus draws its own CSD chrome; Hypr's border reads as a thick orange/black
+-- frame (worse with fractional scale). Same for float menus/popovers.
+hl.window_rule({
+    name = "nautilus-no-border",
+    match = {
+        class = "^(org\\.gnome\\.Nautilus|Nautilus|nautilus)$",
+    },
+    border_size = 0,
+})
+
 -- Telegram RMB menus / media viewer already have their own chrome — Hypr's
--- active border shows up as a weird outline (side effect of float-stay rules).
+-- active border shows up as a weird thick outline on fractional scale.
 hl.window_rule({
     name = "telegram-float-no-border",
     match = {

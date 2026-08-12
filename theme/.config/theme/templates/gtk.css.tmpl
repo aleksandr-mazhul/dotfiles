@@ -14,9 +14,67 @@
 @define-color window_bg_color {{ background }};
 @define-color window_fg_color {{ on_surface }};
 
-window, dialog, messagedialog, menu, .background {
+/* Main chrome — include .background so libadwaita sidebars stay dark */
+window:not(.popup):not(.tooltip), dialog, messagedialog, .background {
   background-color: @window_bg_color;
   color: @window_fg_color;
+}
+
+/* Popup WINDOW shell only: transparent so we don't get a black plate behind
+   rounded menus. Actual menu/popover body is painted below. */
+window.popup, window.tooltip {
+  background-color: transparent;
+  background-image: none;
+  box-shadow: none;
+}
+
+popover > contents,
+popover.menu contents,
+menu,
+.menu,
+.csd.popup menuitem,
+tooltip > contents {
+  background-color: @card_bg_color;
+  color: @theme_fg_color;
+  border-radius: 12px;
+  border: 1px solid alpha({{ outline }}, 0.35);
+}
+
+popover > contents modelbutton:hover,
+popover > contents modelbutton:selected,
+menu menuitem:hover,
+.menu menuitem:hover {
+  background-color: @theme_selected_bg_color;
+  color: @theme_selected_fg_color;
+  border-radius: 8px;
+}
+
+/* Nautilus / Adw navigation sidebar */
+.sidebar,
+.navigation-sidebar,
+list.navigation-sidebar,
+.nautilus-window .sidebar,
+flap > .sidebar {
+  background-color: @view_bg_color;
+  color: @theme_fg_color;
+}
+
+.sidebar label,
+.sidebar .title,
+.navigation-sidebar label,
+.navigation-sidebar .title,
+list.navigation-sidebar label,
+list.navigation-sidebar row,
+list.navigation-sidebar row label {
+  color: @theme_fg_color;
+  opacity: 1;
+}
+
+list.navigation-sidebar row:selected,
+list.navigation-sidebar row:selected label,
+.navigation-sidebar row:selected,
+.navigation-sidebar row:selected label {
+  color: @theme_selected_fg_color;
 }
 
 entry, spinbutton, search, textview {

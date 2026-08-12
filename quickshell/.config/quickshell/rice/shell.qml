@@ -25,7 +25,6 @@ ShellRoot {
             calendar: calendarPanel
             notifCenter: notifications
             pinned: OverlayHub.barPinned
-            forceHidden: !OverlayHub.barVisible
         }
     }
 
@@ -81,18 +80,14 @@ ShellRoot {
     IpcHandler {
         target: "bar"
         function toggle(): void {
-            // Showing (pinned or peekable) → hide now.
-            // Hidden → pin and show.
-            const showing = OverlayHub.barPinned || OverlayHub.barVisible
-            if (showing) {
-                OverlayHub.barPinned = false
-                OverlayHub.barVisible = false
+            // Pinned (always on) ↔ autohide (top-edge hover reveals, like fullscreen).
+            // Persisted via OverlayHub.barPinned → rice.json.
+            OverlayHub.barPinned = !OverlayHub.barPinned
+            OverlayHub.barVisible = true
+            if (!OverlayHub.barPinned) {
                 qsPanel.close()
                 calendarPanel.close()
                 notifications.close()
-            } else {
-                OverlayHub.barPinned = true
-                OverlayHub.barVisible = true
             }
         }
         function showBar(): void {
@@ -101,7 +96,7 @@ ShellRoot {
         }
         function hideBar(): void {
             OverlayHub.barPinned = false
-            OverlayHub.barVisible = false
+            OverlayHub.barVisible = true
             qsPanel.close()
             calendarPanel.close()
             notifications.close()

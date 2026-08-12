@@ -7,6 +7,11 @@ sleep 0.5
 kitty >/dev/null 2>&1 &
 
 (
+  sleep 1.5
+  zen-browser >/dev/null 2>&1 &
+) &
+
+(
   sleep 2
   Telegram >/dev/null 2>&1 &
 ) &

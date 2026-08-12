@@ -1,0 +1,3 @@
+module vim
+singleton VimKeys 1.0 VimKeys.qml
+VimEngine 1.0 VimEngine.qml

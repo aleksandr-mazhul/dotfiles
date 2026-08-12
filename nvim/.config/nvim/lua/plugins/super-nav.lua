@@ -1,4 +1,4 @@
--- Ctrl+hjkl window nav (matches HRM D=Ctrl). Super reserved for clear/redraw elsewhere.
+-- Ctrl+hjkl window nav. Super+H/L are code↔tree in keymaps.lua.
 return {
   {
     "folke/snacks.nvim",
@@ -22,6 +22,29 @@ return {
         nav_j = { "<C-j>", term_nav("j"), desc = "Go to Lower Window", expr = true, mode = "t" },
         nav_k = { "<C-k>", term_nav("k"), desc = "Go to Upper Window", expr = true, mode = "t" },
         nav_l = { "<C-l>", term_nav("l"), desc = "Go to Right Window", expr = true, mode = "t" },
+      })
+
+      -- From inside explorer: Super+L / F14 → back to code
+      local function back_to_code()
+        if _G.FocusCodeWindow then
+          _G.FocusCodeWindow()
+          return
+        end
+        vim.cmd.wincmd("l")
+      end
+      opts.picker = opts.picker or {}
+      opts.picker.sources = opts.picker.sources or {}
+      opts.picker.sources.explorer = vim.tbl_deep_extend("force", opts.picker.sources.explorer or {}, {
+        win = {
+          list = {
+            keys = {
+              ["<D-l>"] = back_to_code,
+              ["<F14>"] = back_to_code,
+              ["<D-h>"] = "focus_list",
+              ["<F13>"] = "focus_list",
+            },
+          },
+        },
       })
       return opts
     end,

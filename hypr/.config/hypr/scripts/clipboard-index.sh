@@ -260,11 +260,16 @@ for line in cliphist_list():
         item["label"] = f"Image ({item['dimsLabel']})" if item["dimsLabel"] else "Image"
         item["preview"] = item["label"]
     else:
-        text = preview.replace("\n", " ").strip()
-        if len(text) > 90:
-            text = text[:87] + "…"
-        item["label"] = text or "Text"
-        item["preview"] = text
+        # List label is short; keep raw list preview separately — full body is
+        # decoded lazily by the Quickshell panel (cliphist list truncates).
+        raw = preview.replace("\r\n", "\n").replace("\r", "\n")
+        one_line = " ".join(raw.split())
+        if len(one_line) > 90:
+            item["label"] = one_line[:87] + "…"
+        else:
+            item["label"] = one_line or "Text"
+        item["preview"] = raw
+        item["needsDecode"] = True
 
     items.append(item)
 

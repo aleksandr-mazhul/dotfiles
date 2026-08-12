@@ -1,0 +1,20 @@
+[Desktop Entry]
+Name=Devin
+Comment=AI agent IDE — Devin Desktop
+GenericName=Text Editor
+Exec=/usr/bin/devin-desktop %F
+Icon=devin-desktop
+Type=Application
+Terminal=false
+StartupNotify=false
+StartupWMClass=Devin
+Categories=TextEditor;Development;IDE;
+MimeType=application/x-devin-desktop-workspace;x-scheme-handler/devin;x-scheme-handler/windsurf;
+Actions=new-empty-window;
+Keywords=devin;windsurf;vscode;code;editor;ide;agent;
+
+[Desktop Action new-empty-window]
+Name=New Empty Window
+Name[ru]=Новое пустое окно
+Exec=/usr/bin/devin-desktop --new-window %F
+Icon=devin-desktop

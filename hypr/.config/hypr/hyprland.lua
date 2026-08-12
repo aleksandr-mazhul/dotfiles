@@ -11,7 +11,7 @@ require("workspaces")
 local terminal = "kitty"
 local fileManager = home .. "/.local/bin/nautilus-dark --new-window"
 local menu = "qs -c rice ipc call launcher toggle"
-local browser = "firefox"
+local browser = "zen-browser"
 
 -- Expose for binds.lua
 programs = {
@@ -227,11 +227,11 @@ hl.on("hyprland.start", function()
     hl.exec_cmd("~/.config/hypr/scripts/ocr-daemon-start.sh")
     hl.exec_cmd("xrdb -merge ~/.Xresources")
     hl.exec_cmd("~/.config/hypr/scripts/session-autostart.sh")
-    -- On-screen annotation daemon (paint while recording); idle until toggled.
-    hl.exec_cmd("pidof gromit-mpx || gromit-mpx -o 0.85")
-    -- Ergohaven: Entropy Live Features + Hyprland→keyboard layout sync (Wayland).
-    hl.exec_cmd("~/.config/hypr/scripts/entropy-autostart.sh")
+    -- Gromit: do NOT autostart (welcome assistant spam). Starts on first Super+D via gromit-ctl.sh.
+    -- Ergohaven: Wayland EN/RU sync (Entropy Live Features hang on Hypr — do not autostart).
     hl.exec_cmd("~/.config/hypr/scripts/eh-layout-sync.sh")
+    -- After keyboard appears, restore Vial default layer if configured (see eh-default-layer).
+    hl.exec_cmd("~/.config/hypr/scripts/eh-default-layer.sh")
     -- Each window remembers EN/RU; restores on focus (pauses while launcher forces EN).
     hl.exec_cmd("~/.config/hypr/scripts/eh-window-layout.py")
     -- Names match Mac skhd/yabai spaces.sh (W C V D G X Z E T I P Q U Y R A)

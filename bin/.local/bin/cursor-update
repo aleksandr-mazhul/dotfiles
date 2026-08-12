@@ -1,0 +1,47 @@
+#!/usr/bin/env bash
+# Update Cursor AppImage in-place (in-app Update button cannot replace AppImages).
+set -euo pipefail
+
+APPDIR="${CURSOR_APPDIR:-$HOME/Applications}"
+BIN_LINK="${CURSOR_BIN_LINK:-$HOME/.local/bin/cursor}"
+TRACK="${CURSOR_RELEASE_TRACK:-latest}"
+ARCH="$(uname -m)"
+case "$ARCH" in
+  x86_64) PLATFORM=linux-x64 ;;
+  aarch64|arm64) PLATFORM=linux-arm64 ;;
+  *) echo "Unsupported arch: $ARCH" >&2; exit 1 ;;
+esac
+
+API="https://cursor.com/api/download?platform=${PLATFORM}&releaseTrack=${TRACK}"
+json="$(curl -fsSL -A 'Mozilla/5.0' "$API")"
+url="$(python3 -c 'import json,sys; print(json.load(sys.stdin)["downloadUrl"])' <<<"$json")"
+ver="$(python3 -c 'import json,sys; print(json.load(sys.stdin)["version"])' <<<"$json")"
+
+if [[ -z "$url" || "$url" == "null" ]]; then
+  echo "Failed to resolve download URL" >&2
+  exit 1
+fi
+
+mkdir -p "$APPDIR"
+tmp="$(mktemp "$APPDIR/.Cursor-${ver}.XXXXXX.AppImage")"
+cleanup() { rm -f "$tmp"; }
+trap cleanup EXIT
+
+echo "Downloading Cursor ${ver}..."
+curl -fL -A 'Mozilla/5.0' --progress-bar -o "$tmp" "$url"
+chmod +x "$tmp"
+
+dest="$APPDIR/Cursor-${ver}-x86_64.AppImage"
+if [[ "$PLATFORM" == "linux-arm64" ]]; then
+  dest="$APPDIR/Cursor-${ver}-aarch64.AppImage"
+fi
+mv -f "$tmp" "$dest"
+trap - EXIT
+
+# Point stable names at the new build
+ln -sfn "$dest" "$APPDIR/Cursor.AppImage"
+mkdir -p "$(dirname "$BIN_LINK")"
+ln -sfn "$APPDIR/Cursor.AppImage" "$BIN_LINK"
+
+echo "Installed Cursor ${ver} → $dest"
+echo "Restart Cursor to finish (Help → Reload Window is not enough)."

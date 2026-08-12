@@ -32,3 +32,11 @@ gui:
       - "{{ error }}"
     defaultFgColor:
       - "{{ on_surface }}"
+
+# Commit / branch graph in the Commits panel
+git:
+  log:
+    # always | when-maximised | never
+    showGraph: always
+    # true = git log --all (all branches in one graph)
+    showWholeGraph: true

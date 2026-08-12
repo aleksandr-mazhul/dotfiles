@@ -3,6 +3,7 @@ import QtQuick.Layouts
 import Quickshell
 import Quickshell.Io
 import Quickshell.Wayland
+import "vim"
 
 // Raycast-inspired clipboard history: fixed size, list + preview/info, type filter.
 PanelWindow {
@@ -19,6 +20,19 @@ PanelWindow {
     property bool filterMenuOpen: false
     property int filterHighlight: 0
     property bool pendingOpenFilter: false
+    // list = history; preview = vim text pane
+    property string focusPane: "list"
+    property string previewFullText: ""
+    property bool previewLoading: false
+    property string previewDecodeId: ""
+    property string previewOriginal: ""
+    readonly property bool previewDirty: previewEdit ? (previewEdit.text !== previewOriginal) : false
+    readonly property string decodeHelper: Quickshell.env("HOME") + "/.config/hypr/scripts/clipboard-decode-text.sh"
+    readonly property string storeHelper: Quickshell.env("HOME") + "/.config/hypr/scripts/clipboard-store-text.sh"
+    // Proxied from shared VimEngine (rice/vim) for UI + host checks
+    readonly property string vimMode: vimEngine.mode
+    readonly property string vimModeLabel: vimEngine.modeLabel
+    readonly property bool visualLinewise: vimEngine.visualLinewise
 
     readonly property var filterOptions: [
         { value: "all", label: "All Types" },
@@ -65,6 +79,9 @@ PanelWindow {
         filterMenuOpen = false
         markedLines = []
         selectedIndex = 0
+        focusPane = "list"
+        previewFullText = ""
+        vimEngine.reset()
         refreshList()
         openAnim.play()
         Qt.callLater(() => {
@@ -85,6 +102,8 @@ PanelWindow {
         filterMenuOpen = false
         pendingOpenFilter = false
         markedLines = []
+        focusPane = "list"
+        previewFullText = ""
     }
 
     function showFilter() {
@@ -245,6 +264,212 @@ PanelWindow {
             return
         selectedIndex = nextItemIndex(selectedIndex, delta)
         listView.positionViewAtIndex(selectedIndex, ListView.Contain)
+        if (focusPane === "preview")
+            loadPreviewBody()
+    }
+
+    function focusListPane() {
+        if (focusPane === "preview" && vimMode === "insert" && previewDirty)
+            commitPreviewEdit()
+        focusPane = "list"
+        vimEngine.enterCopy(true)
+        searchField.forceActiveFocus()
+    }
+
+    function focusPreviewPane() {
+        if (!selectedItem || selectedItem.isImage)
+            return
+        focusPane = "preview"
+        vimEngine.enterCopy(false)
+        loadPreviewBody()
+        Qt.callLater(() => root.placePreviewCursorAtStart())
+    }
+
+    function placePreviewCursorAtStart() {
+        if (!previewEdit)
+            return
+        vimEngine.attach(previewEdit, previewFlick)
+        previewEdit.forceActiveFocus()
+        previewEdit.cursorVisible = vimEngine.isInsert
+        if (previewFlick)
+            previewFlick.contentY = 0
+        vimEngine.enterCopy(false)
+        vimEngine.setCursor(0)
+    }
+
+    function shQuote(s) {
+        return "'" + String(s).replace(/'/g, "'\"'\"'") + "'"
+    }
+
+    function storeNewClip(text) {
+        if (!text || !String(text).length)
+            return
+        const q = shQuote(text)
+        Quickshell.execDetached([
+            "bash", "-lc",
+            "printf %s " + q + " | wl-copy; printf %s " + q + " | cliphist store"
+        ])
+        clipRefreshTimer.restart()
+    }
+
+    function commitPreviewEdit() {
+        if (!previewEdit)
+            return
+        const body = previewEdit.text
+        if (body === previewOriginal)
+            return
+        storeNewClip(body)
+        previewOriginal = body
+        previewFullText = body
+    }
+
+    function yankPreviewText(text) {
+        if (!text)
+            return
+        storeNewClip(text)
+        vimEngine.enterCopy(true)
+    }
+
+    function loadPreviewBody() {
+        const it = selectedItem
+        previewDecodeId = ""
+        previewLoading = false
+        if (!it) {
+            previewFullText = ""
+            previewOriginal = ""
+            if (previewEdit)
+                previewEdit.text = ""
+            return
+        }
+        if (it.isImage) {
+            previewFullText = ""
+            previewOriginal = ""
+            if (previewEdit)
+                previewEdit.text = ""
+            return
+        }
+        const snippet = it.preview || ""
+        previewFullText = snippet
+        previewOriginal = snippet
+        if (previewEdit)
+            previewEdit.text = snippet
+        if (!it.line)
+            return
+        previewLoading = true
+        previewDecodeId = String(it.id || it.line)
+        decodeProc.running = false
+        decodeProc.command = ["bash", decodeHelper, it.line]
+        decodeProc.running = true
+    }
+
+    onSelectedItemChanged: {
+        if (focusPane === "preview" && vimMode === "insert" && previewDirty)
+            commitPreviewEdit()
+        loadPreviewBody()
+        if (focusPane === "preview" && (!selectedItem || selectedItem.isImage))
+            focusListPane()
+        else if (focusPane === "preview")
+            Qt.callLater(() => root.placePreviewCursorAtStart())
+    }
+
+    function handleVimKey(event) {
+        if (!previewEdit)
+            return false
+        const meta = !!(event.modifiers & Qt.MetaModifier)
+        // Super+H → list (physical H via VimKeys)
+        if (meta && VimKeys.resolve(event) === "h") {
+            focusListPane()
+            return true
+        }
+        if (!vimEngine.editor)
+            vimEngine.attach(previewEdit, previewFlick)
+        try {
+            return vimEngine.handleKey(event)
+        } catch (e) {
+            console.log("VimEngine.handleKey error:", e)
+            return true
+        }
+    }
+
+    function handleKey(event) {
+        if (!root.open)
+            return false
+
+        const meta = !!(event.modifiers & Qt.MetaModifier)
+        const cmd = VimKeys.resolveShifted(event)
+
+        if (root.filterMenuOpen) {
+            if (event.key === Qt.Key_Escape || cmd === "escape") {
+                root.closeFilterMenu()
+                return true
+            }
+            if (event.key === Qt.Key_Down || cmd === "j" || cmd === "down") {
+                root.moveFilterHighlight(1)
+                return true
+            }
+            if (event.key === Qt.Key_Up || cmd === "k" || cmd === "up") {
+                root.moveFilterHighlight(-1)
+                return true
+            }
+            if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter || cmd === "enter") {
+                root.applyFilterHighlight()
+                return true
+            }
+            return true
+        }
+
+        // Super+H / Super+L — physical keys (works on RU layout)
+        if (meta && cmd === "l") {
+            root.focusPreviewPane()
+            return true
+        }
+        if (meta && cmd === "h") {
+            root.focusListPane()
+            return true
+        }
+
+        if (root.focusPane === "preview")
+            return root.handleVimKey(event)
+
+        if (event.key === Qt.Key_Escape || cmd === "escape") {
+            root.close()
+            return true
+        }
+        // j/k — history list (EN + RU). Don't steal letters while filtering text.
+        const listNav = searchField.text.length === 0
+        if (event.key === Qt.Key_Down || cmd === "down" || (listNav && cmd === "j")) {
+            root.moveSelection(1)
+            return true
+        }
+        if (event.key === Qt.Key_Up || cmd === "up" || (listNav && cmd === "k")) {
+            root.moveSelection(-1)
+            return true
+        }
+        if ((event.key === Qt.Key_Return || event.key === Qt.Key_Enter)
+                && (event.modifiers & Qt.ShiftModifier)) {
+            root.toggleMarkAt(root.selectedIndex)
+            return true
+        }
+        if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter || cmd === "enter") {
+            root.activateSelected()
+            return true
+        }
+        return false
+    }
+
+    VimEngine {
+        id: vimEngine
+        onYankRequested: text => root.yankPreviewText(text)
+        onCommitRequested: {
+            if (root.previewDirty)
+                root.commitPreviewEdit()
+        }
+        onLeaveRequested: root.focusListPane()
+        onModeChanged: {
+            if (previewEdit)
+                previewEdit.cursorVisible = vimEngine.isInsert
+            vimEngine.syncBlockCursor()
+        }
     }
 
     function isMarked(item) {
@@ -336,52 +561,11 @@ PanelWindow {
         return path ? ("file://" + path) : ""
     }
 
-    function handleKey(event) {
-        if (!root.open)
-            return false
-
-        if (root.filterMenuOpen) {
-            if (event.key === Qt.Key_Escape) {
-                root.closeFilterMenu()
-                return true
-            }
-            if (event.key === Qt.Key_Down) {
-                root.moveFilterHighlight(1)
-                return true
-            }
-            if (event.key === Qt.Key_Up) {
-                root.moveFilterHighlight(-1)
-                return true
-            }
-            if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
-                root.applyFilterHighlight()
-                return true
-            }
-            return true
-        }
-
-        if (event.key === Qt.Key_Escape) {
-            root.close()
-            return true
-        }
-        if (event.key === Qt.Key_Down) {
-            root.moveSelection(1)
-            return true
-        }
-        if (event.key === Qt.Key_Up) {
-            root.moveSelection(-1)
-            return true
-        }
-        if ((event.key === Qt.Key_Return || event.key === Qt.Key_Enter)
-                && (event.modifiers & Qt.ShiftModifier)) {
-            root.toggleMarkAt(root.selectedIndex)
-            return true
-        }
-        if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
-            root.activateSelected()
-            return true
-        }
-        return false
+    Timer {
+        id: clipRefreshTimer
+        interval: 250
+        repeat: false
+        onTriggered: root.refreshList()
     }
 
     Process {
@@ -409,6 +593,40 @@ PanelWindow {
     }
 
     Process { id: pasteProc }
+
+    Process {
+        id: decodeProc
+        stdout: StdioCollector {
+            onStreamFinished: {
+                const want = root.previewDecodeId
+                const it = root.selectedItem
+                if (!it || it.isImage)
+                    return
+                if (want && String(it.id || it.line) !== want)
+                    return
+                const body = text
+                if (body.length > 0) {
+                    root.previewFullText = body
+                    // Don't clobber in-progress insert edits.
+                    if (root.vimMode !== "insert") {
+                        root.previewOriginal = body
+                        if (previewEdit)
+                            previewEdit.text = body
+                    }
+                }
+                root.previewLoading = false
+                if (previewFlick)
+                    previewFlick.contentY = 0
+                if (root.focusPane === "preview" && root.vimMode === "copy")
+                    Qt.callLater(() => root.placePreviewCursorAtStart())
+            }
+        }
+        onExited: {
+            root.previewLoading = false
+            if (root.focusPane === "preview" && root.vimMode === "copy")
+                Qt.callLater(() => root.placePreviewCursorAtStart())
+        }
+    }
 
     Rectangle {
         id: dim
@@ -510,7 +728,7 @@ PanelWindow {
 
                     Rectangle {
                         id: filterPill
-                        Layout.preferredWidth: filterLabel.implicitWidth + 36
+                        Layout.preferredWidth: filterLabel.implicitWidth + filterHint.implicitWidth + 44
                         Layout.fillHeight: true
                         radius: height / 2
                         color: Theme.surfaceContainer
@@ -526,6 +744,14 @@ PanelWindow {
                                 color: Theme.text
                                 font.family: Theme.fontFamily
                                 font.pixelSize: Theme.fontSizeSm
+                            }
+                            Text {
+                                id: filterHint
+                                text: "⌃P"
+                                color: Theme.textMuted
+                                font.family: Theme.fontFamily
+                                font.pixelSize: Theme.fontSizeSm
+                                opacity: 0.85
                             }
                             Text {
                                 text: "▾"
@@ -556,145 +782,213 @@ PanelWindow {
                 Layout.fillHeight: true
                 spacing: 0
 
-                // Left list
-                ListView {
-                    id: listView
+                // Left list + history depth scrollbar
+                Item {
                     Layout.preferredWidth: 340
                     Layout.fillHeight: true
-                    clip: true
-                    spacing: 2
-                    model: root.listModel
-                    currentIndex: root.selectedIndex
-                    // Don't auto-scroll to current item — that hides the Today header above it.
-                    highlightFollowsCurrentItem: false
-                    boundsBehavior: Flickable.StopAtBounds
 
-                    delegate: Item {
-                        required property var modelData
-                        required property int index
-                        width: ListView.view.width
-                        height: modelData.kind === "header" ? 28 : 48
+                    ListView {
+                        id: listView
+                        anchors.fill: parent
+                        anchors.rightMargin: listScrollBar.visible ? 10 : 0
+                        clip: true
+                        spacing: 2
+                        model: root.listModel
+                        currentIndex: root.selectedIndex
+                        // Don't auto-scroll to current item — that hides the Today header above it.
+                        highlightFollowsCurrentItem: false
+                        boundsBehavior: Flickable.StopAtBounds
 
-                        Text {
-                            visible: modelData.kind === "header"
-                            anchors.left: parent.left
-                            anchors.leftMargin: 14
-                            anchors.right: parent.right
-                            anchors.rightMargin: 14
-                            anchors.verticalCenter: parent.verticalCenter
-                            text: modelData.title || ""
-                            color: Theme.textMuted
-                            font.family: Theme.fontFamily
-                            font.pixelSize: Theme.fontSizeSm
-                            font.bold: true
-                            elide: Text.ElideRight
-                        }
+                        delegate: Item {
+                            required property var modelData
+                            required property int index
+                            width: ListView.view.width
+                            height: modelData.kind === "header" ? 28 : 48
 
-                        Rectangle {
-                            visible: modelData.kind === "item"
-                            anchors.fill: parent
-                            anchors.leftMargin: 8
-                            anchors.rightMargin: 8
-                            radius: Theme.radiusSm
-                            color: {
-                                if (index === root.selectedIndex)
-                                    return Theme.rowSelected
-                                if (rowMouse.containsMouse)
-                                    return Theme.rowHover
-                                return "transparent"
+                            Text {
+                                visible: modelData.kind === "header"
+                                anchors.left: parent.left
+                                anchors.leftMargin: 14
+                                anchors.right: parent.right
+                                anchors.rightMargin: 14
+                                anchors.verticalCenter: parent.verticalCenter
+                                text: modelData.title || ""
+                                color: Theme.textMuted
+                                font.family: Theme.fontFamily
+                                font.pixelSize: Theme.fontSizeSm
+                                font.bold: true
+                                elide: Text.ElideRight
                             }
-                            border.width: modelData.item && root.isMarked(modelData.item) ? 2 : 0
-                            border.color: Theme.secondary
 
-                            RowLayout {
+                            Rectangle {
+                                visible: modelData.kind === "item"
                                 anchors.fill: parent
-                                anchors.leftMargin: 10
-                                anchors.rightMargin: 10
-                                spacing: 10
+                                anchors.leftMargin: 8
+                                anchors.rightMargin: 8
+                                radius: Theme.radiusSm
+                                color: {
+                                    if (index === root.selectedIndex)
+                                        return Theme.rowSelected
+                                    if (rowMouse.containsMouse)
+                                        return Theme.rowHover
+                                    return "transparent"
+                                }
+                                border.width: modelData.item && root.isMarked(modelData.item) ? 2 : 0
+                                border.color: Theme.secondary
+                                opacity: root.focusPane === "preview" ? 0.72 : 1
 
-                                Rectangle {
-                                    Layout.preferredWidth: 28
-                                    Layout.preferredHeight: 28
-                                    radius: 6
-                                    color: Qt.rgba(0, 0, 0, 0.35)
-                                    clip: true
-
-                                    Image {
-                                        anchors.fill: parent
-                                        anchors.margins: 2
-                                        visible: !!(modelData.item && modelData.item.isImage)
-                                        source: modelData.item ? root.thumbUrl(modelData.item) : ""
-                                        fillMode: Image.PreserveAspectCrop
-                                        asynchronous: true
-                                        cache: true
-                                    }
-
-                                    Text {
-                                        anchors.centerIn: parent
-                                        visible: !(modelData.item && modelData.item.isImage)
-                                        text: "Aa"
-                                        color: index === root.selectedIndex ? Theme.textOnAccent : Theme.textMuted
-                                        font.family: Theme.fontFamily
-                                        font.pixelSize: 10
-                                        font.bold: true
-                                    }
+                                RowLayout {
+                                    anchors.fill: parent
+                                    anchors.leftMargin: 10
+                                    anchors.rightMargin: 10
+                                    spacing: 10
 
                                     Rectangle {
-                                        visible: !!(modelData.item && root.isMarked(modelData.item))
-                                        anchors.right: parent.right
-                                        anchors.top: parent.top
-                                        anchors.margins: 1
-                                        width: 12
-                                        height: 12
+                                        Layout.preferredWidth: 28
+                                        Layout.preferredHeight: 28
                                         radius: 6
-                                        color: Theme.secondary
+                                        color: Qt.rgba(0, 0, 0, 0.35)
+                                        clip: true
+
+                                        Image {
+                                            anchors.fill: parent
+                                            anchors.margins: 2
+                                            visible: !!(modelData.item && modelData.item.isImage)
+                                            source: modelData.item ? root.thumbUrl(modelData.item) : ""
+                                            fillMode: Image.PreserveAspectCrop
+                                            asynchronous: true
+                                            cache: true
+                                        }
 
                                         Text {
                                             anchors.centerIn: parent
-                                            text: "✓"
-                                            color: Theme.textOnAccent
-                                            font.pixelSize: 8
+                                            visible: !(modelData.item && modelData.item.isImage)
+                                            text: "Aa"
+                                            color: index === root.selectedIndex ? Theme.textOnAccent : Theme.textMuted
+                                            font.family: Theme.fontFamily
+                                            font.pixelSize: 10
                                             font.bold: true
                                         }
+
+                                        Rectangle {
+                                            visible: !!(modelData.item && root.isMarked(modelData.item))
+                                            anchors.right: parent.right
+                                            anchors.top: parent.top
+                                            anchors.margins: 1
+                                            width: 12
+                                            height: 12
+                                            radius: 6
+                                            color: Theme.secondary
+
+                                            Text {
+                                                anchors.centerIn: parent
+                                                text: "✓"
+                                                color: Theme.textOnAccent
+                                                font.pixelSize: 8
+                                                font.bold: true
+                                            }
+                                        }
+                                    }
+
+                                    Text {
+                                        Layout.fillWidth: true
+                                        text: modelData.item ? (modelData.item.label || "") : ""
+                                        color: index === root.selectedIndex ? Theme.textOnAccent : Theme.text
+                                        font.family: Theme.fontFamily
+                                        font.pixelSize: Theme.fontSize
+                                        elide: Text.ElideRight
                                     }
                                 }
 
-                                Text {
-                                    Layout.fillWidth: true
-                                    text: modelData.item ? (modelData.item.label || "") : ""
-                                    color: index === root.selectedIndex ? Theme.textOnAccent : Theme.text
-                                    font.family: Theme.fontFamily
-                                    font.pixelSize: Theme.fontSize
-                                    elide: Text.ElideRight
-                                }
-                            }
-
-                            MouseArea {
-                                id: rowMouse
-                                anchors.fill: parent
-                                hoverEnabled: true
-                                acceptedButtons: Qt.LeftButton | Qt.RightButton
-                                onEntered: root.selectedIndex = index
-                                onClicked: mouse => {
-                                    root.selectedIndex = index
-                                    if (mouse.modifiers & Qt.ShiftModifier || mouse.button === Qt.RightButton)
-                                        root.toggleMarkAt(index)
-                                }
-                                onDoubleClicked: {
-                                    root.selectedIndex = index
-                                    root.activateSelected()
+                                MouseArea {
+                                    id: rowMouse
+                                    anchors.fill: parent
+                                    hoverEnabled: true
+                                    acceptedButtons: Qt.LeftButton | Qt.RightButton
+                                    onEntered: root.selectedIndex = index
+                                    onClicked: mouse => {
+                                        root.selectedIndex = index
+                                        root.focusListPane()
+                                        if (mouse.modifiers & Qt.ShiftModifier || mouse.button === Qt.RightButton)
+                                            root.toggleMarkAt(index)
+                                    }
+                                    onDoubleClicked: {
+                                        root.selectedIndex = index
+                                        root.activateSelected()
+                                    }
                                 }
                             }
                         }
+
+                        Text {
+                            anchors.centerIn: parent
+                            visible: !root.filtered || root.filtered.length === 0
+                            text: "Nothing found"
+                            color: Theme.textMuted
+                            font.family: Theme.fontFamily
+                            font.pixelSize: Theme.fontSize
+                        }
                     }
 
-                    Text {
-                        anchors.centerIn: parent
-                        visible: !root.filtered || root.filtered.length === 0
-                        text: "Nothing found"
-                        color: Theme.textMuted
-                        font.family: Theme.fontFamily
-                        font.pixelSize: Theme.fontSize
+                    Item {
+                        id: listScrollBar
+                        readonly property bool needed: listView.contentHeight > listView.height + 2
+                        readonly property real ratio: listView.height / Math.max(1, listView.contentHeight)
+                        readonly property real thumbH: Math.max(28, height * ratio)
+                        readonly property real maxThumbY: Math.max(0, height - thumbH)
+                        readonly property real maxContentY: Math.max(1, listView.contentHeight - listView.height)
+                        readonly property real thumbY: maxThumbY * (listView.contentY / maxContentY)
+
+                        visible: needed
+                        anchors.right: parent.right
+                        anchors.top: parent.top
+                        anchors.bottom: parent.bottom
+                        width: 6
+
+                        Rectangle {
+                            anchors.fill: parent
+                            radius: 3
+                            color: Theme.borderSubtle
+                            opacity: 0.35
+                        }
+
+                        Rectangle {
+                            id: listScrollThumb
+                            width: parent.width
+                            height: listScrollBar.thumbH
+                            y: listScrollBar.thumbY
+                            radius: 3
+                            color: Theme.primary
+                            opacity: listScrollDrag.active ? 0.95 : 0.65
+
+                            MouseArea {
+                                id: listScrollDrag
+                                anchors.fill: parent
+                                anchors.margins: -4
+                                cursorShape: Qt.PointingHandCursor
+                                preventStealing: true
+                                property real grabOffset: 0
+                                onPressed: mouse => { grabOffset = mouse.y }
+                                onPositionChanged: mouse => {
+                                    if (!pressed)
+                                        return
+                                    const localY = listScrollThumb.y + mouse.y - grabOffset
+                                    const clamped = Math.max(0, Math.min(listScrollBar.maxThumbY, localY))
+                                    listView.contentY = (clamped / Math.max(1, listScrollBar.maxThumbY)) * listScrollBar.maxContentY
+                                }
+                            }
+                        }
+
+                        MouseArea {
+                            anchors.fill: parent
+                            z: -1
+                            cursorShape: Qt.PointingHandCursor
+                            onClicked: mouse => {
+                                const target = mouse.y - listScrollBar.thumbH / 2
+                                const clamped = Math.max(0, Math.min(listScrollBar.maxThumbY, target))
+                                listView.contentY = (clamped / Math.max(1, listScrollBar.maxThumbY)) * listScrollBar.maxContentY
+                            }
+                        }
                     }
                 }
 
@@ -715,6 +1009,8 @@ PanelWindow {
                         Layout.fillHeight: true
                         color: Theme.surfaceContainer
                         clip: true
+                        border.width: root.focusPane === "preview" ? 1 : 0
+                        border.color: Theme.primary
 
                         // Image preview
                         Image {
@@ -728,24 +1024,160 @@ PanelWindow {
                             cache: true
                         }
 
-                        // Text preview
-                        Flickable {
+                        // Full text preview — scrollable + selectable
+                        Item {
                             anchors.fill: parent
-                            anchors.margins: 18
                             visible: root.selectedItem && !root.selectedItem.isImage
-                            contentWidth: width
-                            contentHeight: previewText.implicitHeight
-                            clip: true
-                            boundsBehavior: Flickable.StopAtBounds
+
+                            Flickable {
+                                id: previewFlick
+                                anchors.fill: parent
+                                anchors.margins: 14
+                                anchors.rightMargin: previewScrollBar.visible ? 18 : 14
+                                contentWidth: width
+                                contentHeight: previewEdit.implicitHeight
+                                clip: true
+                                boundsBehavior: Flickable.StopAtBounds
+                                interactive: true
+                                flickableDirection: Flickable.VerticalFlick
+
+                                TextEdit {
+                                    id: previewEdit
+                                    width: previewFlick.width
+                                    color: Theme.text
+                                    font.family: Theme.fontFamily
+                                    font.pixelSize: Theme.fontSize
+                                    wrapMode: TextEdit.Wrap
+                                    readOnly: !vimEngine.isInsert
+                                    selectByMouse: vimEngine.isInsert || vimEngine.isVisual
+                                    persistentSelection: true
+                                    activeFocusOnPress: true
+                                    cursorVisible: activeFocus && vimEngine.isInsert
+                                    selectionColor: Theme.primary
+                                    selectedTextColor: Theme.textOnAccent
+
+                                    cursorDelegate: Rectangle {
+                                        width: 2
+                                        color: Theme.primary
+                                        visible: previewEdit.activeFocus && vimEngine.isInsert
+                                        SequentialAnimation on opacity {
+                                            running: previewEdit.activeFocus && vimEngine.isInsert
+                                            loops: Animation.Infinite
+                                            NumberAnimation { from: 1; to: 0; duration: 530 }
+                                            NumberAnimation { from: 0; to: 1; duration: 530 }
+                                        }
+                                    }
+
+                                    onActiveFocusChanged: {
+                                        if (activeFocus) {
+                                            root.focusPane = "preview"
+                                            if (!vimEngine.editor)
+                                                vimEngine.attach(previewEdit, previewFlick)
+                                            vimEngine.syncBlockCursor()
+                                        }
+                                    }
+
+                                    onCursorPositionChanged: {
+                                        if (vimEngine.isInsert)
+                                            vimEngine.syncBlockCursor()
+                                    }
+
+                                    onTextChanged: {
+                                        if (root.focusPane === "preview")
+                                            Qt.callLater(() => vimEngine.syncBlockCursor())
+                                    }
+
+                                    Keys.onPressed: event => {
+                                        if (root.handleVimKey(event))
+                                            event.accepted = true
+                                    }
+                                }
+
+                                // Vim block cursor overlay (copy / visual) — tracks visualHead independently of Qt selection end
+                                Rectangle {
+                                    id: vimBlockCursor
+                                    x: vimEngine.blockX
+                                    y: vimEngine.blockY
+                                    width: vimEngine.blockW
+                                    height: vimEngine.blockH
+                                    visible: vimEngine.blockVisible && !vimEngine.isInsert
+                                    color: Theme.primary
+                                    opacity: vimEngine.isVisual ? 0.95 : 0.88
+                                    z: 10
+                                }
+                            }
+
+                            Item {
+                                id: previewScrollBar
+                                readonly property bool needed: previewFlick.contentHeight > previewFlick.height + 2
+                                readonly property real ratio: previewFlick.height / Math.max(1, previewFlick.contentHeight)
+                                readonly property real thumbH: Math.max(24, height * ratio)
+                                readonly property real maxThumbY: Math.max(0, height - thumbH)
+                                readonly property real maxContentY: Math.max(1, previewFlick.contentHeight - previewFlick.height)
+                                readonly property real thumbY: maxThumbY * (previewFlick.contentY / maxContentY)
+
+                                visible: needed
+                                anchors.right: parent.right
+                                anchors.top: parent.top
+                                anchors.bottom: parent.bottom
+                                anchors.margins: 6
+                                width: 6
+
+                                Rectangle {
+                                    anchors.fill: parent
+                                    radius: 3
+                                    color: Theme.borderSubtle
+                                    opacity: 0.35
+                                }
+
+                                Rectangle {
+                                    id: previewScrollThumb
+                                    width: parent.width
+                                    height: previewScrollBar.thumbH
+                                    y: previewScrollBar.thumbY
+                                    radius: 3
+                                    color: Theme.primary
+                                    opacity: previewScrollDrag.active ? 0.95 : 0.65
+
+                                    MouseArea {
+                                        id: previewScrollDrag
+                                        anchors.fill: parent
+                                        anchors.margins: -4
+                                        cursorShape: Qt.PointingHandCursor
+                                        preventStealing: true
+                                        property real grabOffset: 0
+                                        onPressed: mouse => { grabOffset = mouse.y }
+                                        onPositionChanged: mouse => {
+                                            if (!pressed)
+                                                return
+                                            const localY = previewScrollThumb.y + mouse.y - grabOffset
+                                            const clamped = Math.max(0, Math.min(previewScrollBar.maxThumbY, localY))
+                                            previewFlick.contentY = (clamped / Math.max(1, previewScrollBar.maxThumbY)) * previewScrollBar.maxContentY
+                                        }
+                                    }
+                                }
+
+                                MouseArea {
+                                    anchors.fill: parent
+                                    z: -1
+                                    cursorShape: Qt.PointingHandCursor
+                                    onClicked: mouse => {
+                                        const target = mouse.y - previewScrollBar.thumbH / 2
+                                        const clamped = Math.max(0, Math.min(previewScrollBar.maxThumbY, target))
+                                        previewFlick.contentY = (clamped / Math.max(1, previewScrollBar.maxThumbY)) * previewScrollBar.maxContentY
+                                    }
+                                }
+                            }
 
                             Text {
-                                id: previewText
-                                width: parent.width
-                                text: root.selectedItem ? (root.selectedItem.preview || "") : ""
-                                color: Theme.text
+                                anchors.right: parent.right
+                                anchors.bottom: parent.bottom
+                                anchors.margins: 10
+                                visible: root.previewLoading
+                                text: "loading…"
+                                color: Theme.textMuted
                                 font.family: Theme.fontFamily
-                                font.pixelSize: Theme.fontSize
-                                wrapMode: Text.Wrap
+                                font.pixelSize: Theme.fontSizeSm
                             }
                         }
 
@@ -878,9 +1310,21 @@ PanelWindow {
                     }
 
                     Text {
-                        text: root.filterMenuOpen
-                            ? "↑↓ filter  ·  ↵ choose  ·  esc close menu"
-                            : "⇧↵ mark  ·  ↵ paste  ·  esc close"
+                        text: {
+                            if (root.filterMenuOpen)
+                                return "↑↓/jk filter  ·  ↵ choose  ·  esc close menu"
+                            if (root.focusPane === "preview") {
+                                const mode = "-- " + root.vimModeLabel + " --"
+                                if (root.vimMode === "insert")
+                                    return mode + "  ·  esc copy  ·  edits → new clip  ·  Super+H list"
+                                if (root.vimMode === "visual")
+                                    return mode + "  ·  hjkl move  ·  y yank  ·  /f search  ·  esc copy"
+                                if (root.vimMode === "search" || root.vimMode === "findchar")
+                                    return mode + "  ·  type…  ·  ↵ go  ·  esc cancel"
+                                return mode + "  ·  hjkl  ·  /? nN  ·  fFtT  ·  i insert  ·  v visual  ·  Super+H list"
+                            }
+                            return "jk list  ·  Super+L preview  ·  ⌃P filter  ·  ⇧↵ mark  ·  ↵ paste"
+                        }
                         color: Theme.textMuted
                         font.family: Theme.fontFamily
                         font.pixelSize: Theme.fontSizeSm

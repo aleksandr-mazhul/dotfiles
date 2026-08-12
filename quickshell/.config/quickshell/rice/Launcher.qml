@@ -1,12 +1,14 @@
 import QtQuick
-import QtQuick.Layouts
 import Quickshell
 import Quickshell.Io
 import Quickshell.Hyprland
+import "ds" as DS
 
-// Raycast-style hub: built-in commands (Clipboard / Wallpapers / VPN) + apps.
-// Dedicated hotkeys still open each overlay directly.
-RicePanel {
+// Launcher — the reference popup of the design system
+// (~/Projects/desktop-design-system/components/launcher.md).
+// Presentation is pure composition of ds/ building blocks; this file owns only
+// data & behaviour: built-in commands, app list, scoring, focus-or-launch.
+DS.SearchListPopup {
     id: root
 
     property var commands: []
@@ -33,18 +35,17 @@ RicePanel {
         "cups": 1  // CUPS web UI duplicate of system-config-printer
     })
 
-    title: "Launcher"
-    searchPlaceholder: "Search apps & commands…"
-    footerText: "↑↓ move  ·  ↵ open  ·  esc close"
+    placeholder: "Search apps & commands…"
+    hintKeys: ["alt", "O"]
     model: filtered
-    countText: filtered.length + (filtered.length === 1 ? " result" : " results")
-    maxVisible: 9
+    maxRows: 8
+    surfaceWidth: 660
 
     Component.onCompleted: {
         buildCommands()
         loadApps()
     }
-    onPanelOpened: {
+    onPopupOpened: {
         // EN for search typing; restore previous layout on close.
         // eh-layout-sync keeps Ergohaven firmware in step with Hyprland.
         Quickshell.execDetached(["bash", "-lc", "~/.config/hypr/scripts/launcher-layout.sh open"])
@@ -52,17 +53,17 @@ RicePanel {
         loadApps()
         applyFilter()
     }
-    onPanelClosed: {
+    onPopupClosed: {
         Quickshell.execDetached(["bash", "-lc", "~/.config/hypr/scripts/launcher-layout.sh close"])
     }
-    onQueryChanged: applyFilter()
+    onSearchTextChanged: applyFilter()
     onActivated: (item, index) => {
         let action = null
         if (item && item.kind === "command")
             action = item.action
         else if (item)
             action = () => focusOrLaunch(item)
-        // Instant close like Clipboard, then run action (no close-anim wait).
+        // Instant close, then run action (no close-anim wait).
         close()
         if (typeof action === "function")
             action()
@@ -270,7 +271,8 @@ RicePanel {
     }
 
     function buildCommands() {
-        // Easy to extend later — just push another entry.
+        // Chrome icons: our own mono glyph set (foundation/icons.md) — commands are
+        // system chrome, so they never use random theme icons.
         commands = [
             {
                 kind: "command",
@@ -278,8 +280,8 @@ RicePanel {
                 name: "Clipboard History",
                 genericName: "Paste from clipboard history",
                 keywords: ["clipboard", "clip", "paste", "буфер", "история"],
-                icon: "edit-paste",
-                shortcut: "Super+Q",
+                monoIcon: "cmd-clipboard.svg",
+                shortcutKeys: ["super", "Q"],
                 action: () => OverlayHub.open("clipboard")
             },
             {
@@ -288,8 +290,8 @@ RicePanel {
                 name: "Wallpapers",
                 genericName: "Browse and apply wallpapers",
                 keywords: ["wallpaper", "wall", "фон", "обои", "theme"],
-                icon: "preferences-desktop-wallpaper",
-                shortcut: "Super+W",
+                monoIcon: "cmd-wallpaper.svg",
+                shortcutKeys: ["super", "W"],
                 action: () => OverlayHub.open("wallpaper")
             },
             {
@@ -298,8 +300,8 @@ RicePanel {
                 name: "VPN",
                 genericName: "Connect or switch VPN location",
                 keywords: ["vpn", "mullvad", "wireguard", "proxy"],
-                icon: "network-vpn",
-                shortcut: "Super+V",
+                monoIcon: "cmd-vpn.svg",
+                shortcutKeys: ["super", "V"],
                 action: () => OverlayHub.open("vpn")
             }
         ]
@@ -394,8 +396,13 @@ RicePanel {
     function applyFilter() {
         const q = searchText.trim().toLowerCase()
         if (!q) {
-            // Raycast-like: commands pinned on top, then apps.
-            filtered = commands.concat(apps)
+            // Sections per List Pattern: quiet labels, no boxes (ref #8 naming).
+            let out = []
+            if (commands.length)
+                out = out.concat([{ kind: "header", label: "Suggestions" }], commands)
+            if (apps.length)
+                out = out.concat([{ kind: "header", label: "Applications" }], apps)
+            filtered = out
         } else {
             const scored = []
             const pool = commands.concat(apps)
@@ -420,109 +427,78 @@ RicePanel {
         clampSelection()
     }
 
-    rowDelegate: Rectangle {
-        id: row
+    rowDelegate: Item {
+        id: rowItem
         required property var modelData
         required property int index
-        readonly property bool selected: index === root.selectedIndex
-        width: ListView.view ? ListView.view.width : root.panelWidth - 28
-        height: Theme.rowHeight
-        radius: Theme.radiusMd
-        color: {
-            if (row.selected)
-                return hover.containsMouse ? Theme.glassTileActiveHover : Theme.glassTileActive
-            if (hover.containsMouse)
-                return Theme.glassSurfaceHover
-            return Theme.glassSurface
-        }
-        border.width: 1
-        border.color: row.selected ? Theme.glassTileBorder : Theme.glassBorderSubtle
-        Behavior on color {
-            ColorAnimation { duration: Theme.hoverMs; easing.type: Easing.OutCubic }
-        }
-        Behavior on border.color {
-            ColorAnimation { duration: Theme.hoverMs; easing.type: Easing.OutCubic }
+
+        readonly property bool isHeader: !!(modelData && modelData.kind === "header")
+        readonly property bool isCommand: !!(modelData && modelData.kind === "command")
+
+        width: ListView.view ? ListView.view.width : 0
+        height: isHeader ? DS.Tokens.sectionHeight : DS.Tokens.rowHeight
+
+        DS.SectionLabel {
+            visible: rowItem.isHeader
+            anchors.left: parent.left
+            anchors.leftMargin: DS.Tokens.rowPaddingX
+            anchors.bottom: parent.bottom
+            anchors.bottomMargin: 10
+            label: rowItem.isHeader ? (rowItem.modelData.label || "") : ""
         }
 
-        readonly property bool isCommand: modelData && modelData.kind === "command"
-
-        RowLayout {
+        DS.ListRow {
+            visible: !rowItem.isHeader
             anchors.fill: parent
-            anchors.margins: 8
-            spacing: 12
+            primary: rowItem.isHeader ? "" : (rowItem.modelData.name || rowItem.modelData.id || "")
+            secondary: rowItem.isHeader ? "" : (rowItem.modelData.genericName || "")
+            trailingKeys: rowItem.isCommand ? (rowItem.modelData.shortcutKeys || []) : []
+            chevron: !rowItem.isHeader && !rowItem.isCommand
+            selected: rowItem.index === root.selectedIndex
+            onEntered: root.selectedIndex = rowItem.index
+            onActivated: {
+                root.selectedIndex = rowItem.index
+                root.activateSelected()
+            }
 
+            // Commands are chrome → our mono glyph set; apps are content → their
+            // own (possibly colorful) icons, falling back to our glyph.
+            leading: rowItem.isCommand ? cmdIcon : appIconSlot
+        }
+
+        Component {
+            id: cmdIcon
             Item {
-                Layout.preferredWidth: 28
-                Layout.preferredHeight: 28
+                RiceIcon {
+                    anchors.centerIn: parent
+                    customSource: Qt.resolvedUrl("assets/" + (rowItem.modelData.monoIcon || "app-fallback.svg"))
+                    tint: DS.Tokens.textSecondary
+                    implicitSize: 22
+                }
+            }
+        }
 
+        Component {
+            id: appIconSlot
+            Item {
                 Image {
                     id: appIcon
                     anchors.fill: parent
-                    source: Quickshell.iconPath(modelData.icon, isCommand ? "applications-system" : "application-x-executable")
+                    source: rowItem.isHeader
+                        ? ""
+                        : Quickshell.iconPath(rowItem.modelData.icon, "application-x-executable")
                     fillMode: Image.PreserveAspectFit
                     smooth: true
                     visible: status !== Image.Error
                 }
 
-                // Real app icons keep their identity; only the "no icon resolved"
-                // state falls back to our own cohesive glyph.
                 RiceIcon {
                     anchors.fill: parent
                     visible: appIcon.status === Image.Error
                     customSource: Qt.resolvedUrl("assets/app-fallback.svg")
-                    tint: Theme.textMuted
-                    implicitSize: 28
+                    tint: DS.Tokens.textSecondary
+                    implicitSize: DS.Tokens.leadingSize
                 }
-            }
-
-            ColumnLayout {
-                Layout.fillWidth: true
-                spacing: 2
-
-                RowLayout {
-                    Layout.fillWidth: true
-                    spacing: 8
-
-                    Text {
-                        Layout.fillWidth: true
-                        text: modelData.name || modelData.id
-                        color: Theme.text
-                        font.family: Theme.fontFamily
-                        font.pixelSize: Theme.fontSize
-                        elide: Text.ElideRight
-                    }
-
-                    // Raycast-style shortcut hint for built-in commands
-                    Text {
-                        visible: isCommand && !!(modelData.shortcut && modelData.shortcut.length)
-                        text: modelData.shortcut || ""
-                        color: row.selected ? Theme.primary : Theme.textMuted
-                        font.family: Theme.fontFamily
-                        font.pixelSize: Theme.fontSizeSm
-                    }
-                }
-
-                Text {
-                    Layout.fillWidth: true
-                    visible: !!(modelData.genericName && modelData.genericName.length)
-                    text: modelData.genericName || ""
-                    color: row.selected ? Theme.primary : Theme.textMuted
-                    font.family: Theme.fontFamily
-                    font.pixelSize: Theme.fontSizeSm
-                    elide: Text.ElideRight
-                }
-            }
-        }
-
-        MouseArea {
-            id: hover
-            anchors.fill: parent
-            hoverEnabled: true
-            cursorShape: Qt.PointingHandCursor
-            onEntered: root.selectedIndex = index
-            onClicked: {
-                root.selectedIndex = index
-                root.activateSelected()
             }
         }
     }

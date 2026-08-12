@@ -23,7 +23,7 @@ const SECTIONS: Section[] = [
     title: "Bar / overlays",
     source: "hypr/binds.lua",
     rows: [
-      { keys: "Super+B", action: "Toggle top bar (hide ↔ pinned show)" },
+      { keys: "Super+B", action: "Toggle bar pinned ↔ autohide", note: "Hover top edge to peek; state persists" },
       { keys: "Super+Shift+B", action: "Same as Super+B" },
       { keys: "Super+Q", action: "Clipboard history" },
       { keys: "Super+W", action: "Wallpaper picker" },

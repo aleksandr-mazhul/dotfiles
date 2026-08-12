@@ -3,4 +3,5 @@
 unset GTK_THEME
 export GTK_THEME=
 export ADW_DISABLE_PORTAL=1
+export GTK_APPLICATION_PREFER_DARK_THEME=1
 exec /usr/bin/nautilus "$@"

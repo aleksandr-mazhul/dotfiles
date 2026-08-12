@@ -111,7 +111,7 @@ PanelWindow {
         panelClosed()
     }
 
-    // Shared Super+P entry: toggle filter if open; otherwise open with filter menu.
+    // Shared filter entry (Ctrl+P): toggle filter if open; otherwise open with filter menu.
     function toggleFilter() {
         if (!hasFilter)
             return
@@ -425,7 +425,7 @@ PanelWindow {
                 Rectangle {
                     id: filterPill
                     visible: root.hasFilter
-                    Layout.preferredWidth: Math.max(110, filterPillLabel.implicitWidth + 36)
+                    Layout.preferredWidth: Math.max(110, filterPillLabel.implicitWidth + filterPillHint.implicitWidth + 44)
                     Layout.preferredHeight: 42
                     radius: height / 2
                     color: filterPillHover.containsMouse ? Theme.glassSurfaceHover : Theme.glassSurface
@@ -447,6 +447,14 @@ PanelWindow {
                             color: Theme.text
                             font.family: Theme.fontFamily
                             font.pixelSize: Theme.fontSizeSm
+                        }
+                        Text {
+                            id: filterPillHint
+                            text: "⌃P"
+                            color: Theme.textMuted
+                            font.family: Theme.fontFamily
+                            font.pixelSize: Theme.fontSizeSm
+                            opacity: 0.85
                         }
                         Text {
                             text: "☰"

@@ -116,8 +116,8 @@ exec fish   # обновить fish-обёртки (cbonsai, pipes, gum, …)
 | [`git/`](git/) | Глобальный `.gitconfig` (delta, aliases, `merge.ff=false`) |
 | [`obs/`](obs/) | Сцены/профили записи (без websocket password) |
 | [`herdr/`](herdr/) | Доп. theming consumer |
-| [`entropy/`](entropy/) | Entropy-related config / autostart glue |
-| [`misc/`](misc/) | mimeapps, gromit-mpx и прочий мелкий glue |
+| [`entropy/`](entropy/) | Entropy GUI settings (autostart off — hangs on Hypr; use `eh-layout-sync`) |
+| [`misc/`](misc/) | mimeapps, gromit-mpx (+ `gromit-mpx.ini` без intro), ergohaven notes |
 
 ### Документация и мета
 
@@ -146,7 +146,7 @@ exec fish   # обновить fish-обёртки (cbonsai, pipes, gum, …)
 
 | Клавиши | Действие |
 | --- | --- |
-| `Super+B` | Скрыть / показать верхний бар |
+| `Super+B` | Скрыть бар (autohide) / закрепить снова; наведение на верх — peek |
 | `Alt+O` | Launcher |
 | `Super+Q` | Clipboard history |
 | `Super+W` | Wallpaper picker |

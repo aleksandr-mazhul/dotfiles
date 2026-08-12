@@ -6,7 +6,8 @@ Sources: `hypr/.../binds.lua`, `kitty.conf`, `nvim/.../keymaps.lua`, `kanata.kbd
 Kitty also keeps default **Ctrl+Shift** (`kitty_mod`) shortcuts unless overridden below.  
 VPN has no hotkey — use launcher (`vpn`) or QuickSettings.
 
-> **Hide / show top bar:** `Super+B` (also `Super+Shift+B`)
+> **Hide / show top bar:** `Super+B` (also `Super+Shift+B`)  
+> Hidden = autohide; hover the top edge to peek (same as fullscreen). State is saved across reboots.
 
 ---
 
@@ -14,7 +15,7 @@ VPN has no hotkey — use launcher (`vpn`) or QuickSettings.
 
 | Keys | Action |
 | --- | --- |
-| Super+B | Toggle top bar (hide ↔ pinned show) |
+| Super+B | Toggle bar pinned ↔ autohide (hover peek) |
 | Super+Shift+B | Same as Super+B |
 | Super+Q | Clipboard history |
 | Super+W | Wallpaper picker |
@@ -131,8 +132,8 @@ VPN has no hotkey — use launcher (`vpn`) or QuickSettings.
 
 | Keys | Action |
 | --- | --- |
-| Vol ± / Mute / MicMute | PipeWire volume / mute |
-| Bright ± | Brightness (qs-brightness) |
+| Vol ± / Mute / MicMute | Volume in **16 Mac-style steps** (~6%); mute toggle |
+| Bright ± | Brightness in the **same 16-step grid** as volume |
 | Media keys | playerctl next/pause/play/prev |
 
 ## Kitty (custom maps)
@@ -142,7 +143,7 @@ VPN has no hotkey — use launcher (`vpn`) or QuickSettings.
 | Ctrl+C | Copy |
 | Ctrl+V | Paste |
 | Super+C | Interrupt (SIGINT) |
-| Super+L | Clear terminal screen |
+| Ctrl+L | Clear terminal screen (shell); nvim window-right |
 | Ctrl+PgUp / PgDn | tmux prev/next window |
 | Ctrl+Shift+[ / ] | tmux prev/next window |
 | Ctrl+Shift+H / L | tmux swap window left/right |
@@ -154,10 +155,14 @@ VPN has no hotkey — use launcher (`vpn`) or QuickSettings.
 | Keys | Action | Note |
 | --- | --- | --- |
 | Ctrl+H/J/K/L | Window focus (+ tmux navigate) | |
+| Super+H | Focus file tree (open if needed) | kitty send_text → FocusFileTree() |
+| Super+L | Focus code (leave tree) | kitty send_text → FocusCodeWindow() |
 | Ctrl+arrows | Resize splits | |
-| Super+L | Redraw / clear search highlight | |
 | Super+V | Visual-block | Mac Ctrl+V → Super (Ctrl+V is terminal paste) |
 | leader+gg | Lazygit (toggleterm) | |
+| co / ct / cb / c0 | Conflict: ours / theirs / both / none | buffer-local in conflict |
+| ]x / [x | Next / prev conflict | buffer-local |
+| leader+gc o/t/b/0/n/p/l | Same + next/prev/list | git-conflict.nvim |
 | leader+bd | Delete buffer | |
 | leader+Tab+d | Close tab | |
 

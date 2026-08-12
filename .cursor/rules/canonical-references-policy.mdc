@@ -1,0 +1,18 @@
+---
+description: Canonical References Policy for rice/Quickshell UI — family match, Visual Distance, Screenshot Validation
+alwaysApply: true
+---
+
+# Canonical References Policy (Desktop Design System)
+
+When changing Quickshell rice UI or design-system tokens:
+
+- Source of truth: `~/Projects/desktop-design-system/`
+- Policy: `~/Projects/desktop-design-system/process/canonical-references-policy.md`
+
+## Must follow
+
+1. Extract principles from Canonical References (not pixels). Result must feel same design family.
+2. **Visual Distance Rule:** among valid designs, prefer the closest to the Canonical. Do not diverge for originality.
+3. After implement: family check — “same team as Canonical?” If no, re-analyze.
+4. **Screenshot Validation required:** left Canonical / right ours; list matches, differences, intentional reasons, next fixes. Component not Done without this.
