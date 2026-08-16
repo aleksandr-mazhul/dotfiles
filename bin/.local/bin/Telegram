@@ -1,0 +1,18 @@
+#!/usr/bin/env bash
+# Telegram with 24-hour clocks (en_US system locale is 12-hour).
+# Uses a user-local en_GB locale under ~/.locale — no root required.
+set -euo pipefail
+
+LOCALE_DIR="${HOME}/.locale"
+LOCALE_NAME="en_GB.UTF-8"
+
+if [[ ! -e "${LOCALE_DIR}/${LOCALE_NAME}/LC_TIME" ]]; then
+  mkdir -p "${LOCALE_DIR}"
+  localedef -i en_GB -f UTF-8 "${LOCALE_DIR}/${LOCALE_NAME}" >/dev/null 2>&1 || true
+fi
+
+export LOCPATH="${LOCALE_DIR}"
+# Full en_GB for this process so LOCPATH does not break other LC_* lookups.
+export LC_ALL="${LOCALE_NAME}"
+
+exec /usr/bin/Telegram "$@"

@@ -2,6 +2,7 @@ apple_cursor
 apple_hyprcursor
 cbonsai
 claude-desktop
+docker-desktop
 gromit-mpx
 jetbrains-toolbox
 kanata-bin
@@ -19,3 +20,4 @@ yandex-browser
 yay
 zen-browser-bin
 zoom
+chatgpt-desktop-bin

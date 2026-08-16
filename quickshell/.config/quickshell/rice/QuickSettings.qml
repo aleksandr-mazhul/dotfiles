@@ -34,6 +34,8 @@ PanelWindow {
     property string brightTarget: "all"
     // True while any QS slider is being dragged — keeps panel open / blocks flick steal.
     property bool sliderGrabbed: false
+    // Bumped while Apps is open so corked/playing streams refresh.
+    property int streamRev: 0
 
     function toggle() { open = !open }
     function show() { open = true }
@@ -214,11 +216,39 @@ PanelWindow {
     }
 
     PwObjectTracker {
-        objects: [Pipewire.defaultAudioSink, Pipewire.defaultAudioSource]
+        // Bind defaults + every stream so corked/volume props are readable.
+        objects: root.trackedPwObjects
     }
 
     readonly property var sink: Pipewire.defaultAudioSink
     readonly property var source: Pipewire.defaultAudioSource
+    // Playback apps: isStream && isSink (QS/end-4). Drop corked idle tabs
+    // (Zen keeps an Init stream open even when nothing is audible).
+    readonly property var playbackStreams: {
+        const _ = root.streamRev
+        const nodes = Pipewire.nodes.values || []
+        const out = []
+        for (let i = 0; i < nodes.length; i++) {
+            const n = nodes[i]
+            if (!n || !n.isStream || !n.audio || !n.isSink)
+                continue
+            if (root.streamIsCorked(n))
+                continue
+            out.push(n)
+        }
+        return out
+    }
+    readonly property var trackedPwObjects: {
+        const base = [Pipewire.defaultAudioSink, Pipewire.defaultAudioSource]
+        const nodes = Pipewire.nodes.values || []
+        const streams = []
+        for (let i = 0; i < nodes.length; i++) {
+            const n = nodes[i]
+            if (n && n.isStream)
+                streams.push(n)
+        }
+        return base.concat(streams)
+    }
     readonly property real sinkVol: sink && sink.audio ? sink.audio.volume : 0
     readonly property real sourceVol: source && source.audio ? source.audio.volume : 0
     readonly property bool sinkMuted: sink && sink.audio ? sink.audio.muted : false
@@ -247,6 +277,40 @@ PanelWindow {
         if (sinkVol < 0.67)
             return "audio-volume-medium"
         return "audio-volume-high"
+    }
+
+    function streamIsCorked(node) {
+        if (!node)
+            return true
+        const p = node.properties || {}
+        const c = p["pulse.corked"]
+        return c === true || c === "true" || c === 1 || c === "1"
+    }
+
+    function streamLabel(node) {
+        if (!node)
+            return "App"
+        const p = node.properties || {}
+        const app = p["application.name"] || node.nickname || node.description || node.name || "App"
+        const media = p["media.name"] || p["media.title"] || ""
+        // e.g. "Zen · YouTube" when the tab title is available
+        if (media && media !== app && media !== "playStream")
+            return app + " · " + media
+        return app
+    }
+
+    function streamIcon(node) {
+        if (!node)
+            return "audio-volume-high"
+        const p = node.properties || {}
+        return p["application.icon-name"] || "audio-volume-high"
+    }
+
+    Timer {
+        interval: 800
+        running: root.open && root.expanded === "apps"
+        repeat: true
+        onTriggered: root.streamRev++
     }
 
     Rectangle {
@@ -806,6 +870,39 @@ PanelWindow {
                     }
                 }
             }
+
+            // Per-app volumes (PipeWire streams): YouTube, Zoom, music, …
+            PowerRow {
+                Layout.fillWidth: true
+                label: "Apps"
+                detail: root.playbackStreams.length === 0
+                    ? "Nothing playing"
+                    : (root.playbackStreams.length + " active")
+                iconName: "audio-volume-high"
+                onActivated: root.setExpanded("apps")
+            }
+
+            ColumnLayout {
+                visible: root.expanded === "apps"
+                Layout.fillWidth: true
+                spacing: 6
+                Text {
+                    visible: root.playbackStreams.length === 0
+                    text: "Play something to see per-app volume here"
+                    color: Theme.textMuted
+                    font.family: Theme.fontFamily
+                    font.pixelSize: Theme.fontSizeSm
+                    Layout.fillWidth: true
+                    wrapMode: Text.Wrap
+                }
+                Repeater {
+                    model: root.playbackStreams
+                    delegate: AppSoundRow {
+                        required property var modelData
+                        node: modelData
+                    }
+                }
+            }
         }
         }
     }
@@ -1273,6 +1370,44 @@ PanelWindow {
             hoverEnabled: true
             cursorShape: Qt.PointingHandCursor
             onClicked: activated()
+        }
+    }
+
+    component AppSoundRow: ColumnLayout {
+        id: arow
+        property var node: null
+        readonly property var audio: node && node.audio ? node.audio : null
+        readonly property real vol: audio ? audio.volume : 0
+        readonly property bool muted: audio ? audio.muted : false
+        Layout.fillWidth: true
+        spacing: 2
+
+        Text {
+            text: root.streamLabel(arow.node)
+            color: Theme.text
+            font.family: Theme.fontFamily
+            font.pixelSize: Theme.fontSizeSm
+            elide: Text.ElideRight
+            Layout.fillWidth: true
+        }
+
+        SoundRow {
+            Layout.fillWidth: true
+            expandable: false
+            iconName: arow.muted ? "audio-volume-muted" : root.streamIcon(arow.node)
+            fallbackIcon: "audio-volume-high"
+            struck: arow.muted
+            value: arow.muted ? 0 : arow.vol
+            onIconClicked: {
+                if (arow.audio)
+                    arow.audio.muted = !arow.audio.muted
+            }
+            onMoved: v => {
+                if (arow.audio) {
+                    arow.audio.muted = false
+                    arow.audio.volume = v
+                }
+            }
         }
     }
 

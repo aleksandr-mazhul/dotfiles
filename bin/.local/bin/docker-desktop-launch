@@ -1,0 +1,31 @@
+#!/usr/bin/env bash
+# Prefer GUI Docker Desktop (Mac-like); fall back to lazydocker TUI.
+set -euo pipefail
+
+try_exec() {
+  if command -v "$1" >/dev/null 2>&1; then
+    exec "$@"
+  fi
+  if [[ -x $1 ]]; then
+    exec "$@"
+  fi
+  return 1
+}
+
+try_exec docker-desktop "$@" || true
+try_exec /opt/docker-desktop/bin/docker-desktop "$@" || true
+# Some builds expose this name:
+try_exec /opt/docker-desktop/bin/com.docker.backend "$@" || true
+
+if [[ -f /usr/share/applications/docker-desktop.desktop ]]; then
+  exec gtk-launch docker-desktop "$@" 2>/dev/null || \
+    exec gio launch /usr/share/applications/docker-desktop.desktop "$@" 2>/dev/null || true
+fi
+
+notify-send -a Docker -u normal "Docker Desktop" \
+  "Still installing? In yay: type y to remove conflicting compose/buildx" 2>/dev/null || true
+term="${TERMINAL:-kitty}"
+if command -v lazydocker >/dev/null 2>&1; then
+  exec "$term" -e lazydocker
+fi
+exit 1

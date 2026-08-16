@@ -4,6 +4,21 @@
 set -euo pipefail
 
 cmd="${1:-toggle}"
+log="${XDG_CACHE_HOME:-$HOME/.cache}/gromit-ctl.log"
+
+log_event() {
+  local focus=""
+  focus="$(hyprctl activewindow -j 2>/dev/null | python3 -c "
+import json, sys
+try:
+    w = json.load(sys.stdin)
+    print('%s\t%s' % (w.get('class', ''), (w.get('title') or '')[:80]))
+except Exception:
+    print('?\t?')
+" 2>/dev/null || printf '?\t?')"
+  mkdir -p "$(dirname "$log")"
+  printf '%s\t%s\t%s\n' "$(date -Iseconds)" "$cmd" "$focus" >>"$log"
+}
 
 if ! command -v gromit-mpx >/dev/null 2>&1; then
   notify-send -a Gromit "Gromit-MPX not installed" 2>/dev/null || true
@@ -21,6 +36,8 @@ if ! pgrep -x gromit-mpx >/dev/null 2>&1; then
   # give the daemon a moment before the client command
   sleep 0.35
 fi
+
+log_event
 
 case "$cmd" in
   toggle|paint)

@@ -1,0 +1,11 @@
+[Desktop Entry]
+Name=Telegram
+Comment=Official Telegram Desktop client
+Exec=/home/stranger/.local/bin/Telegram -- %u
+Icon=telegram
+Terminal=false
+StartupWMClass=TelegramDesktop
+Type=Application
+Categories=Chat;Network;InstantMessaging;
+MimeType=x-scheme-handler/tg;x-scheme-handler/tonsite;
+Keywords=tg;chat;im;messaging;messenger;

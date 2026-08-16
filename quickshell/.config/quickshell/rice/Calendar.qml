@@ -541,13 +541,16 @@ PanelWindow {
                     Item {
                         id: cell
                         required property var modelData
+                        // Keep day:0 spacers visible so GridLayout preserves Mon–Sun columns.
                         Layout.fillWidth: true
                         Layout.preferredHeight: 40
-                        visible: modelData.day > 0
 
-                        readonly property bool selected: modelData.day === root.selectedDay
-                        readonly property bool hovered: dayMouse.containsMouse
+                        readonly property bool isPad: modelData.day <= 0
+                        readonly property bool selected: !isPad && modelData.day === root.selectedDay
+                        readonly property bool hovered: !isPad && dayMouse.containsMouse
                         readonly property var cals: {
+                            if (cell.isPad)
+                                return []
                             // Prefer baked-in model data; fall back to live map.
                             const baked = modelData.cals
                             if (Array.isArray(baked) && baked.length)
@@ -562,6 +565,7 @@ PanelWindow {
                             width: 28
                             height: 28
                             radius: 14
+                            visible: !cell.isPad
                             color: {
                                 if (cell.selected)
                                     return Theme.text
@@ -577,7 +581,7 @@ PanelWindow {
 
                             Text {
                                 anchors.centerIn: parent
-                                text: cell.modelData.day > 0 ? String(cell.modelData.day) : ""
+                                text: cell.isPad ? "" : String(cell.modelData.day)
                                 color: cell.selected
                                     ? Theme.background
                                     : (cell.modelData.today ? Theme.primary : Theme.text)
@@ -613,7 +617,8 @@ PanelWindow {
                         MouseArea {
                             id: dayMouse
                             anchors.fill: parent
-                            hoverEnabled: true
+                            enabled: !cell.isPad
+                            hoverEnabled: !cell.isPad
                             cursorShape: Qt.PointingHandCursor
                             onClicked: {
                                 root.selectedDay = cell.modelData.day

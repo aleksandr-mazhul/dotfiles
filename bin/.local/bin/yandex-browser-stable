@@ -3,8 +3,11 @@ export XCURSOR_THEME="${XCURSOR_THEME:-macOS}"
 export XCURSOR_SIZE="${XCURSOR_SIZE:-24}"
 export HYPRCURSOR_THEME="${HYPRCURSOR_THEME:-macOS-hypr}"
 export HYPRCURSOR_SIZE="${HYPRCURSOR_SIZE:-24}"
-# Prefer Wayland: compositor draws macOS hyprcursor instead of X11 client cursors
+# Prefer Wayland: compositor draws macOS hyprcursor instead of X11 client cursors.
+# --disable-background-mode: stop ghost Yandex process after close (it otherwise
+# pops huge tiled "Яндекс.Погода" / forecast toasts on Wayland).
 exec /usr/bin/yandex-browser-stable \
   --ozone-platform=wayland \
   --enable-features=UseOzonePlatform,WaylandWindowDecorations \
+  --disable-background-mode \
   "$@"

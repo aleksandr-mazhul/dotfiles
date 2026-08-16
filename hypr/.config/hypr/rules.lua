@@ -228,12 +228,179 @@ hl.window_rule({
     no_shortcuts_inhibit = true,
 })
 
+-- Yandex Browser weather / promo toasts are normal top-level windows on Wayland.
+-- Without float they tile into giant empty panes (orange Hypr border, almost blank).
+-- Kill them; keep real browser tabs (titles end with "Yandex Browser").
+local function yandex_weather_spam(win)
+    if type(win) == "table" and win.window then
+        win = win.window
+    end
+    if type(win) ~= "userdata" and type(win) ~= "table" then
+        return false
+    end
+    local class = tostring(win.class or ""):lower()
+    if not class:find("yandex", 1, true) then
+        return false
+    end
+    local title = tostring(win.title or "")
+    local initial = tostring(win.initial_title or "")
+    -- Real browser chrome always includes the product name.
+    if title:find("Browser", 1, true) or initial:find("Browser", 1, true) then
+        return false
+    end
+    local hay = title .. "\n" .. initial
+    return hay:find("Погода", 1, true)
+        or hay:find("Прогноз", 1, true)
+        or hay:find("Yandex Weather", 1, true)
+        or hay:find("Weather forecast", 1, true)
+end
+
+local function close_yandex_weather_spam(win)
+    if not yandex_weather_spam(win) then
+        return
+    end
+    if type(win) == "table" and win.window then
+        win = win.window
+    end
+    pcall(function()
+        hl.dispatch(hl.dsp.window.close({ window = win }))
+    end)
+end
+
+hl.on("window.open_early", close_yandex_weather_spam)
+hl.on("window.open", close_yandex_weather_spam)
+hl.on("window.title", close_yandex_weather_spam)
+
+-- If close races the map, at least don't tile a fullscreen empty toast.
+hl.window_rule({
+    name = "yandex-weather-toast-float",
+    match = {
+        class = "^[Yy]andex.?[Bb]rowser$",
+        title = ".*(Погода|Прогноз|Yandex Weather|Weather forecast).*",
+    },
+    float = true,
+    no_focus = true,
+    no_anim = true,
+    border_size = 0,
+})
+
 -- Zoom: don't block Ctrl+Tab tab switching
 hl.window_rule({
     name = "zoom-no-shortcuts-inhibit",
     match = { class = "^(zoom|Zoom)$" },
     no_shortcuts_inhibit = true,
 })
+
+-- Zoom annotate / classic whiteboard on XWayland often renders a mostly-transparent
+-- surface. With decoration.blur that becomes a frosted pane + pen cursor — looks like
+-- a random "draw mode" overlay. Force opaque / no blur; keep Meeting usable.
+hl.window_rule({
+    name = "zoom-no-frost-overlay",
+    match = { class = "^(zoom|Zoom)$" },
+    no_blur = true,
+    opaque = true,
+})
+
+-- During a call Zoom often opens Workplace/Home next to Meeting. Closing it
+-- makes Zoom recreate it; park Home on special:zoom instead (Ctrl+W toggles).
+local function zoom_has_meeting()
+    for _, w in ipairs(hl.get_windows()) do
+        local class = string.lower(w.class or "")
+        if (class == "zoom" or class:find("zoom", 1, true)) and (w.title == "Meeting" or (w.title or ""):find("^Meeting ")) then
+            return true
+        end
+    end
+    return false
+end
+
+local function maybe_stash_zoom_home(win)
+    if type(win) == "table" and win.window then
+        win = win.window
+    end
+    if type(win) ~= "userdata" and type(win) ~= "table" then
+        return
+    end
+    local class = string.lower(win.class or "")
+    if class ~= "zoom" and not class:find("zoom", 1, true) then
+        return
+    end
+    local title = win.title or ""
+    if title ~= "Meeting" and not title:find("^Meeting ") then
+        -- Home / Workplace shell
+        if title:find("Zoom Workplace", 1, true) or title == "Zoom" then
+            if zoom_has_meeting() then
+                pcall(function()
+                    hl.dispatch(hl.dsp.window.move({
+                        window = win,
+                        workspace = "special:zoom",
+                        silent = true,
+                    }))
+                end)
+            end
+        end
+        return
+    end
+    -- Meeting just appeared: stash any existing Home windows.
+    for _, other in ipairs(hl.get_windows()) do
+        if other.address ~= win.address then
+            local oc = string.lower(other.class or "")
+            local ot = other.title or ""
+            if (oc == "zoom" or oc:find("zoom", 1, true))
+                and (ot:find("Zoom Workplace", 1, true) or ot == "Zoom")
+            then
+                pcall(function()
+                    hl.dispatch(hl.dsp.window.move({
+                        window = other,
+                        workspace = "special:zoom",
+                        silent = true,
+                    }))
+                end)
+            end
+        end
+    end
+end
+
+hl.on("window.open", maybe_stash_zoom_home)
+
+-- Log every Zoom window (title/class) so we can identify annotate/whiteboard popups.
+-- Also auto-close known draw/whiteboard shells that aren't the real Meeting.
+local function zoom_draw_spam(win)
+    if type(win) == "table" and win.window then
+        win = win.window
+    end
+    if type(win) ~= "userdata" and type(win) ~= "table" then
+        return
+    end
+    local class = string.lower(win.class or "")
+    if class ~= "zoom" and not class:find("zoom", 1, true) then
+        return
+    end
+    local title = tostring(win.title or "")
+    local initial = tostring(win.initial_title or "")
+    local log = io.open((os.getenv("XDG_CACHE_HOME") or (os.getenv("HOME") .. "/.cache")) .. "/zoom-windows.log", "a")
+    if log then
+        log:write(string.format("%s\t%s\t%s\tfloat=%s\n", os.date("!%Y-%m-%dT%H:%M:%SZ"), title, initial, tostring(win.floating)))
+        log:close()
+    end
+    local hay = title .. "\n" .. initial
+    -- Keep Meeting + Workplace + security; kill annotate/whiteboard ghosts.
+    if title == "Meeting" or title:find("^Meeting ") or title:find("Zoom Workplace", 1, true) or title:find("security", 1, true) then
+        return
+    end
+    if hay:find("[Ww]hiteboard")
+        or hay:find("[Aa]nnotat")
+        or hay:find("[Cc]anvas")
+        or hay:find("[Dd]rawing")
+        or (win.floating and title == "")
+    then
+        pcall(function()
+            hl.dispatch(hl.dsp.window.close({ window = win }))
+        end)
+    end
+end
+
+hl.on("window.open", zoom_draw_spam)
+hl.on("window.title", zoom_draw_spam)
 
 -- Gromit-MPX overlay: stay above everything, never steal focus permanently
 hl.window_rule({

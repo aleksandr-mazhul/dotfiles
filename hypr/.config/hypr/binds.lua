@@ -54,6 +54,69 @@ local function is_tabbed_app(class)
         or class:find("nautilus", 1, true)
 end
 
+-- Zoom keeps respawning the Workplace/Home dashboard if you closewindow it
+-- during a call. Stash it on special:zoom instead (toggle back: Alt+S style
+-- won't show it — use Super+… or focus from zoom; Ctrl+W again restores).
+local function is_zoom_home(win)
+    local class = string.lower(win.class or "")
+    if class ~= "zoom" and not class:find("zoom", 1, true) then
+        return false
+    end
+    local title = win.title or ""
+    if title == "Meeting" or title:find("^Meeting ") then
+        return false
+    end
+    if title:find("security", 1, true) then
+        return false
+    end
+    -- "Zoom Workplace - …", bare "Zoom", chat/mail shells, etc.
+    return title:find("Zoom Workplace", 1, true) ~= nil
+        or title == "Zoom"
+        or title:find("^Zoom ")
+end
+
+local function zoom_home_on_special(win)
+    local ws = win.workspace
+    return ws and (ws.name == "special:zoom" or (type(ws.id) == "number" and ws.id < 0 and tostring(ws.name or ""):find("zoom", 1, true)))
+end
+
+local function stash_zoom_home(win)
+    hl.dispatch(hl.dsp.window.move({
+        window = win,
+        workspace = "special:zoom",
+        silent = true,
+    }))
+end
+
+local function restore_zoom_home(win)
+    -- Prefer the Meeting workspace; else current workspace.
+    local target = nil
+    for _, w in ipairs(hl.get_windows()) do
+        local class = string.lower(w.class or "")
+        local title = w.title or ""
+        if (class == "zoom" or class:find("zoom", 1, true)) and (title == "Meeting" or title:find("^Meeting ")) then
+            if w.workspace and w.workspace.id then
+                target = w.workspace.id
+                break
+            end
+        end
+    end
+    if not target then
+        local active = hl.get_active_workspace()
+        if active and active.id then
+            target = active.id
+        end
+    end
+    if not target then
+        return
+    end
+    hl.dispatch(hl.dsp.window.move({
+        window = win,
+        workspace = target,
+        silent = true,
+    }))
+end
+
 hl.bind("CTRL + W", function()
     local focused = hl.get_active_window()
     if not focused then
@@ -62,6 +125,15 @@ hl.bind("CTRL + W", function()
     -- Like macOS: apps with tabs handle Cmd/Ctrl+W themselves (close tab)
     if is_tabbed_app(focused.class) then
         hl.dispatch(hl.dsp.pass({ window = focused }))
+        return
+    end
+    -- Zoom Home: hide ↔ restore without closewindow (avoids respawn loop).
+    if is_zoom_home(focused) then
+        if zoom_home_on_special(focused) then
+            restore_zoom_home(focused)
+        else
+            stash_zoom_home(focused)
+        end
         return
     end
     hl.dispatch(hl.dsp.window.close({ window = focused }))
@@ -380,7 +452,7 @@ hl.bind(secondMod .. " + Q", hl.dsp.exec_cmd("qs -c rice ipc call clipboard togg
 hl.bind(mainMod .. " + O", hl.dsp.exec_cmd(p.menu))
 -- Alt+J is movefocus down only (legacy togglesplit conflicted with the same key)
 
-hl.bind(secondMod .. " + SHIFT + L", hl.dsp.exec_cmd("pidof hyprlock || hyprlock"))
+hl.bind(secondMod .. " + SHIFT + L", hl.dsp.exec_cmd("~/.config/hypr/scripts/hyprlock-with-repair.sh"))
 hl.bind(secondMod .. " + W", hl.dsp.exec_cmd("qs -c rice ipc call wallpaper toggle"))
 -- Overlay type filter: was Super+P, now Ctrl+P (shown in panel footers)
 hl.bind("CTRL + P", hl.dsp.exec_cmd("qs -c rice ipc call overlay filter"))
@@ -392,12 +464,14 @@ hl.bind(secondMod .. " + SHIFT + CTRL + 4", hl.dsp.exec_cmd("~/.config/hypr/scri
 hl.bind(secondMod .. " + T", hl.dsp.exec_cmd("~/.config/hypr/scripts/ocr-region.sh"))
 
 -- Screen record (OBS) + on-screen draw (Gromit-MPX)
+-- Deliberate chord only — easy to confuse with Zoom annotate frost overlays.
+-- Toggle: Super+Shift+Alt+D   Clear: Super+Shift+Alt+C
 hl.bind(secondMod .. " + SHIFT + R", hl.dsp.exec_cmd("~/.local/bin/obs-record-toggle toggle"))
 hl.bind(secondMod .. " + ALT + R", hl.dsp.exec_cmd("obs --disable-shutdown-check"))
-hl.bind(secondMod .. " + D", hl.dsp.exec_cmd("~/.config/hypr/scripts/gromit-ctl.sh toggle"))
-hl.bind(secondMod .. " + SHIFT + D", hl.dsp.exec_cmd("~/.config/hypr/scripts/gromit-ctl.sh clear"))
-hl.bind(secondMod .. " + CTRL + D", hl.dsp.exec_cmd("~/.config/hypr/scripts/gromit-ctl.sh undo"))
-hl.bind(secondMod .. " + ALT + D", hl.dsp.exec_cmd("~/.config/hypr/scripts/gromit-ctl.sh visibility"))
+hl.bind(secondMod .. " + SHIFT + ALT + D", hl.dsp.exec_cmd("~/.config/hypr/scripts/gromit-ctl.sh toggle"))
+hl.bind(secondMod .. " + SHIFT + ALT + C", hl.dsp.exec_cmd("~/.config/hypr/scripts/gromit-ctl.sh clear"))
+hl.bind(secondMod .. " + SHIFT + ALT + U", hl.dsp.exec_cmd("~/.config/hypr/scripts/gromit-ctl.sh undo"))
+hl.bind(secondMod .. " + SHIFT + ALT + V", hl.dsp.exec_cmd("~/.config/hypr/scripts/gromit-ctl.sh visibility"))
 
 -- Focus windows (skhd alt - hjkl)
 hl.bind(mainMod .. " + H", hl.dsp.focus({ direction = "left" }))

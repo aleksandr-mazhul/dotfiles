@@ -5,9 +5,10 @@ After=graphical-session.target
 
 [Service]
 Type=simple
-ExecStart=/usr/bin/kanata --cfg %h/.config/kanata/kanata.kbd
+# --nodelay: skip 2s startup sleep so unlock repair / USB re-plug keeps HRM alive
+ExecStart=/usr/bin/kanata --nodelay --cfg %h/.config/kanata/kanata.kbd
 Restart=on-failure
-RestartSec=2
+RestartSec=1
 Environment=RUST_LOG=info
 
 [Install]

@@ -35,12 +35,27 @@
   "text_expansion_rules": [],
   "layout_sync_enabled": false,
   "typing_trainer": {
-    "language": "english",
+    "language": "russian",
     "mode": "time",
     "punctuation_enabled": false,
     "numbers_enabled": false,
     "duration_secs": 30,
     "word_count": 25
   },
-  "typing_trainer_history": []
+  "typing_trainer_history": [
+    {
+      "finished_at_unix_secs": 1786626080,
+      "language": "russian",
+      "mode": "time",
+      "duration_secs": 30,
+      "word_count": 25,
+      "punctuation_enabled": false,
+      "numbers_enabled": false,
+      "wpm": 44,
+      "accuracy_percent": 98,
+      "errors": 2,
+      "typed_chars": 111,
+      "elapsed_secs": 31
+    }
+  ]
 }

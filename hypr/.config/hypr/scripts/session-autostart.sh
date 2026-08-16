@@ -13,7 +13,14 @@ kitty >/dev/null 2>&1 &
 
 (
   sleep 2
-  Telegram >/dev/null 2>&1 &
+  # Wrapper forces 24h clocks (system en_US is 12h AM/PM).
+  "$HOME/.local/bin/Telegram" >/dev/null 2>&1 &
+) &
+
+(
+  sleep 3
+  # Wrapper: Wayland + --disable-background-mode (no ghost weather toasts).
+  "$HOME/.local/bin/yandex-browser-stable" >/dev/null 2>&1 &
 ) &
 
 (

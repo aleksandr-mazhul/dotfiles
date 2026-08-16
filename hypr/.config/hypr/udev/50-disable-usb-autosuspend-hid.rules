@@ -1,0 +1,4 @@
+# Keep keyboard/mouse receivers awake (idle/DPMS used to drop them).
+# Install: sudo cp ~/.config/hypr/udev/50-disable-usb-autosuspend-hid.rules /etc/udev/rules.d/ && sudo udevadm control --reload-rules
+ACTION=="add", SUBSYSTEM=="usb", ATTR{bInterfaceClass}=="03", TEST=="power/control", ATTR{power/control}="on"
+ACTION=="add", SUBSYSTEM=="usb", ENV{ID_USB_INTERFACES}=="*:0301*:*", TEST=="power/control", ATTR{power/control}="on"
