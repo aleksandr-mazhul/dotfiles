@@ -25,11 +25,14 @@ hl.layer_rule({
 -- DS popup surfaces (launcher & future popups): one glass pane, NO fullscreen
 -- dim (design-system anti-pattern #6 — dim kills the material). The layer is
 -- fully transparent outside the pane, so ignore_alpha frosts only the glass.
+-- Glossy experiment: lower ignore_alpha to match the thinner tint (0.10);
+-- xray frosts the wallpaper instead of the dark window underneath.
 hl.layer_rule({
     name = "rice-popup-glass",
     match = { namespace = "^rice-popup$" },
     blur = true,
-    ignore_alpha = 0.2,
+    ignore_alpha = 0.05,
+    xray = true,
 })
 
 hl.window_rule({

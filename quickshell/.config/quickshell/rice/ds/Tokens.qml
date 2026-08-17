@@ -6,23 +6,28 @@ import ".."
 // ~/Projects/desktop-design-system/tokens/tokens.md (Material v2, ADR-0005).
 // Values: Draft until validated on screen. Palette comes from the color SSOT.
 QtObject {
-    // ————— Material v2: transparent satin glass —————
-    // Light tint of the palette — the environment must read through the pane.
-    readonly property color shellTint: Qt.rgba(Colors.background.r, Colors.background.g, Colors.background.b, 0.22)
+    // ————— Material: glossy glass experiment (this branch) —————
+    // Thinner dark tint so wallpaper colour reads through; light lives at the
+    // top edge (specular) rather than as a milky full-surface veil.
+    readonly property color shellTint: Qt.rgba(Colors.background.r, Colors.background.g, Colors.background.b, 0.10)
+    readonly property color shellLiftTop: Qt.rgba(1, 1, 1, 0.16)
+    readonly property color shellLiftMid: Qt.rgba(1, 1, 1, 0.03)
+    readonly property color shellLiftBottom: Qt.rgba(0, 0, 0, 0.08)
+    readonly property color specular: Qt.rgba(1, 1, 1, 0.28)
     // Glass levels go LIGHTER upwards (ADR-0005): raised / field are white-based lifts.
-    readonly property color raised: Qt.rgba(1, 1, 1, 0.10)
-    readonly property color raisedStrong: Qt.rgba(1, 1, 1, 0.13)
-    readonly property color raisedRim: Qt.rgba(1, 1, 1, 0.12)
-    readonly property color fieldFill: Qt.rgba(1, 1, 1, 0.08)
-    readonly property color fieldRim: Qt.rgba(1, 1, 1, 0.14)
-    // Edge of the plate — light, not a drawn frame.
-    readonly property color rimOuter: Qt.rgba(1, 1, 1, 0.27)
-    readonly property color rimLine: Qt.rgba(0, 0, 0, 0.10)
-    readonly property color rimInner: Qt.rgba(1, 1, 1, 0.07)
-    readonly property color sheen: Qt.rgba(1, 1, 1, 0.04)
-    readonly property color shadow: Qt.rgba(0, 0, 0, 0.28)
+    readonly property color raised: Qt.rgba(1, 1, 1, 0.11)
+    readonly property color raisedStrong: Qt.rgba(1, 1, 1, 0.16)
+    readonly property color raisedRim: Qt.rgba(1, 1, 1, 0.18)
+    readonly property color fieldFill: Qt.rgba(1, 1, 1, 0.10)
+    readonly property color fieldRim: Qt.rgba(1, 1, 1, 0.22)
+    // Edge of the plate — light, not a drawn frame. Brighter outer rim = polish.
+    readonly property color rimOuter: Qt.rgba(1, 1, 1, 0.46)
+    readonly property color rimLine: Qt.rgba(0, 0, 0, 0.12)
+    readonly property color rimInner: Qt.rgba(1, 1, 1, 0.14)
+    readonly property color sheen: Qt.rgba(1, 1, 1, 0.10)
+    readonly property color shadow: Qt.rgba(0, 0, 0, 0.30)
     readonly property color hairline: Qt.rgba(Colors.text.r, Colors.text.g, Colors.text.b, 0.10)
-    readonly property real noiseOpacity: 0.015
+    readonly property real noiseOpacity: 0.008
 
     // ————— Shape (v2) —————
     readonly property int radiusSurface: 28

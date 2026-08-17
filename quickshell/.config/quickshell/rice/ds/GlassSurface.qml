@@ -1,11 +1,10 @@
 import QtQuick
 import QtQuick.Effects
 
-// material.shell v2 (ADR-0005): a thin transparent satin-glass plate.
-// The environment reads through it; the compositor provides the blur
-// (Hyprland layerrule on the surface's layer namespace).
-// The edge is light — bright outer rim, refraction line, soft inner rim —
-// which gives the plate physical thickness. Never a drawn frame.
+// material.shell — glossy glass experiment (this branch).
+// Thin tint so the environment reads through; compositor blur (Hyprland
+// layerrule, xray) frosts wallpaper. Light lives at the top edge (specular)
+// and along the rim — physical thickness, not a drawn frame.
 Item {
     id: root
 
@@ -29,50 +28,52 @@ Item {
         color: Tokens.shellTint
         clip: true
 
-        // Satin lift — glass catches light from above; keeps the center calm.
+        // Volume: bright catch at the top, calm centre, slight bottom shade.
         Rectangle {
             anchors.fill: parent
             radius: root.radius
             gradient: Gradient {
-                GradientStop { position: 0.0; color: Qt.rgba(1, 1, 1, 0.07) }
-                GradientStop { position: 0.45; color: Qt.rgba(1, 1, 1, 0.02) }
-                GradientStop { position: 1.0; color: Qt.rgba(1, 1, 1, 0.04) }
+                GradientStop { position: 0.0; color: Tokens.shellLiftTop }
+                GradientStop { position: 0.18; color: Tokens.shellLiftMid }
+                GradientStop { position: 0.72; color: "transparent" }
+                GradientStop { position: 1.0; color: Tokens.shellLiftBottom }
             }
         }
 
-        // Diagonal sheen — almost imperceptible light play across the plate.
+        // Specular — the glossy top-edge reflection (rounded via clip).
         Rectangle {
-            width: parent.width * 1.8
-            height: parent.height * 0.6
-            x: -parent.width * 0.3
-            y: -parent.height * 0.12
-            rotation: -16
+            anchors.left: parent.left
+            anchors.right: parent.right
+            anchors.top: parent.top
+            height: Math.round(parent.height * 0.22)
             gradient: Gradient {
-                GradientStop { position: 0.0; color: "transparent" }
-                GradientStop { position: 0.5; color: Tokens.sheen }
+                GradientStop { position: 0.0; color: Tokens.specular }
+                GradientStop { position: 0.35; color: Qt.rgba(1, 1, 1, 0.08) }
                 GradientStop { position: 1.0; color: "transparent" }
             }
         }
 
-        // Micro-noise kills the "plastic" feel; imperceptible as a layer.
+        // Diagonal sheen — light play across polished glass.
+        Rectangle {
+            width: parent.width * 1.8
+            height: parent.height * 0.55
+            x: -parent.width * 0.28
+            y: -parent.height * 0.18
+            rotation: -18
+            gradient: Gradient {
+                GradientStop { position: 0.0; color: "transparent" }
+                GradientStop { position: 0.45; color: Tokens.sheen }
+                GradientStop { position: 1.0; color: "transparent" }
+            }
+        }
+
+        // Micro-noise — quieter than satin so the surface stays glossy.
         Image {
             anchors.fill: parent
             source: Qt.resolvedUrl("../assets/noise.png")
             fillMode: Image.Tile
             opacity: Tokens.noiseOpacity
             smooth: false
-        }
-
-        // Faint bottom shade — the lower edge of the glass volume.
-        Rectangle {
-            anchors.left: parent.left
-            anchors.right: parent.right
-            anchors.bottom: parent.bottom
-            height: 48
-            gradient: Gradient {
-                GradientStop { position: 0.0; color: "transparent" }
-                GradientStop { position: 1.0; color: Qt.rgba(0, 0, 0, 0.05) }
-            }
         }
 
         Item {
