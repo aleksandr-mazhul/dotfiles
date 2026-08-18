@@ -1,23 +1,36 @@
 import QtQuick
 
-// Key-cap hint v2 (ADR-0005) — a light glass chip (material.field) with a soft rim.
-// Same light language as the plate. It is a caption, not a button: no hover, no motion.
+// Neutral glass keycap.
 Rectangle {
     property string key: ""
 
     implicitWidth: Math.max(implicitHeight, label.implicitWidth + 12)
-    implicitHeight: 22
-    radius: Tokens.radiusMin
-    color: Tokens.fieldFill
+    implicitHeight: 20
+    radius: 6
+    color: Qt.rgba(1, 1, 1, 0.12)
     border.width: 1
-    border.color: Tokens.fieldRim
+    border.color: Qt.rgba(1, 1, 1, 0.26)
+
+    Rectangle {
+        anchors.left: parent.left
+        anchors.right: parent.right
+        anchors.top: parent.top
+        height: Math.round(parent.height * 0.45)
+        radius: parent.radius
+        gradient: Gradient {
+            GradientStop { position: 0.0; color: Qt.rgba(1, 1, 1, 0.10) }
+            GradientStop { position: 1.0; color: "transparent" }
+        }
+    }
 
     Text {
         id: label
         anchors.centerIn: parent
         text: key
-        color: Tokens.textSecondary
+        color: Qt.rgba(1, 1, 1, 0.72)
         font.family: Tokens.fontUi
         font.pixelSize: Tokens.fontSizeSm - 1
+        style: Text.Outline
+        styleColor: Qt.rgba(0, 0, 0, 0.28)
     }
 }

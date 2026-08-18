@@ -1,4 +1,5 @@
 import QtQuick
+import QtQuick.Effects
 import ".."
 
 // Search Pattern v2 (ADR-0005): the search field is the visual anchor of a popup —
@@ -18,22 +19,52 @@ Item {
 
     implicitHeight: Tokens.searchFieldHeight
 
+    RectangularShadow {
+        anchors.fill: field
+        offset: Qt.vector2d(0, 0)
+        radius: field.radius
+        blur: 14
+        spread: 0
+        color: Tokens.focusGlow
+        opacity: input.activeFocus ? 1 : 0
+        Behavior on opacity {
+            NumberAnimation { duration: Tokens.stateMs; easing.type: Easing.OutCubic }
+        }
+    }
+
     Rectangle {
         id: field
         anchors.fill: parent
-        radius: Tokens.innerRadius(Tokens.radiusSurface, Tokens.paddingSurface)
+        radius: Tokens.radiusField
         color: Tokens.fieldFill
         border.width: 1
-        border.color: Tokens.fieldRim
+        border.color: input.activeFocus ? Tokens.focusRim : Tokens.fieldRim
+
+        Behavior on border.color {
+            ColorAnimation { duration: Tokens.stateMs; easing.type: Easing.OutCubic }
+        }
+
+        Rectangle {
+            anchors.left: parent.left
+            anchors.right: parent.right
+            anchors.top: parent.top
+            anchors.margins: 1
+            height: Math.round(parent.height * 0.42)
+            radius: parent.radius
+            gradient: Gradient {
+                GradientStop { position: 0.0; color: Qt.rgba(1, 1, 1, 0.10) }
+                GradientStop { position: 1.0; color: "transparent" }
+            }
+        }
     }
 
     RiceIcon {
         id: icon
         anchors.left: parent.left
-        anchors.leftMargin: Tokens.rowPaddingX
+        anchors.leftMargin: Tokens.paddingFieldX
         anchors.verticalCenter: parent.verticalCenter
         customSource: Qt.resolvedUrl("../assets/search.svg")
-        tint: Tokens.textTertiary
+        tint: Tokens.textIcon
         implicitSize: 16
     }
 
@@ -42,7 +73,7 @@ Item {
         anchors.left: icon.right
         anchors.leftMargin: Tokens.gapInline
         anchors.right: hintRow.visible ? hintRow.left : parent.right
-        anchors.rightMargin: Tokens.rowPaddingX
+        anchors.rightMargin: Tokens.paddingFieldX
         anchors.verticalCenter: parent.verticalCenter
         color: Tokens.textPrimary
         font.family: Tokens.fontUi
@@ -56,8 +87,10 @@ Item {
             anchors.fill: parent
             verticalAlignment: Text.AlignVCenter
             text: root.placeholder
-            color: Tokens.textTertiary
+            color: Qt.rgba(1, 1, 1, 0.50)
             font: input.font
+            style: Text.Outline
+            styleColor: Tokens.textHalo
             visible: input.text.length === 0
         }
 
@@ -76,7 +109,7 @@ Item {
         id: hintRow
         visible: input.text.length === 0 && root.hintKeys.length > 0
         anchors.right: parent.right
-        anchors.rightMargin: Tokens.rowPaddingX
+        anchors.rightMargin: Tokens.paddingFieldX
         anchors.verticalCenter: parent.verticalCenter
         spacing: 4
 

@@ -8,7 +8,7 @@ Item {
 
     readonly property bool needed: view && view.contentHeight > view.height + 2
     visible: needed
-    width: 4
+    width: 3
 
     // Pin the thumb to the top at origin. ListView originY is often non-zero,
     // so contentY/range alone can report "end of list" while the view is at the top.
@@ -34,7 +34,7 @@ Item {
         radius: 2
         height: Math.max(24, root.height * Math.max(0.05, Math.min(1, ratio)))
         y: (root.height - height) * root.progress
-        color: Tokens.textTertiary
-        opacity: 0.5
+        color: Qt.rgba(1, 1, 1, 0.40)
+        opacity: 0.55
     }
 }

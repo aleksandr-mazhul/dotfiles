@@ -57,13 +57,12 @@ hl.config({
             render_power = 3,
             color = "rgba(1a1a1aee)",
         },
-        -- Kawase needs ≥3 passes or the downsample tiles show through glass.
-        -- noise 0: default dither (~0.012) reads as a grid on dark panes.
+        -- System frost (kitty + windows). Layer blur amount is global in
+        -- Hyprland — do not raise size/passes for the launcher alone.
         blur = {
             enabled = true,
             size = 8,
-            passes = 3,
-            noise = 0,
+            passes = 2,
             vibrancy = 0.1696,
             new_optimizations = true,
         },

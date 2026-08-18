@@ -10,4 +10,6 @@ Text {
     font.family: Tokens.fontUi
     font.pixelSize: Tokens.fontSizeSection
     font.letterSpacing: Tokens.sectionTracking
+    style: Text.Outline
+    styleColor: Qt.rgba(0, 0, 0, 0.22)
 }

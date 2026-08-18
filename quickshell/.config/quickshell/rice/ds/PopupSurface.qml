@@ -87,7 +87,7 @@ PanelWindow {
         id: pane
         anchors.horizontalCenter: parent.horizontalCenter
         y: Math.round(root.height * root.anchorY)
-        width: root.surfaceWidth
+        width: Math.min(root.surfaceWidth, Math.max(480, root.width - 80))
         height: inner.children.length > 0 ? inner.children[0].implicitHeight : 0
         transformOrigin: Item.Center
 

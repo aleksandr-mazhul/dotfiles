@@ -16,6 +16,31 @@ DS.SearchListPopup {
     property var filtered: []
     // Candidates awaiting Exec-binary existence check (id → entry).
     property var pendingApps: []
+    // Coalesce applyFilter() so ListView.setModel is not called from a key
+    // handler / QQmlBinding stack (Qt 6.11 SIGSEGV in QQmlIncubator).
+    property int filterSeq: 0
+    // normId(wayland appId / class) → 1, refreshed on open.
+    property var runningNorm: ({})
+
+    // Well-known products: the name is enough; genericName is marketing noise.
+    readonly property var quietAppNames: ({
+        "chatgpt": 1,
+        "claude": 1,
+        "obsidian": 1,
+        "visual studio code": 1,
+        "code - oss": 1,
+        "code": 1,
+        "cursor": 1,
+        "zen browser": 1,
+        "firefox": 1,
+        "google chrome": 1,
+        "chromium": 1,
+        "discord": 1,
+        "spotify": 1,
+        "telegram": 1,
+        "slack": 1,
+        "steam": 1
+    })
 
     // DE leftovers / service browsers / helper stubs that aren't useful as
     // top-level launcher icons on Hyprland. Keep real apps + rice commands.
@@ -43,7 +68,7 @@ DS.SearchListPopup {
     hintKeys: ["alt", "O"]
     model: filtered
     maxRows: 8
-    surfaceWidth: 660
+    surfaceWidth: 960
 
     Component.onCompleted: {
         buildCommands()
@@ -53,6 +78,7 @@ DS.SearchListPopup {
         // EN for search typing; restore previous layout on close.
         // eh-layout-sync keeps Ergohaven firmware in step with Hyprland.
         Quickshell.execDetached(["bash", "-lc", "~/.config/hypr/scripts/launcher-layout.sh open"])
+        refreshRunning()
         buildCommands()
         loadApps()
         applyFilter()
@@ -62,6 +88,7 @@ DS.SearchListPopup {
     }
     onSearchTextChanged: applyFilter()
     onActivated: (item, index) => {
+        recordUsage(item)
         let action = null
         if (item && item.kind === "command")
             action = item.action
@@ -71,6 +98,20 @@ DS.SearchListPopup {
         close()
         if (typeof action === "function")
             action()
+    }
+
+    // Launch frecency — not in git; Quickshell.stateDir is per-machine.
+    property FileView usageFile: FileView {
+        path: `${Quickshell.stateDir}/launcher-usage.json`
+        blockLoading: true
+        printErrors: false
+        watchChanges: true
+        onFileChanged: reload()
+        onAdapterUpdated: writeAdapter()
+        adapter: JsonAdapter {
+            id: usageAdapter
+            property var launches: ({})
+        }
     }
 
     // One-shot: drop entries whose Exec binary is missing from PATH / disk.
@@ -99,6 +140,55 @@ DS.SearchListPopup {
                 root.applyFilter()
             }
         }
+    }
+
+    function copyStrList(v) {
+        const out = []
+        if (!v)
+            return out
+        try {
+            for (let i = 0; i < v.length; i++)
+                out.push(String(v[i]))
+        } catch (e) {}
+        return out
+    }
+
+    // Plain JS only — ListView must not hold live DesktopEntry QObjects.
+    // Quickshell replaces those entries and Qt 6.11 then SIGSEGVs in the incubator.
+    function snapshotApp(e) {
+        if (!e)
+            return null
+        return {
+            id: String(e.id || ""),
+            name: String(e.name || ""),
+            genericName: String(e.genericName || ""),
+            comment: String(e.comment || ""),
+            icon: String(e.icon || ""),
+            startupClass: String(e.startupClass || ""),
+            execString: String(e.execString || ""),
+            runInTerminal: !!e.runInTerminal,
+            command: copyStrList(e.command),
+            keywords: copyStrList(e.keywords),
+            categories: copyStrList(e.categories)
+        }
+    }
+
+    function findDesktopEntry(id) {
+        const raw = String(id || "").trim()
+        if (!raw)
+            return null
+        const key = appIdKey({ id: raw })
+        const entries = DesktopEntries.applications.values || []
+        for (let i = 0; i < entries.length; i++) {
+            const e = entries[i]
+            if (!e)
+                continue
+            if (String(e.id || "").trim() === raw)
+                return e
+            if (key && appIdKey(e) === key)
+                return e
+        }
+        return null
     }
 
     function normId(s) {
@@ -199,6 +289,93 @@ DS.SearchListPopup {
         return id.replace(/\.desktop$/i, "").toLowerCase()
     }
 
+    function usageKey(entry) {
+        if (!entry)
+            return ""
+        if (entry.kind === "command")
+            return "cmd:" + String(entry.id || entry.name || "")
+        return appIdKey(entry) || String(entry.name || "").toLowerCase()
+    }
+
+    function recordUsage(entry) {
+        const key = usageKey(entry)
+        if (!key)
+            return
+        const table = Object.assign({}, (usageAdapter && usageAdapter.launches) ? usageAdapter.launches : {})
+        const prev = table[key] || {}
+        table[key] = {
+            count: (prev.count || 0) + 1,
+            last: Date.now()
+        }
+        usageAdapter.launches = table
+    }
+
+    function refreshRunning() {
+        const map = {}
+        try {
+            if (Hyprland.refreshToplevels)
+                Hyprland.refreshToplevels()
+        } catch (e) {}
+        const tops = (Hyprland.toplevels && Hyprland.toplevels.values) ? Hyprland.toplevels.values : []
+        for (let i = 0; i < tops.length; i++) {
+            const t = tops[i]
+            const appId = normId(t.wayland ? t.wayland.appId : "")
+            if (appId)
+                map[appId] = 1
+            try {
+                const ipc = t.lastIpcObject || {}
+                const cls = normId(ipc.class || ipc.initialClass || "")
+                if (cls)
+                    map[cls] = 1
+            } catch (e) {}
+        }
+        runningNorm = map
+    }
+
+    function isRunning(entry) {
+        const hints = appHints(entry)
+        const map = runningNorm || {}
+        for (let i = 0; i < hints.length; i++) {
+            if (hints[i] && map[hints[i]])
+                return true
+        }
+        return false
+    }
+
+    function usageScore(entry) {
+        const key = usageKey(entry)
+        const table = (usageAdapter && usageAdapter.launches) ? usageAdapter.launches : {}
+        const rec = (key && table[key]) ? table[key] : null
+        const count = rec && rec.count ? rec.count : 0
+        const last = rec && rec.last ? rec.last : 0
+        const ageH = last > 0 ? Math.max(0, (Date.now() - last) / 3600000) : 1e6
+        // Half-life ~14 days: last week counts almost fully, last month less.
+        const recency = last > 0 ? Math.pow(0.5, ageH / (14 * 24)) : 0
+        const freq = Math.log(1 + count)
+        const running = isRunning(entry) ? 0.45 : 0
+        return freq * (0.35 + 0.65 * recency) + running
+    }
+
+    function fieldTight(text, q) {
+        if (!text || !q)
+            return 99
+        const lower = String(text).toLowerCase()
+        if (lower === q)
+            return 0
+        if (lower.startsWith(q))
+            return Math.min(lower.length - q.length, 20)
+        const words = wordTokens(text)
+        let best = 99
+        for (let i = 0; i < words.length; i++) {
+            const t = words[i].toLowerCase()
+            if (t === q)
+                return 0
+            if (t.startsWith(q))
+                best = Math.min(best, Math.min(t.length - q.length, 20))
+        }
+        return best
+    }
+
     function execBinary(entry) {
         const cmd = entry && entry.command
         if (!cmd || !cmd.length)
@@ -244,6 +421,34 @@ DS.SearchListPopup {
         return false
     }
 
+    function rowDescription(entry) {
+        if (!entry)
+            return ""
+        const generic = String(entry.genericName || "").trim()
+        if (!generic)
+            return ""
+        if (entry.kind === "command")
+            return generic
+        const lower = String(entry.name || "").trim().toLowerCase()
+        if (!lower)
+            return generic
+        if (root.quietAppNames[lower])
+            return ""
+        const keys = [
+            "chatgpt", "claude", "obsidian", "visual studio code",
+            "code - oss", "code", "cursor", "zen browser", "firefox",
+            "google chrome", "chromium", "discord", "spotify",
+            "telegram", "slack", "steam"
+        ]
+        for (let i = 0; i < keys.length; i++) {
+            if (lower.indexOf(keys[i]) === 0)
+                return ""
+        }
+        if (lower === generic.toLowerCase())
+            return ""
+        return generic
+    }
+
     function launchEntry(entry) {
         if (!entry)
             return
@@ -255,9 +460,12 @@ DS.SearchListPopup {
             return
         }
 
-        if (entry.execute) {
+        // Snapshots are plain JS — look up the live DesktopEntry so DBusActivatable
+        // / field-code execute() still works when the cache has not dropped it.
+        const live = findDesktopEntry(entry.id)
+        if (live && live.execute) {
             try {
-                entry.execute()
+                live.execute()
                 return
             } catch (e) {}
         }
@@ -335,9 +543,12 @@ DS.SearchListPopup {
             const e = entries[i]
             if (isJunkApp(e))
                 continue
-            list.push(e)
-            const id = appIdKey(e)
-            const bin = execBinary(e)
+            const snap = snapshotApp(e)
+            if (!snap)
+                continue
+            list.push(snap)
+            const id = appIdKey(snap)
+            const bin = execBinary(snap)
             if (id)
                 checkArgs.push(id, bin || "")
         }
@@ -357,26 +568,108 @@ DS.SearchListPopup {
         binCheck.running = true
     }
 
+    function isWordBoundary(text, i) {
+        if (i <= 0)
+            return true
+        const prev = text[i - 1]
+        const curr = text[i]
+        return /[\s\-_.+/]/.test(prev)
+            || (/[a-z0-9]/.test(prev) && /[A-Z]/.test(curr))
+    }
+
+    function wordTokens(text) {
+        return String(text || "").split(/[\s\-_.+/]+/).filter(t => t.length > 0)
+    }
+
+    function initialsOf(text) {
+        const s = String(text || "")
+        let ini = ""
+        for (let i = 0; i < s.length; i++) {
+            if (/[A-Za-z0-9]/.test(s[i]) && isWordBoundary(s, i))
+                ini += s[i].toLowerCase()
+        }
+        return ini
+    }
+
+    function keywordList(entry) {
+        const kw = entry && entry.keywords
+        if (!kw)
+            return []
+        const raw = Array.isArray(kw) ? kw : [kw]
+        const out = []
+        for (let i = 0; i < raw.length; i++) {
+            const parts = String(raw[i]).split(/[;,]/)
+            for (let j = 0; j < parts.length; j++) {
+                const t = parts[j].trim()
+                if (t)
+                    out.push(t)
+            }
+        }
+        return out
+    }
+
+    function idFields(entry) {
+        const fields = []
+        const push = (s) => {
+            const t = String(s || "").trim()
+            if (t && fields.indexOf(t) < 0)
+                fields.push(t)
+        }
+        const skip = { org: 1, com: 1, io: 1, net: 1, desktop: 1, www: 1 }
+        const id = String(entry && entry.id ? entry.id : "")
+        const parts = id.split(/[./]/)
+        // Skip reverse-domain prefixes so "co" does not match com.anthropic.*
+        if (parts.length <= 1)
+            push(id)
+        for (let i = 0; i < parts.length; i++) {
+            if (parts[i] && !skip[parts[i].toLowerCase()])
+                push(parts[i])
+        }
+        push(entry && entry.startupClass)
+        const bin = execBinary(entry)
+        if (bin)
+            push(String(bin).split("/").pop())
+        return fields
+    }
+
     function fieldScore(text, q) {
         if (!text || !q)
             return 0
-        const lower = text.toLowerCase()
+        const raw = String(text)
+        const lower = raw.toLowerCase()
         if (lower === q)
             return 100
-        if (lower.startsWith(q))
-            return 90
 
         let best = 0
-        for (let i = 1; i <= lower.length - q.length; i++) {
-            if (lower.slice(i, i + q.length) !== q)
-                continue
-            const prev = text[i - 1]
-            const curr = text[i]
-            const boundary = /[\s\-_.+/]/.test(prev)
-                || (/[a-z0-9]/.test(prev) && /[A-Z]/.test(curr))
-            const tier = boundary ? 80 : Math.max(1, 50 - Math.min(i, 40))
-            if (tier > best)
-                best = tier
+        const tightPrefix = (str, base) => {
+            const s = String(str).toLowerCase()
+            if (s === q)
+                return Math.max(base, 96)
+            if (!s.startsWith(q))
+                return 0
+            return base
+        }
+
+        best = Math.max(best, tightPrefix(lower, 92))
+
+        const words = wordTokens(raw)
+        for (let i = 0; i < words.length; i++)
+            best = Math.max(best, tightPrefix(words[i], 92))
+
+        const idx = lower.indexOf(q)
+        if (idx > 0) {
+            if (isWordBoundary(raw, idx))
+                best = Math.max(best, 86 - Math.min(idx, 20))
+            else if (q.length >= 3)
+                best = Math.max(best, Math.max(1, 45 - Math.min(idx, 40)))
+        }
+
+        if (q.length >= 2) {
+            const ini = initialsOf(raw)
+            if (ini === q)
+                best = Math.max(best, 74)
+            else if (ini.startsWith(q))
+                best = Math.max(best, 68)
         }
         return best
     }
@@ -384,21 +677,45 @@ DS.SearchListPopup {
     function entryScore(entry, q) {
         const n = fieldScore(entry.name || "", q)
         const g = fieldScore(entry.genericName || "", q)
-        const kw = entry.keywords
-            ? (Array.isArray(entry.keywords) ? entry.keywords.join(" ") : String(entry.keywords))
-            : ""
-        const k = fieldScore(kw, q)
-        // Also match command id ("clip", "wall")
-        const idScore = entry.kind === "command" ? fieldScore(entry.id || "", q) : 0
-        if (!n && !g && !k && !idScore)
+        const c = fieldScore(entry.comment || "", q)
+
+        let k = 0
+        const kws = keywordList(entry)
+        for (let i = 0; i < kws.length; i++)
+            k = Math.max(k, fieldScore(kws[i], q))
+
+        let idScore = 0
+        if (entry.kind === "command") {
+            idScore = fieldScore(entry.id || "", q)
+        } else {
+            const ids = idFields(entry)
+            for (let i = 0; i < ids.length; i++)
+                idScore = Math.max(idScore, fieldScore(ids[i], q))
+        }
+
+        if (!n && !g && !k && !idScore && !c)
             return 0
-        // Commands get a small boost so "w" → Wallpapers stays competitive.
-        const boost = entry.kind === "command" ? 15 : 0
-        return n * 100 + g * 10 + k + idScore * 50 + boost
+        return Math.max(n * 100, idScore * 55, g * 40, k * 40, c * 12)
     }
 
     function applyFilter() {
+        filterSeq += 1
+        const seq = filterSeq
+        Qt.callLater(() => {
+            if (seq !== root.filterSeq)
+                return
+            root.applyFilterNow()
+        })
+    }
+
+    function applyFilterNow() {
         const q = searchText.trim().toLowerCase()
+        if (q) {
+            // Lock hover before swapping the model so a rebuilt row under the
+            // cursor cannot steal the top (best) match.
+            keyboardNav = true
+            navPointer = Qt.point(-1, -1)
+        }
         if (!q) {
             // Sections per List Pattern: quiet labels, no boxes (ref #8 naming).
             let out = []
@@ -419,16 +736,27 @@ DS.SearchListPopup {
             scored.sort((a, b) => {
                 if (b.score !== a.score)
                     return b.score - a.score
-                // Prefer commands on tie
+                // Same matched-letter quality → more used / more recent first.
+                const ua = usageScore(a.entry)
+                const ub = usageScore(b.entry)
+                if (ub !== ua)
+                    return ub - ua
+                const ta = fieldTight(a.entry.name || "", q)
+                const tb = fieldTight(b.entry.name || "", q)
+                if (ta !== tb)
+                    return ta - tb
                 const ac = a.entry.kind === "command" ? 1 : 0
                 const bc = b.entry.kind === "command" ? 1 : 0
                 if (bc !== ac)
                     return bc - ac
+                const al = String(a.entry.name || "").length
+                const bl = String(b.entry.name || "").length
+                if (al !== bl)
+                    return al - bl
                 return (a.entry.name || "").localeCompare(b.entry.name || "", undefined, { sensitivity: "base" })
             })
             filtered = scored.map(x => x.entry)
         }
-        clampSelection()
     }
 
     rowDelegate: Item {
@@ -442,12 +770,22 @@ DS.SearchListPopup {
         width: ListView.view ? ListView.view.width : 0
         height: isHeader ? DS.Tokens.sectionHeight : DS.Tokens.rowHeight
 
+        DS.Hairline {
+            visible: rowItem.isHeader && String(rowItem.modelData.label || "").toLowerCase() === "applications"
+            anchors.left: parent.left
+            anchors.right: parent.right
+            anchors.leftMargin: DS.Tokens.rowPaddingX
+            anchors.rightMargin: DS.Tokens.rowPaddingX
+            anchors.top: parent.top
+            anchors.topMargin: 4
+        }
+
         DS.SectionLabel {
             visible: rowItem.isHeader
             anchors.left: parent.left
             anchors.leftMargin: DS.Tokens.rowPaddingX
             anchors.bottom: parent.bottom
-            anchors.bottomMargin: 10
+            anchors.bottomMargin: 6
             label: rowItem.isHeader ? (rowItem.modelData.label || "") : ""
         }
 
@@ -477,7 +815,7 @@ DS.SearchListPopup {
                 RiceIcon {
                     anchors.centerIn: parent
                     customSource: Qt.resolvedUrl("assets/" + (rowItem.modelData.monoIcon || "app-fallback.svg"))
-                    tint: DS.Tokens.textSecondary
+                    tint: DS.Tokens.textIcon
                     implicitSize: 22
                 }
             }

@@ -46,9 +46,14 @@ PopupSurface {
 
     function scrollToStart() {
         const pin = () => {
+            if (!list)
+                return
             list.contentY = Number(list.originY) || 0
         }
-        list.forceLayout()
+        // Do not forceLayout() here: during ListView incubation Qt 6.11 SIGSEGVs
+        // in QQmlIncubator / QMetaObject::propertyCount.
+        if (list.count > 0)
+            list.positionViewAtBeginning()
         pin()
         Qt.callLater(() => {
             if (root.selectedIndex === firstSelectable()) {
@@ -71,7 +76,6 @@ PopupSurface {
             return
         }
 
-        list.forceLayout()
         const origin = Number(list.originY) || 0
         const maxY = origin + Math.max(0, list.contentHeight - list.height)
         const item = list.itemAtIndex(i)
@@ -139,13 +143,36 @@ PopupSurface {
         activated(model[selectedIndex], selectedIndex)
     }
 
+    function selectFirst() {
+        selectedIndex = firstSelectable()
+        if (selectedIndex >= 0)
+            scrollToStart()
+    }
+
     function clampSelection() {
         if (canSelect(selectedIndex))
             return
-        selectedIndex = firstSelectable()
+        selectFirst()
     }
 
-    onModelChanged: clampSelection()
+    // Typing is keyboard input: ignore hover until the pointer actually moves,
+    // otherwise a rebuilt row under the cursor steals the first (best) match.
+    onSearchTextChanged: {
+        if (String(searchText).trim()) {
+            keyboardNav = true
+            navPointer = Qt.point(-1, -1)
+        }
+    }
+
+    onModelChanged: {
+        // Defer until after QQmlIncubator finishes creating delegates.
+        Qt.callLater(() => {
+            if (String(searchText).trim())
+                selectFirst()
+            else
+                clampSelection()
+        })
+    }
     onSelectedIndexChanged: {
         if (selectedIndex === firstSelectable())
             scrollToStart()
@@ -153,7 +180,7 @@ PopupSurface {
 
     onPopupOpened: {
         search.text = ""
-        selectedIndex = firstSelectable()
+        selectFirst()
         keyboardNav = false
         navPointer = Qt.point(-1, -1)
         Qt.callLater(() => search.input.forceActiveFocus())
@@ -181,12 +208,12 @@ PopupSurface {
     }
 
     Column {
-        width: root.surfaceWidth
+        width: parent.width
         topPadding: Tokens.paddingSurface
         bottomPadding: Tokens.paddingSurface
         leftPadding: Tokens.paddingSurface
         rightPadding: Tokens.paddingSurface
-        spacing: 6
+        spacing: 8
 
         SearchField {
             id: search

@@ -7,8 +7,9 @@ alwaysApply: true
 
 When changing Quickshell rice UI or design-system tokens:
 
-- Source of truth: `~/Projects/desktop-design-system/`
-- Policy: `~/Projects/desktop-design-system/process/canonical-references-policy.md`
+- Source of truth: `~/projects/personal/desktop-design-system/`
+- Policy: `~/projects/personal/desktop-design-system/process/canonical-references-policy.md`
+- Material of popups: **v3 / ADR-0006** (neutral optical glass). Do not reinterpret toward darker, flatter, more opaque, or tinted blue/navy.
 
 ## Must follow
 

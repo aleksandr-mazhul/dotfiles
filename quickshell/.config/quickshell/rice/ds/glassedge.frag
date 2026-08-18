@@ -19,15 +19,31 @@ float roundedBox(vec2 p, vec2 halfSize, float r) {
 void main() {
     vec2 size = vec2(max(itemWidth, 1.0), max(itemHeight, 1.0));
     vec2 p = qt_TexCoord0 * size - size * 0.5;
+    vec2 halfSize = size * 0.5;
     float r = min(radius, min(size.x, size.y) * 0.5);
-    // Keep the band on the frosted plate, not on the ignore_alpha fringe.
-    float d = roundedBox(p, size * 0.5 - vec2(1.5), max(r - 1.5, 1.0));
-    float inside = 1.0 - smoothstep(-0.5, 0.8, d);
+
+    float d = roundedBox(p, halfSize - vec2(1.0), max(r - 1.0, 1.0));
+    float inside = 1.0 - smoothstep(-0.6, 0.8, d);
     float inward = max(-d, 0.0);
 
-    // One lobe only: bright perimeter that decays inward. A second dark ring
-    // reads as a stacked frame, which is exactly the garbage to avoid.
-    float rim = exp(-inward * 0.22);
-    float a = rim * 0.12 * inside * qt_Opacity;
+    // Catch-light on the perimeter — decays into the transparent center.
+    float rim = exp(-inward * 0.10);
+    // Inner reflection, a few pixels in from the lip.
+    float inner = exp(-pow(inward - 5.0, 2.0) * 0.10);
+
+    vec2 ap = abs(p);
+    float cx = smoothstep(halfSize.x - r - 22.0, halfSize.x - r + 4.0, ap.x);
+    float cy = smoothstep(halfSize.y - r - 22.0, halfSize.y - r + 4.0, ap.y);
+    float corner = cx * cy;
+
+    float ny = p.y / max(halfSize.y, 1.0);
+    float topBottom = smoothstep(0.50, 1.0, abs(ny));
+
+    float a = rim * 0.30;
+    a += inner * 0.11;
+    a += rim * corner * 0.24;
+    a += rim * topBottom * 0.12;
+    a *= inside * qt_Opacity;
+
     fragColor = vec4(vec3(a), a);
 }

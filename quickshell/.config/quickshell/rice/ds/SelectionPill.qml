@@ -1,22 +1,74 @@
 import QtQuick
+import QtQuick.Effects
 
-// material.raised v2 (ADR-0005) — hover/selection is a LIGHTER glass level.
-// Soft fill, hairline rim — never a dark boxed stroke.
-Rectangle {
+// Selected row is a second glass sheet floating on the plate.
+Item {
+    id: root
+
     property bool hovered: false
     property bool selected: false
 
-    radius: Tokens.innerRadius(Tokens.radiusSurface, Tokens.paddingSurface)
-    color: selected ? Tokens.raisedStrong : (hovered ? Tokens.raised : "transparent")
-    border.width: (selected || hovered) ? 1 : 0
-    border.color: selected ? Tokens.raisedRim : Qt.rgba(1, 1, 1, 0.08)
+    readonly property int pillRadius: Tokens.innerRadius(Tokens.radiusSurface, Tokens.paddingSurface)
 
-    Behavior on color {
-        ColorAnimation {
-            // Keyboard selection must paint in the same frame as the list snap.
-            // Animate only hover, or the pill lags behind the scroll.
-            duration: (hovered && !selected) ? Tokens.stateMs : 0
-            easing.type: Easing.OutCubic
+    RectangularShadow {
+        anchors.fill: fill
+        visible: root.selected
+        offset: Qt.vector2d(0, 6)
+        radius: root.pillRadius
+        blur: 18
+        spread: 0
+        color: Qt.rgba(0, 0, 0, 0.04)
+    }
+
+    RectangularShadow {
+        anchors.fill: fill
+        visible: root.selected
+        offset: Qt.vector2d(0, 0)
+        radius: root.pillRadius
+        blur: 16
+        spread: 0
+        color: Tokens.selectGlow
+    }
+
+    Rectangle {
+        id: fill
+        anchors.fill: parent
+        radius: root.pillRadius
+        color: root.selected ? Tokens.raisedStrong : (root.hovered ? Tokens.raised : "transparent")
+        border.width: root.selected ? 1 : (root.hovered ? 1 : 0)
+        border.color: root.selected ? Tokens.raisedRim : Qt.rgba(1, 1, 1, 0.08)
+
+        Behavior on color {
+            ColorAnimation {
+                duration: (root.hovered && !root.selected) ? Tokens.stateMs : 0
+                easing.type: Easing.OutCubic
+            }
+        }
+    }
+
+    Rectangle {
+        visible: root.selected
+        anchors.fill: parent
+        anchors.margins: 1
+        radius: Math.max(Tokens.radiusMin, root.pillRadius - 1)
+        color: "transparent"
+        border.width: 1
+        border.color: Qt.rgba(1, 1, 1, 0.07)
+    }
+
+    Rectangle {
+        visible: root.selected
+        anchors.left: parent.left
+        anchors.right: parent.right
+        anchors.top: parent.top
+        anchors.leftMargin: 2
+        anchors.rightMargin: 2
+        anchors.topMargin: 1
+        height: Math.round(parent.height * 0.42)
+        radius: root.pillRadius
+        gradient: Gradient {
+            GradientStop { position: 0.0; color: Qt.rgba(1, 1, 1, 0.10) }
+            GradientStop { position: 1.0; color: "transparent" }
         }
     }
 }

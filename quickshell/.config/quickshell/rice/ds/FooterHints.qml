@@ -1,7 +1,6 @@
 import QtQuick
 
-// Footer hints v2 (ADR-0005): a natural continuation of the glass plate —
-// no band, no hairline; separation is air. Quiet but readable.
+// Footer is part of the smoked plate — hairline, compact keycaps, quiet type.
 Item {
     id: root
 
@@ -12,9 +11,16 @@ Item {
 
     implicitHeight: Tokens.footerHeight
 
+    Hairline {
+        anchors.left: parent.left
+        anchors.right: parent.right
+        anchors.top: parent.top
+        opacity: 0.85
+    }
+
     component HintGroup: Row {
         property var hint: ({ keys: [], label: "" })
-        spacing: 8
+        spacing: 6
 
         Repeater {
             model: hint.keys
@@ -29,6 +35,8 @@ Item {
             color: Tokens.textSecondary
             font.family: Tokens.fontUi
             font.pixelSize: Tokens.fontSizeSm
+            style: Text.Outline
+            styleColor: Qt.rgba(0, 0, 0, 0.22)
             anchors.verticalCenter: parent.verticalCenter
         }
     }
