@@ -21,6 +21,24 @@ Item {
     height: implicitHeight
 
     Text {
+        id: sh2
+        x: fg.x
+        y: fg.y + 2
+        width: fg.width
+        height: fg.height
+        text: fg.text
+        font: fg.font
+        elide: fg.elide
+        wrapMode: fg.wrapMode
+        maximumLineCount: fg.maximumLineCount
+        horizontalAlignment: fg.horizontalAlignment
+        verticalAlignment: fg.verticalAlignment
+        color: Qt.rgba(0, 0, 0, 0.12 + Tokens.contrast * 0.18)
+        visible: fg.text.length > 0
+        z: 0
+    }
+
+    Text {
         id: sh
         x: fg.x
         y: fg.y + 1
@@ -50,6 +68,8 @@ Item {
         verticalAlignment: root.verticalAlignment
         font.weight: root.fontWeight
         font.bold: root.fontBold
+        style: Text.Outline
+        styleColor: Tokens.textHalo
         z: 1
     }
 }

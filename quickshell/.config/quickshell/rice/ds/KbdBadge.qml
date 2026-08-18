@@ -7,7 +7,7 @@ Rectangle {
     implicitWidth: Math.max(implicitHeight, label.implicitWidth + 12)
     implicitHeight: 20
     radius: 6
-    color: Qt.rgba(1, 1, 1, 0.12)
+    color: Qt.rgba(1, 1, 1, 0.12 * (1 - AdaptiveContrast.contrast * 0.75))
     border.width: 1
     border.color: Qt.rgba(1, 1, 1, 0.22 + AdaptiveContrast.contrast * 0.10)
 
@@ -34,7 +34,7 @@ Rectangle {
         id: label
         anchors.centerIn: parent
         text: key
-        color: Qt.rgba(1, 1, 1, 0.78)
+        color: Qt.rgba(1, 1, 1, 0.78 + AdaptiveContrast.contrast * 0.12)
         font.family: Tokens.fontUi
         font.pixelSize: Tokens.fontSizeSm - 1
     }

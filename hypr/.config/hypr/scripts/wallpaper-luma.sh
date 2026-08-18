@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
-# Print Rec.709 luma of the current wallpaper (0.000–1.000).
-# Used by rice AdaptiveContrast; stdout must be a single number.
+# Print Rec.709 luma (0.000–1.000) of the wallpaper region behind the launcher
+# (upper-center crop), mixed with the full-frame mean so captions at the
+# bottom cannot hide a bright sky/cream field.
 set -euo pipefail
 
 wall=""
@@ -22,5 +23,13 @@ if [[ -z "${wall}" || ! -f "${wall}" ]]; then
   exit 0
 fi
 
-magick "${wall}" -resize 48x48! -format '%[fx:mean.r*0.2126+mean.g*0.7152+mean.b*0.0722]' info:
-printf '\n'
+full="$(magick "${wall}" -resize 48x48! -format '%[fx:mean.r*0.2126+mean.g*0.7152+mean.b*0.0722]' info:)"
+upper="$(magick "${wall}" -gravity North -crop 70%x48%+0+8% +repage -resize 32x32! -format '%[fx:mean.r*0.2126+mean.g*0.7152+mean.b*0.0722]' info:)"
+
+python3 - "${full}" "${upper}" <<'PY'
+import sys
+full, upper = float(sys.argv[1]), float(sys.argv[2])
+# Prefer the region the launcher sits on; never go below the full-frame mean.
+luma = max(full, 0.35 * full + 0.65 * upper)
+print(f"{min(1.0, max(0.0, luma)):.6f}")
+PY

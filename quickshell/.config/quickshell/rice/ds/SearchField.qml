@@ -94,7 +94,7 @@ Item {
             anchors.fill: parent
             verticalAlignment: Text.AlignVCenter
             text: root.placeholder
-            color: Qt.rgba(1, 1, 1, 0.50)
+            color: Qt.rgba(1, 1, 1, 0.58 + Tokens.contrast * 0.12)
             font: input.font
             visible: input.text.length === 0
         }

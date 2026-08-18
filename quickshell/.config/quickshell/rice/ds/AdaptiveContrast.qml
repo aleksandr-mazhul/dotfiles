@@ -16,8 +16,8 @@ Item {
     property real contrast: 0
 
     function contrastFromLuma(L) {
-        const lo = 0.34
-        const hi = 0.76
+        const lo = 0.30
+        const hi = 0.68
         const t = Math.min(1, Math.max(0, (L - lo) / (hi - lo)))
         return t * t * (3 - 2 * t)
     }
