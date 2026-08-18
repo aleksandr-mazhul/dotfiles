@@ -26,6 +26,8 @@ const SECTIONS: Section[] = [
       { keys: "Super+B", action: "Toggle bar pinned ↔ autohide", note: "Hover top edge to peek; state persists" },
       { keys: "Super+Shift+B", action: "Same as Super+B" },
       { keys: "Super+Q", action: "Clipboard history" },
+      { keys: "Super+L", action: "Clipboard: focus preview", note: "When clipboard is open; else pass to app" },
+      { keys: "Super+H", action: "Clipboard: focus list", note: "When clipboard is open; else pass to app" },
       { keys: "Super+W", action: "Wallpaper picker" },
       { keys: "Super+Shift+W", action: "Random wallpaper" },
       { keys: "Super+Alt+W", action: "Waypaper" },
@@ -110,6 +112,7 @@ const SECTIONS: Section[] = [
     title: "Capture / annotate",
     source: "hypr/binds.lua",
     rows: [
+      { keys: "Super+Shift+Ctrl+3", action: "Screenshot focused monitor", note: "Includes GloView / menus; white flash" },
       { keys: "Super+Shift+Ctrl+4", action: "Screenshot region" },
       { keys: "Super+T", action: "OCR region" },
       { keys: "Super+Shift+R", action: "OBS record toggle" },

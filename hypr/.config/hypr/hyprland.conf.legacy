@@ -91,9 +91,9 @@ env = GTK_ICON_THEME,Papirus-Dark
 env = HYPRCURSOR_SIZE,24
 env = GTK_THEME,Graphite-Dark
 env = QT_QPA_PLATFORMTHEME,gtk3
-env = HYPRSHOT_DIR,$HOME/Pictures/Screenshots
-env = XDG_SCREENSHOTS_DIR,$HOME/Pictures/Screenshots
-env = XDG_PICTURES_DIR,$HOME/Pictures
+env = HYPRSHOT_DIR,$HOME/pictures/screenshots
+env = XDG_SCREENSHOTS_DIR,$HOME/pictures/screenshots
+env = XDG_PICTURES_DIR,$HOME/pictures
 
 
 ###################

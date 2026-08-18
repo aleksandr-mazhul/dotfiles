@@ -1,0 +1,45 @@
+/* Windows-style autoscroll origin — optical glass disc, not Firefox's
+ * opaque white circle. Must stay out of the generic `panel` chrome rules. */
+.autoscroller,
+#autoscroller,
+panel.autoscroller {
+  appearance: none !important;
+  -moz-default-appearance: none !important;
+  -moz-window-shadow: none !important;
+  background: transparent !important;
+  background-color: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+  color: transparent !important;
+  --panel-background: transparent !important;
+  --panel-background-color: transparent no-repeat center / 32px 32px var(--autoscroll-background-image) !important;
+  --arrowpanel-background: transparent !important;
+  --panel-border-color: transparent !important;
+  --panel-border-radius: 999px !important;
+  --panel-padding: 0 !important;
+  --panel-shadow: none !important;
+  --panel-box-shadow: none !important;
+  --panel-box-shadow-margin: 4px !important;
+  --autoscroll-background-image: url("autoscroll.svg") !important;
+}
+
+.autoscroller::part(content),
+#autoscroller::part(content) {
+  padding: 0 !important;
+  margin: 0 !important;
+  border: none !important;
+  border-radius: 999px !important;
+  background: var(--autoscroll-background-image) center / 32px 32px no-repeat !important;
+  background-color: transparent !important;
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.4) !important;
+}
+
+.autoscroller[scrolldir="NS"],
+#autoscroller[scrolldir="NS"] {
+  --autoscroll-background-image: url("autoscroll-vertical.svg") !important;
+}
+
+.autoscroller[scrolldir="EW"],
+#autoscroller[scrolldir="EW"] {
+  --autoscroll-background-image: url("autoscroll-horizontal.svg") !important;
+}

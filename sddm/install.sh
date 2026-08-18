@@ -6,7 +6,7 @@ ROOT="$(cd "$(dirname "$0")" && pwd)"
 SRC="$ROOT/themes/adaptive"
 DST="/usr/share/sddm/themes/adaptive"
 CACHE="${XDG_CONFIG_HOME:-$HOME/.config}/sddm-adaptive"
-WALL="${1:-$HOME/Pictures/Wallpapers/minimal/minimal-05.jpg}"
+WALL="${1:-$HOME/pictures/wallpapers/minimal/minimal-05.jpg}"
 
 if [[ ! -d "$SRC" ]]; then
   echo "Theme source not found: $SRC" >&2

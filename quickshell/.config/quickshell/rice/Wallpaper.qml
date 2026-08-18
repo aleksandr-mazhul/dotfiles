@@ -9,7 +9,7 @@ RicePanel {
     property var walls: []
     property var filtered: []
     property var markedPaths: []
-    property string wallDir: Quickshell.env("HOME") + "/Pictures/Wallpapers"
+    property string wallDir: Quickshell.env("HOME") + "/pictures/wallpapers"
     property string categoryFilter: "all"
 
     title: "Wallpapers"
@@ -232,7 +232,11 @@ RicePanel {
             anchors.fill: parent
             hoverEnabled: true
             acceptedButtons: Qt.LeftButton | Qt.RightButton
-            onEntered: root.selectedIndex = index
+            onEntered: {
+                if (root.keyboardNav)
+                    return
+                root.selectedIndex = index
+            }
             onClicked: mouse => {
                 root.selectedIndex = index
                 if (mouse.modifiers & Qt.ShiftModifier || mouse.button === Qt.RightButton) {

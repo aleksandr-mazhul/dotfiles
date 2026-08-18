@@ -28,7 +28,7 @@ case "${class,,}" in
     if command -v cursor >/dev/null; then
       exec cursor -n
     fi
-    exec "$HOME/Applications/Cursor.AppImage" -n
+    exec "$HOME/applications/Cursor.AppImage" -n
     ;;
   firefox)
     exec firefox --new-window

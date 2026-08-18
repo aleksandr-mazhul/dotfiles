@@ -2,6 +2,7 @@ import QtQuick
 import QtQuick.Layouts
 import Quickshell
 import Quickshell.Wayland
+import "vim"
 
 PanelWindow {
     id: root
@@ -14,6 +15,9 @@ PanelWindow {
     property bool showSearch: true
     property var model: []
     property int selectedIndex: 0
+    // Keyboard ↑/↓ hides the pointer and ignores hover until the mouse moves.
+    property bool keyboardNav: false
+    property point navPointer: Qt.point(-1, -1)
     property int itemHeight: Theme.rowHeight
     property int maxVisible: 8
     property int panelWidth: Theme.panelWidth
@@ -79,9 +83,12 @@ PanelWindow {
         OverlayHub.closeOthers(root)
         open = true
         selectedIndex = 0
+        keyboardNav = false
+        navPointer = Qt.point(-1, -1)
         searchField.text = ""
         filterMenuOpen = false
         panelOpened()
+        Qt.callLater(() => root.scrollToStart())
         openAnim.play()
         Qt.callLater(() => {
             if (pendingOpenFilter && hasFilter) {
@@ -131,11 +138,73 @@ PanelWindow {
         toggleFilter()
     }
 
+    function scrollToStart() {
+        const pin = () => {
+            listView.contentY = Number(listView.originY) || 0
+        }
+        listView.forceLayout()
+        pin()
+        Qt.callLater(() => {
+            if (root.selectedIndex === 0) {
+                pin()
+                return
+            }
+            const item = listView.itemAtIndex(root.selectedIndex)
+            if (!item || !listView.contentItem)
+                return
+            const origin = Number(listView.originY) || 0
+            const y = item.mapToItem(listView.contentItem, 0, 0).y
+            if (y + item.height <= origin + listView.height + 1)
+                pin()
+        })
+    }
+
+    function revealIndex(i, delta) {
+        if (i <= 0) {
+            scrollToStart()
+            return
+        }
+
+        listView.forceLayout()
+        const origin = Number(listView.originY) || 0
+        const maxY = origin + Math.max(0, listView.contentHeight - listView.height)
+        const item = listView.itemAtIndex(i)
+
+        // Rows that still fit on the first screen stay pinned to the top.
+        if (item && listView.contentItem) {
+            const y = item.mapToItem(listView.contentItem, 0, 0).y
+            if (y + item.height <= origin + listView.height + 1) {
+                scrollToStart()
+                return
+            }
+        }
+
+        if (!item) {
+            const step = root.itemHeight + listView.spacing
+            listView.contentY = Math.max(origin, Math.min(maxY, listView.contentY + (delta > 0 ? step : -step)))
+            return
+        }
+
+        let cy = listView.contentY
+        const topInView = item.mapToItem(listView, 0, 0).y
+        const botInView = topInView + item.height
+        if (botInView > listView.height)
+            cy += botInView - listView.height
+        if (topInView < 0)
+            cy += topInView
+        listView.contentY = Math.max(origin, Math.min(maxY, cy))
+    }
+
     function moveSelection(delta) {
         if (!model || model.length === 0)
             return
-        selectedIndex = (selectedIndex + delta + model.length) % model.length
-        listView.positionViewAtIndex(selectedIndex, ListView.Contain)
+        const next = selectedIndex + delta
+        if (next < 0 || next >= model.length)
+            return
+        keyboardNav = true
+        navPointer = Qt.point(-1, -1)
+        selectedIndex = next
+        revealIndex(next, delta)
     }
 
     function activateSelected() {
@@ -207,7 +276,12 @@ PanelWindow {
         if (!hasFilter)
             return
         const n = filterOptions.length
-        filterHighlight = (filterHighlight + delta + n) % n
+        if (n <= 0)
+            return
+        const next = filterHighlight + delta
+        if (next < 0 || next >= n)
+            return
+        filterHighlight = next
     }
 
     function applyFilterHighlight() {
@@ -223,9 +297,25 @@ PanelWindow {
             focusCatcher.forceActiveFocus()
     }
 
+    function isCtrlP(event) {
+        const ctrl = !!(event.modifiers & Qt.ControlModifier)
+        const meta = !!(event.modifiers & Qt.MetaModifier)
+        const alt = !!(event.modifiers & Qt.AltModifier)
+        const shift = !!(event.modifiers & Qt.ShiftModifier)
+        if (!ctrl || meta || alt || shift)
+            return false
+        return VimKeys.resolve(event) === "p"
+    }
+
     function handleKey(event) {
         if (!root.open)
             return false
+
+        // Ctrl+P — in-panel filter (Hyprland also binds this; compositor usually consumes it).
+        if (root.hasFilter && root.isCtrlP(event)) {
+            root.toggleFilterMenu()
+            return true
+        }
 
         if (root.filterMenuOpen) {
             if (event.key === Qt.Key_Escape) {
@@ -271,7 +361,15 @@ PanelWindow {
         return false
     }
 
-    onModelChanged: clampSelection()
+    onModelChanged: {
+        clampSelection()
+        if (selectedIndex === 0)
+            Qt.callLater(() => root.scrollToStart())
+    }
+    onSelectedIndexChanged: {
+        if (selectedIndex === 0)
+            scrollToStart()
+    }
     onFilterOptionsChanged: syncFilterHighlight()
     onFilterValueChanged: syncFilterHighlight()
 
@@ -312,6 +410,21 @@ PanelWindow {
         transformOrigin: Item.Center
         opacity: 1
         scale: 1
+
+        HoverHandler {
+            enabled: root.keyboardNav
+            acceptedDevices: PointerDevice.Mouse | PointerDevice.TouchPad
+            cursorShape: Qt.BlankCursor
+            onPointChanged: {
+                const p = point.position
+                if (root.navPointer.x < 0) {
+                    root.navPointer = Qt.point(p.x, p.y)
+                    return
+                }
+                if (Math.abs(p.x - root.navPointer.x) > 3 || Math.abs(p.y - root.navPointer.y) > 3)
+                    root.keyboardNav = false
+            }
+        }
 
         RiceOpenAnim {
             id: openAnim
@@ -486,6 +599,10 @@ PanelWindow {
                     model: root.model
                     currentIndex: root.selectedIndex
                     boundsBehavior: Flickable.StopAtBounds
+                    highlightFollowsCurrentItem: false
+                    highlightMoveDuration: 0
+                    highlightResizeDuration: 0
+                    keyNavigationWraps: false
                     delegate: root.rowDelegate
 
                     Text {
@@ -502,11 +619,19 @@ PanelWindow {
                 Item {
                     id: scrollBar
                     readonly property bool needed: listView.contentHeight > listView.height + 2
+                    readonly property real origin: Number(listView.originY) || 0
                     readonly property real ratio: listView.height / Math.max(1, listView.contentHeight)
                     readonly property real thumbH: Math.max(28, height * ratio)
                     readonly property real maxThumbY: Math.max(0, height - thumbH)
                     readonly property real maxContentY: Math.max(1, listView.contentHeight - listView.height)
-                    readonly property real thumbY: maxThumbY * (listView.contentY / maxContentY)
+                    readonly property real thumbY: {
+                        if (listView.atYBeginning)
+                            return 0
+                        const cy = listView.contentY
+                        if (!(cy === cy) || cy <= origin + 1)
+                            return 0
+                        return maxThumbY * Math.max(0, Math.min(1, (cy - origin) / maxContentY))
+                    }
 
                     visible: needed
                     anchors.right: parent.right
@@ -547,7 +672,7 @@ PanelWindow {
                                     return
                                 const localY = scrollThumb.y + mouse.y - grabOffset
                                 const clamped = Math.max(0, Math.min(scrollBar.maxThumbY, localY))
-                                listView.contentY = (clamped / Math.max(1, scrollBar.maxThumbY)) * scrollBar.maxContentY
+                                listView.contentY = scrollBar.origin + (clamped / Math.max(1, scrollBar.maxThumbY)) * scrollBar.maxContentY
                             }
                         }
                     }
@@ -560,7 +685,7 @@ PanelWindow {
                         onClicked: mouse => {
                             const target = mouse.y - scrollBar.thumbH / 2
                             const clamped = Math.max(0, Math.min(scrollBar.maxThumbY, target))
-                            listView.contentY = (clamped / Math.max(1, scrollBar.maxThumbY)) * scrollBar.maxContentY
+                            listView.contentY = scrollBar.origin + (clamped / Math.max(1, scrollBar.maxThumbY)) * scrollBar.maxContentY
                         }
                     }
                 }

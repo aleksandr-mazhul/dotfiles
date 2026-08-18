@@ -39,8 +39,8 @@ PanelWindow {
         || root.revealed
 
     readonly property int fullHeight: Theme.barHeight + Theme.barMargin * 2
-    // Tall enough to catch the cursor at the physical screen edge.
-    readonly property int triggerHeight: 10
+    // Autohide peek: only the physical top edge (easy to brush past a taller strip).
+    readonly property int triggerHeight: 2
     // Only pinned bar reserves space. Autohide overlays content — no exclusiveZone flicker.
     readonly property bool reserveSpace: root.pinned && !root.fullscreenActive
 
@@ -232,7 +232,8 @@ PanelWindow {
 
     Timer {
         id: showTimer
-        interval: 100
+        // Hold at the top edge briefly — avoids accidental peeks while moving the cursor.
+        interval: 450
         onTriggered: root.revealed = true
     }
 

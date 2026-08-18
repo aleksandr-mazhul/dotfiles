@@ -28,9 +28,9 @@ hl.env("GTK_ICON_THEME", "Papirus-Dark")
 hl.env("HYPRCURSOR_SIZE", "24")
 hl.env("GTK_THEME", "Graphite-Dark")
 hl.env("QT_QPA_PLATFORMTHEME", "gtk3")
-hl.env("HYPRSHOT_DIR", os.getenv("HOME") .. "/Pictures/Screenshots")
-hl.env("XDG_SCREENSHOTS_DIR", os.getenv("HOME") .. "/Pictures/Screenshots")
-hl.env("XDG_PICTURES_DIR", os.getenv("HOME") .. "/Pictures")
+hl.env("HYPRSHOT_DIR", os.getenv("HOME") .. "/pictures/screenshots")
+hl.env("XDG_SCREENSHOTS_DIR", os.getenv("HOME") .. "/pictures/screenshots")
+hl.env("XDG_PICTURES_DIR", os.getenv("HOME") .. "/pictures")
 
 hl.config({
     general = {
@@ -224,7 +224,7 @@ hl.on("hyprland.start", function()
     hl.exec_cmd("hypridle")
     hl.exec_cmd("wl-paste --type text --watch cliphist store")
     hl.exec_cmd("wl-paste --type image --watch cliphist store")
-    -- OCR models are heavy; script defers ~25s so login stays snappy.
+    -- RapidOCR models; script defers ~25s so login stays snappy.
     hl.exec_cmd("~/.config/hypr/scripts/ocr-daemon-start.sh")
     hl.exec_cmd("xrdb -merge ~/.Xresources")
     hl.exec_cmd("~/.config/hypr/scripts/session-autostart.sh")
@@ -239,6 +239,8 @@ hl.on("hyprland.start", function()
     hl.exec_cmd("hyprctl dispatch renameworkspace 1 W & hyprctl dispatch renameworkspace 2 C & hyprctl dispatch renameworkspace 3 V & hyprctl dispatch renameworkspace 4 D & hyprctl dispatch renameworkspace 5 G & hyprctl dispatch renameworkspace 6 X & hyprctl dispatch renameworkspace 7 Z & hyprctl dispatch renameworkspace 8 E & hyprctl dispatch renameworkspace 9 T & hyprctl dispatch renameworkspace 10 I & hyprctl dispatch renameworkspace 11 P & hyprctl dispatch renameworkspace 12 Q & hyprctl dispatch renameworkspace 13 U & hyprctl dispatch renameworkspace 14 Y & hyprctl dispatch renameworkspace 15 R & hyprctl dispatch renameworkspace 16 A")
     -- Restore last workspace and keep saving focus changes across reboots.
     hl.exec_cmd("~/.config/hypr/scripts/workspace-persist.sh watch")
+    -- Clipboard index last: thumbs + JSON after apps, so Super+Q opens with history ready.
+    hl.exec_cmd("~/.config/hypr/scripts/clipboard-warmup.sh")
 end)
 
 require("colors-matugen")

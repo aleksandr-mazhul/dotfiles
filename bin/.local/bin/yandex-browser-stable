@@ -6,8 +6,32 @@ export HYPRCURSOR_SIZE="${HYPRCURSOR_SIZE:-24}"
 # Prefer Wayland: compositor draws macOS hyprcursor instead of X11 client cursors.
 # --disable-background-mode: stop ghost Yandex process after close (it otherwise
 # pops huge tiled "Яндекс.Погода" / forecast toasts on Wayland).
-exec /usr/bin/yandex-browser-stable \
-  --ozone-platform=wayland \
-  --enable-features=UseOzonePlatform,WaylandWindowDecorations \
-  --disable-background-mode \
-  "$@"
+# --disable-features=WaylandFractionalScaleV1: video-translate ⋮ / language
+# menus are xdg_popups (not windows). With DP-3 @ 1.25 they often land off the
+# visible output (layout hole at 0x0 where unplugged DP-2 sits).
+# --enable-blink-features=MiddleClickAutoscroll: Windows-style autoscroll
+# (middle-click empty page, move cursor, page scrolls). Blink disables this
+# on Linux because X11 used middle-click to paste.
+
+CACHE="${XDG_CACHE_HOME:-$HOME/.cache}"
+DEBUG_MARK="$CACHE/yandex-wayland.debug"
+DEBUG_LOG="$CACHE/yandex-wayland-debug.log"
+
+args=(
+    --ozone-platform=wayland
+    --enable-features=UseOzonePlatform,WaylandWindowDecorations
+    --enable-blink-features=MiddleClickAutoscroll
+    --disable-features=WaylandFractionalScaleV1
+    --disable-background-mode
+)
+
+if [[ -f "$DEBUG_MARK" ]]; then
+    # Protocol-level debug for video-translate ⋮ : does the client even create
+    # an xdg_popup / subsurface, or does the click do nothing?
+    : > "$DEBUG_LOG"
+    export WAYLAND_DEBUG=1
+    exec /usr/bin/yandex-browser-stable "${args[@]}" "$@" \
+        2> >(stdbuf -oL grep -E 'xdg_popup|xdg_positioner|xdg_wm_base|wl_subsurface|get_popup|grab\(' >> "$DEBUG_LOG")
+fi
+
+exec /usr/bin/yandex-browser-stable "${args[@]}" "$@"

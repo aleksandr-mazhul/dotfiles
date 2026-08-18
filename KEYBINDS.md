@@ -18,6 +18,8 @@ VPN has no hotkey — use launcher (`vpn`) or QuickSettings.
 | Super+B | Toggle bar pinned ↔ autohide (hover peek) |
 | Super+Shift+B | Same as Super+B |
 | Super+Q | Clipboard history |
+| Super+L | Clipboard: focus preview (when open) |
+| Super+H | Clipboard: focus list (when open) |
 | Super+W | Wallpaper picker |
 | Super+Shift+W | Random wallpaper |
 | Super+Alt+W | Waypaper |
@@ -82,8 +84,9 @@ VPN has no hotkey — use launcher (`vpn`) or QuickSettings.
 
 | Keys | Action |
 | --- | --- |
-| Super+Shift+Ctrl+4 | Screenshot region |
-| Super+T | OCR region |
+| Super+Shift+Ctrl+3 | Screenshot focused monitor | What you see, including GloView; white flash |
+| Super+Shift+Ctrl+4 | Screenshot region | |
+| Super+T | OCR region | |
 | Super+Shift+R | OBS record toggle |
 | Super+Alt+R | Open OBS |
 | Super+D | Gromit draw toggle |

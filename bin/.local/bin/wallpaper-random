@@ -3,7 +3,7 @@ export PATH="$HOME/.local/bin:/usr/bin:$PATH"
 export WAYLAND_DISPLAY="${WAYLAND_DISPLAY:-wayland-1}"
 export XDG_RUNTIME_DIR="${XDG_RUNTIME_DIR:-/run/user/$(id -u)}"
 killall -q hyprpaper 2>/dev/null || true
-WALL_DIR="${WALLPAPER_DIR:-$HOME/Pictures/Wallpapers}"
+WALL_DIR="${WALLPAPER_DIR:-$HOME/pictures/wallpapers}"
 BATCH="${XDG_CACHE_HOME:-$HOME/.cache}/qs-wallpaper-batch"
 
 mapfile -t files < <(

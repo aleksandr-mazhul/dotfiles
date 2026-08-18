@@ -28,6 +28,9 @@
 (defcfg
   process-unmapped-keys yes
   concurrent-tap-hold yes
+  ;; HRM anti-roll: same finger sequence as Mac config (A S D F / J K L ;),
+  ;; not remapped onto Linux Super-Alt-Ctrl-Shift key names.
+  tap-hold-require-prior-idle 120
   ;; Exact kbd nodes only — name filters still match duplicate HID interfaces
   ;; (Ergohaven "… Keyboard", multiple Dragonfly nodes) and break Alt+arrows in Qt.
   linux-dev (
@@ -39,7 +42,7 @@
 
 (defvar
   tap-time  200
-  hold-time 200
+  hold-time 220
 )
 
 (defsrc
@@ -63,7 +66,7 @@
   plctl (multi lctl (layer-while-held mctl))
   prctl (multi rctl (layer-while-held mctl))
 
-  caps (tap-hold $tap-time $hold-time esc @plctl)
+  caps (tap-hold $tap-time $hold-time esc @plctl (require-prior-idle 0))
 
   ;; home row mods: Super Alt Ctrl Shift (Linux)
   met  (tap-hold-release $tap-time $hold-time a lmet)

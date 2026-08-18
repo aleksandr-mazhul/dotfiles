@@ -12,7 +12,7 @@ cd ~/dotfiles
 Optional wallpaper override:
 
 ```bash
-BOOTSTRAP_WALLPAPER=~/Pictures/Wallpapers/nature/foo.jpg ./bootstrap.sh
+BOOTSTRAP_WALLPAPER=~/pictures/wallpapers/nature/foo.jpg ./bootstrap.sh
 ```
 
 ## What is in git (restorable)

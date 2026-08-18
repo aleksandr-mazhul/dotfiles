@@ -33,9 +33,6 @@ local function is_tabbed_app(class)
         ["sublime_text"] = true,
         nautilus = true,
         ["org.gnome.nautilus"] = true,
-        dolphin = true,
-        thunar = true,
-        ["org.kde.dolphin"] = true,
         ["org.gnome.gedit"] = true,
     }
     if exact[class] then
@@ -320,8 +317,9 @@ hl.bind("CTRL + I", function()
     nautilus_or_pass("info")
 end)
 
--- Nautilus: Ctrl+Shift+. toggles hidden files (native shortcut is Ctrl+H)
-hl.bind("CTRL + SHIFT + PERIOD", function()
+-- Nautilus: Ctrl+Shift+. toggles hidden files (native shortcut is Ctrl+H).
+-- Shift+. often arrives as `greater` (`>`), so bind both keysyms.
+local function nautilus_toggle_hidden()
     local focused = hl.get_active_window()
     if is_nautilus(focused) then
         hl.dispatch(hl.dsp.exec_cmd("~/.config/hypr/scripts/nautilus-toggle-hidden.sh"))
@@ -330,7 +328,11 @@ hl.bind("CTRL + SHIFT + PERIOD", function()
     if focused then
         hl.dispatch(hl.dsp.pass({ window = focused }))
     end
-end)
+end
+
+hl.bind("CTRL + SHIFT + PERIOD", nautilus_toggle_hidden)
+hl.bind("CTRL + SHIFT + greater", nautilus_toggle_hidden)
+hl.bind("CTRL + greater", nautilus_toggle_hidden)
 
 -- Nautilus icon zoom: Ctrl+= / Ctrl+-
 local function nautilus_zoom(dir)
@@ -452,14 +454,46 @@ hl.bind(secondMod .. " + Q", hl.dsp.exec_cmd("qs -c rice ipc call clipboard togg
 hl.bind(mainMod .. " + O", hl.dsp.exec_cmd(p.menu))
 -- Alt+J is movefocus down only (legacy togglesplit conflicted with the same key)
 
+-- Super+H/L never reach the layer (compositor owns Super). When clipboard is
+-- open, retarget the pane; otherwise pass through (kitty → nvim tree/code).
+local function rice_layer_open(ns)
+    local layers = hl.get_layers()
+    if not layers then
+        return false
+    end
+    for _, layer in ipairs(layers) do
+        if layer.mapped and layer.namespace == ns then
+            return true
+        end
+    end
+    return false
+end
+
+local function clipboard_pane_or_pass(action)
+    return function()
+        if rice_layer_open("rice-clipboard") then
+            hl.dispatch(hl.dsp.exec_cmd("qs -c rice ipc call clipboard " .. action))
+            return
+        end
+        local focused = hl.get_active_window()
+        if focused then
+            hl.dispatch(hl.dsp.pass({ window = focused }))
+        end
+    end
+end
+
+hl.bind(secondMod .. " + L", clipboard_pane_or_pass("focusPreview"))
+hl.bind(secondMod .. " + H", clipboard_pane_or_pass("focusList"))
+
 hl.bind(secondMod .. " + SHIFT + L", hl.dsp.exec_cmd("~/.config/hypr/scripts/hyprlock-with-repair.sh"))
 hl.bind(secondMod .. " + W", hl.dsp.exec_cmd("qs -c rice ipc call wallpaper toggle"))
--- Overlay type filter: was Super+P, now Ctrl+P (shown in panel footers)
+-- Overlay type filter (shown in panel footers)
 hl.bind("CTRL + P", hl.dsp.exec_cmd("qs -c rice ipc call overlay filter"))
 hl.bind(secondMod .. " + SHIFT + W", hl.dsp.exec_cmd("~/.local/bin/wallpaper-random"))
 hl.bind(secondMod .. " + ALT + W", hl.dsp.exec_cmd("~/.local/bin/waypaper"))
 -- Super+V free for apps (nvim visual-block; Mac Ctrl+V → Super). VPN: launcher / QuickSettings.
 
+hl.bind(secondMod .. " + SHIFT + CTRL + 3", hl.dsp.exec_cmd("~/.config/hypr/scripts/screenshot-output.sh"))
 hl.bind(secondMod .. " + SHIFT + CTRL + 4", hl.dsp.exec_cmd("~/.config/hypr/scripts/screenshot-region.sh"))
 hl.bind(secondMod .. " + T", hl.dsp.exec_cmd("~/.config/hypr/scripts/ocr-region.sh"))
 

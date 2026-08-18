@@ -24,6 +24,17 @@ sync_tracked() {
   if [[ -f "$src" ]]; then
     cp -f "$src" "$dst"
   fi
+  # Autoscroll origin glyphs + CSS (tracked; profile chrome is not in git).
+  mkdir -p "$profile/chrome"
+  local chrome_src=""
+  if [[ -d "$zen_cfg/chrome" ]]; then
+    chrome_src="$zen_cfg/chrome"
+  elif [[ -d "$HOME/dotfiles/zen/.config/zen/chrome" ]]; then
+    chrome_src="$HOME/dotfiles/zen/.config/zen/chrome"
+  fi
+  if [[ -n "$chrome_src" ]]; then
+    cp -f "$chrome_src"/autoscroll.css "$chrome_src"/autoscroll*.svg "$profile/chrome/" 2>/dev/null || true
+  fi
 }
 
 sync_vimium() {

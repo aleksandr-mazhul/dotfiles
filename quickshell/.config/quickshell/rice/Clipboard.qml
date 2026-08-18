@@ -20,19 +20,17 @@ PanelWindow {
     property bool filterMenuOpen: false
     property int filterHighlight: 0
     property bool pendingOpenFilter: false
-    // list = history; preview = vim text pane
+    property bool keyboardNav: false
+    property point navPointer: Qt.point(-1, -1)
+    // list = history; preview = text pane (Super+L / Super+H)
     property string focusPane: "list"
     property string previewFullText: ""
     property bool previewLoading: false
     property string previewDecodeId: ""
     property string previewOriginal: ""
-    readonly property bool previewDirty: previewEdit ? (previewEdit.text !== previewOriginal) : false
     readonly property string decodeHelper: Quickshell.env("HOME") + "/.config/hypr/scripts/clipboard-decode-text.sh"
-    readonly property string storeHelper: Quickshell.env("HOME") + "/.config/hypr/scripts/clipboard-store-text.sh"
-    // Proxied from shared VimEngine (rice/vim) for UI + host checks
-    readonly property string vimMode: vimEngine.mode
-    readonly property string vimModeLabel: vimEngine.modeLabel
-    readonly property bool visualLinewise: vimEngine.visualLinewise
+    readonly property string indexHelper: Quickshell.env("HOME") + "/.config/hypr/scripts/clipboard-index.sh"
+    property bool liveIndexReady: false
 
     readonly property var filterOptions: [
         { value: "all", label: "All Types" },
@@ -62,7 +60,10 @@ PanelWindow {
         bottom: true
     }
 
-    Component.onCompleted: OverlayHub.register(root)
+    Component.onCompleted: {
+        OverlayHub.register(root)
+        cacheProc.running = true
+    }
 
     function toggle() {
         if (open)
@@ -81,7 +82,10 @@ PanelWindow {
         selectedIndex = 0
         focusPane = "list"
         previewFullText = ""
-        vimEngine.reset()
+        keyboardNav = false
+        navPointer = Qt.point(-1, -1)
+        if (items && items.length)
+            applyFilter()
         refreshList()
         openAnim.play()
         Qt.callLater(() => {
@@ -104,6 +108,8 @@ PanelWindow {
         markedLines = []
         focusPane = "list"
         previewFullText = ""
+        keyboardNav = false
+        navPointer = Qt.point(-1, -1)
     }
 
     function showFilter() {
@@ -152,9 +158,20 @@ PanelWindow {
             openFilterMenu()
     }
 
+    function beginKeyboardNav() {
+        keyboardNav = true
+        navPointer = Qt.point(-1, -1)
+    }
+
     function moveFilterHighlight(delta) {
         const n = filterOptions.length
-        filterHighlight = (filterHighlight + delta + n) % n
+        if (n <= 0)
+            return
+        const next = filterHighlight + delta
+        if (next < 0 || next >= n)
+            return
+        beginKeyboardNav()
+        filterHighlight = next
     }
 
     function applyFilterHighlight() {
@@ -168,7 +185,7 @@ PanelWindow {
         indexProc.running = true
     }
 
-    function applyFilter() {
+    function applyFilter(preferId) {
         const q = searchField.text.trim().toLowerCase()
         let base = items.slice()
 
@@ -189,6 +206,15 @@ PanelWindow {
 
         filtered = base
         rebuildListModel()
+        if (preferId) {
+            for (let i = 0; i < listModel.length; i++) {
+                const row = listModel[i]
+                if (row && row.kind === "item" && row.item && String(row.item.id) === String(preferId)) {
+                    selectedIndex = i
+                    return
+                }
+            }
+        }
         selectNewest()
     }
 
@@ -250,18 +276,28 @@ PanelWindow {
     function nextItemIndex(from, delta) {
         if (!listModel || listModel.length === 0)
             return 0
+        const step = delta > 0 ? 1 : -1
+        const hops = Math.max(1, Math.abs(delta))
         let i = from
-        for (let n = 0; n < listModel.length; n++) {
-            i = (i + delta + listModel.length) % listModel.length
-            if (listModel[i].kind === "item")
+        for (let h = 0; h < hops; h++) {
+            let found = -1
+            for (let n = i + step; n >= 0 && n < listModel.length; n += step) {
+                if (listModel[n] && listModel[n].kind === "item") {
+                    found = n
+                    break
+                }
+            }
+            if (found < 0)
                 return i
+            i = found
         }
-        return from
+        return i
     }
 
     function moveSelection(delta) {
         if (!listModel || listModel.length === 0)
             return
+        beginKeyboardNav()
         selectedIndex = nextItemIndex(selectedIndex, delta)
         listView.positionViewAtIndex(selectedIndex, ListView.Contain)
         if (focusPane === "preview")
@@ -269,10 +305,7 @@ PanelWindow {
     }
 
     function focusListPane() {
-        if (focusPane === "preview" && vimMode === "insert" && previewDirty)
-            commitPreviewEdit()
         focusPane = "list"
-        vimEngine.enterCopy(true)
         searchField.forceActiveFocus()
     }
 
@@ -280,7 +313,6 @@ PanelWindow {
         if (!selectedItem || selectedItem.isImage)
             return
         focusPane = "preview"
-        vimEngine.enterCopy(false)
         loadPreviewBody()
         Qt.callLater(() => root.placePreviewCursorAtStart())
     }
@@ -288,46 +320,108 @@ PanelWindow {
     function placePreviewCursorAtStart() {
         if (!previewEdit)
             return
-        vimEngine.attach(previewEdit, previewFlick)
         previewEdit.forceActiveFocus()
-        previewEdit.cursorVisible = vimEngine.isInsert
+        previewEdit.cursorVisible = true
+        previewEdit.deselect()
+        previewEdit.cursorPosition = 0
         if (previewFlick)
             previewFlick.contentY = 0
-        vimEngine.enterCopy(false)
-        vimEngine.setCursor(0)
     }
 
-    function shQuote(s) {
-        return "'" + String(s).replace(/'/g, "'\"'\"'") + "'"
-    }
-
-    function storeNewClip(text) {
-        if (!text || !String(text).length)
+    function ensurePreviewCursorVisible() {
+        if (!previewEdit || !previewFlick)
             return
-        const q = shQuote(text)
-        Quickshell.execDetached([
-            "bash", "-lc",
-            "printf %s " + q + " | wl-copy; printf %s " + q + " | cliphist store"
-        ])
-        clipRefreshTimer.restart()
+        const r = previewEdit.cursorRectangle
+        const pad = 6
+        const top = r.y - pad
+        const bot = r.y + r.height + pad
+        const viewTop = previewFlick.contentY
+        const viewBot = viewTop + previewFlick.height
+        if (top < viewTop)
+            previewFlick.contentY = Math.max(0, top)
+        else if (bot > viewBot)
+            previewFlick.contentY = Math.max(0, bot - previewFlick.height)
     }
 
-    function commitPreviewEdit() {
+    function previewGo(pos, shift) {
         if (!previewEdit)
             return
-        const body = previewEdit.text
-        if (body === previewOriginal)
-            return
-        storeNewClip(body)
-        previewOriginal = body
-        previewFullText = body
+        const len = (previewEdit.text || "").length
+        pos = Math.max(0, Math.min(len, pos))
+        if (shift)
+            previewEdit.moveCursorSelection(pos)
+        else
+            previewEdit.cursorPosition = pos
+        previewEdit.cursorVisible = true
+        root.ensurePreviewCursorVisible()
     }
 
-    function yankPreviewText(text) {
-        if (!text)
-            return
-        storeNewClip(text)
-        vimEngine.enterCopy(true)
+    function previewWordPos(pos, dir) {
+        const text = previewEdit ? (previewEdit.text || "") : ""
+        const len = text.length
+        if (dir > 0) {
+            while (pos < len && /\s/.test(text.charAt(pos)))
+                pos++
+            while (pos < len && !/\s/.test(text.charAt(pos)))
+                pos++
+        } else {
+            while (pos > 0 && /\s/.test(text.charAt(pos - 1)))
+                pos--
+            while (pos > 0 && !/\s/.test(text.charAt(pos - 1)))
+                pos--
+        }
+        return pos
+    }
+
+    function previewLinePos(dir) {
+        const r = previewEdit.cursorRectangle
+        const y = r.y + r.height / 2 + dir * Math.max(r.height, 1)
+        return previewEdit.positionAt(r.x, y)
+    }
+
+    function handlePreviewNav(event) {
+        if (!previewEdit)
+            return false
+        const ctrl = !!(event.modifiers & Qt.ControlModifier)
+        const shift = !!(event.modifiers & Qt.ShiftModifier)
+        const pos = previewEdit.cursorPosition
+        const text = previewEdit.text || ""
+
+        if (event.key === Qt.Key_Left) {
+            root.previewGo(ctrl ? root.previewWordPos(pos, -1) : pos - 1, shift)
+            return true
+        }
+        if (event.key === Qt.Key_Right) {
+            root.previewGo(ctrl ? root.previewWordPos(pos, 1) : pos + 1, shift)
+            return true
+        }
+        if (event.key === Qt.Key_Up) {
+            root.previewGo(root.previewLinePos(-1), shift)
+            return true
+        }
+        if (event.key === Qt.Key_Down) {
+            root.previewGo(root.previewLinePos(1), shift)
+            return true
+        }
+        if (event.key === Qt.Key_Home) {
+            if (ctrl) {
+                root.previewGo(0, shift)
+            } else {
+                const nl = text.lastIndexOf("\n", Math.max(0, pos - 1))
+                root.previewGo(nl + 1, shift)
+            }
+            return true
+        }
+        if (event.key === Qt.Key_End) {
+            if (ctrl) {
+                root.previewGo(text.length, shift)
+            } else {
+                const nl = text.indexOf("\n", pos)
+                root.previewGo(nl < 0 ? text.length : nl, shift)
+            }
+            return true
+        }
+        return false
     }
 
     function loadPreviewBody() {
@@ -363,8 +457,6 @@ PanelWindow {
     }
 
     onSelectedItemChanged: {
-        if (focusPane === "preview" && vimMode === "insert" && previewDirty)
-            commitPreviewEdit()
         loadPreviewBody()
         if (focusPane === "preview" && (!selectedItem || selectedItem.isImage))
             focusListPane()
@@ -372,42 +464,37 @@ PanelWindow {
             Qt.callLater(() => root.placePreviewCursorAtStart())
     }
 
-    function handleVimKey(event) {
-        if (!previewEdit)
-            return false
-        const meta = !!(event.modifiers & Qt.MetaModifier)
-        // Super+H → list (physical H via VimKeys)
-        if (meta && VimKeys.resolve(event) === "h") {
-            focusListPane()
-            return true
-        }
-        if (!vimEngine.editor)
-            vimEngine.attach(previewEdit, previewFlick)
-        try {
-            return vimEngine.handleKey(event)
-        } catch (e) {
-            console.log("VimEngine.handleKey error:", e)
-            return true
-        }
-    }
-
     function handleKey(event) {
         if (!root.open)
             return false
 
         const meta = !!(event.modifiers & Qt.MetaModifier)
-        const cmd = VimKeys.resolveShifted(event)
+        const cmd = VimKeys.resolve(event)
+
+        // Super+H / Super+L — physical keys (works on RU layout)
+        if (meta && cmd === "l") {
+            if (root.filterMenuOpen)
+                root.closeFilterMenu()
+            root.focusPreviewPane()
+            return true
+        }
+        if (meta && cmd === "h") {
+            if (root.filterMenuOpen)
+                root.closeFilterMenu()
+            root.focusListPane()
+            return true
+        }
 
         if (root.filterMenuOpen) {
             if (event.key === Qt.Key_Escape || cmd === "escape") {
                 root.closeFilterMenu()
                 return true
             }
-            if (event.key === Qt.Key_Down || cmd === "j" || cmd === "down") {
+            if (event.key === Qt.Key_Down || cmd === "down") {
                 root.moveFilterHighlight(1)
                 return true
             }
-            if (event.key === Qt.Key_Up || cmd === "k" || cmd === "up") {
+            if (event.key === Qt.Key_Up || cmd === "up") {
                 root.moveFilterHighlight(-1)
                 return true
             }
@@ -418,36 +505,39 @@ PanelWindow {
             return true
         }
 
-        // Super+H / Super+L — physical keys (works on RU layout)
-        if (meta && cmd === "l") {
-            root.focusPreviewPane()
-            return true
-        }
-        if (meta && cmd === "h") {
-            root.focusListPane()
-            return true
-        }
-
-        if (root.focusPane === "preview")
-            return root.handleVimKey(event)
-
         if (event.key === Qt.Key_Escape || cmd === "escape") {
             root.close()
             return true
         }
-        // j/k — history list (EN + RU). Don't steal letters while filtering text.
-        const listNav = searchField.text.length === 0
-        if (event.key === Qt.Key_Down || cmd === "down" || (listNav && cmd === "j")) {
-            root.moveSelection(1)
+
+        if ((event.modifiers & Qt.ControlModifier) && cmd === "c") {
+            root.copyCurrent()
             return true
         }
-        if (event.key === Qt.Key_Up || cmd === "up" || (listNav && cmd === "k")) {
-            root.moveSelection(-1)
+        if (root.focusPane === "preview" && (event.modifiers & Qt.ControlModifier) && cmd === "a") {
+            if (previewEdit)
+                previewEdit.selectAll()
             return true
         }
+
         if ((event.key === Qt.Key_Return || event.key === Qt.Key_Enter)
                 && (event.modifiers & Qt.ShiftModifier)) {
             root.toggleMarkAt(root.selectedIndex)
+            return true
+        }
+
+        if (root.focusPane === "preview") {
+            if (root.handlePreviewNav(event))
+                return true
+            return false
+        }
+
+        if (event.key === Qt.Key_Down || cmd === "down") {
+            root.moveSelection(1)
+            return true
+        }
+        if (event.key === Qt.Key_Up || cmd === "up") {
+            root.moveSelection(-1)
             return true
         }
         if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter || cmd === "enter") {
@@ -455,21 +545,6 @@ PanelWindow {
             return true
         }
         return false
-    }
-
-    VimEngine {
-        id: vimEngine
-        onYankRequested: text => root.yankPreviewText(text)
-        onCommitRequested: {
-            if (root.previewDirty)
-                root.commitPreviewEdit()
-        }
-        onLeaveRequested: root.focusListPane()
-        onModeChanged: {
-            if (previewEdit)
-                previewEdit.cursorVisible = vimEngine.isInsert
-            vimEngine.syncBlockCursor()
-        }
     }
 
     function isMarked(item) {
@@ -485,7 +560,7 @@ PanelWindow {
         if (!row || row.kind !== "item")
             return
         const item = row.item
-        if (!item || !item.isImage || !item.line)
+        if (!item || !item.line)
             return
         const line = item.line
         const idx = markedLines.indexOf(line)
@@ -497,6 +572,40 @@ PanelWindow {
             next = markedLines.concat([line])
         }
         markedLines = next
+    }
+
+    function shQuote(s) {
+        return "'" + String(s).replace(/'/g, "'\"'\"'") + "'"
+    }
+
+    function copyPreviewSelection() {
+        if (!previewEdit)
+            return false
+        const t = previewEdit.selectedText
+        if (!t || !String(t).length)
+            return false
+        const q = shQuote(t)
+        Quickshell.execDetached(["bash", "-lc", "printf %s " + q + " | wl-copy"])
+        return true
+    }
+
+    function copyItem(item) {
+        if (!item || !item.line)
+            return
+        Quickshell.execDetached([
+            "bash",
+            Quickshell.env("HOME") + "/.config/hypr/scripts/clipboard-copy-from-line.sh",
+            item.line
+        ])
+    }
+
+    function copyCurrent() {
+        if (root.focusPane === "preview" && root.copyPreviewSelection()) {
+            root.close()
+            return
+        }
+        root.copyItem(root.selectedItem)
+        root.close()
     }
 
     function activateSelected() {
@@ -561,13 +670,6 @@ PanelWindow {
         return path ? ("file://" + path) : ""
     }
 
-    Timer {
-        id: clipRefreshTimer
-        interval: 250
-        repeat: false
-        onTriggered: root.refreshList()
-    }
-
     Process {
         id: captureFocus
         command: ["bash", "-c", "hyprctl activewindow -j | python3 -c 'import json,sys; d=json.load(sys.stdin); print(d.get(\"address\",\"\"))'"]
@@ -577,17 +679,40 @@ PanelWindow {
     }
 
     Process {
+        id: cacheProc
+        command: ["bash", root.indexHelper, "--cached"]
+        stdout: StdioCollector {
+            onStreamFinished: {
+                if (root.liveIndexReady || !text || !text.trim())
+                    return
+                try {
+                    const data = JSON.parse(text)
+                    root.items = data.items || []
+                    if (root.open)
+                        root.applyFilter(root.selectedItem ? root.selectedItem.id : null)
+                    else
+                        root.applyFilter()
+                } catch (e) {
+                }
+            }
+        }
+    }
+
+    Process {
         id: indexProc
-        command: ["bash", Quickshell.env("HOME") + "/.config/hypr/scripts/clipboard-index.sh"]
+        command: ["bash", root.indexHelper]
         stdout: StdioCollector {
             onStreamFinished: {
                 try {
                     const data = JSON.parse(text)
+                    const preferId = (root.open && root.selectedItem) ? root.selectedItem.id : null
                     root.items = data.items || []
+                    root.liveIndexReady = true
+                    root.applyFilter(preferId)
                 } catch (e) {
-                    root.items = []
+                    if (!root.items || root.items.length === 0)
+                        root.items = []
                 }
-                root.applyFilter()
             }
         }
     }
@@ -607,24 +732,34 @@ PanelWindow {
                 const body = text
                 if (body.length > 0) {
                     root.previewFullText = body
-                    // Don't clobber in-progress insert edits.
-                    if (root.vimMode !== "insert") {
-                        root.previewOriginal = body
-                        if (previewEdit)
-                            previewEdit.text = body
+                    root.previewOriginal = body
+                    if (previewEdit) {
+                        const keepPos = previewEdit.activeFocus ? previewEdit.cursorPosition : 0
+                        const keepStart = previewEdit.selectionStart
+                        const keepEnd = previewEdit.selectionEnd
+                        previewEdit.text = body
+                        if (previewEdit.activeFocus) {
+                            previewEdit.cursorPosition = Math.min(keepPos, previewEdit.text.length)
+                            if (keepStart !== keepEnd)
+                                previewEdit.select(Math.min(keepStart, body.length), Math.min(keepEnd, body.length))
+                            previewEdit.forceActiveFocus()
+                            previewEdit.cursorVisible = true
+                        }
                     }
                 }
                 root.previewLoading = false
-                if (previewFlick)
+                if (root.focusPane === "preview" && previewEdit && previewEdit.cursorPosition === 0
+                        && previewEdit.selectionStart === previewEdit.selectionEnd
+                        && previewFlick)
                     previewFlick.contentY = 0
-                if (root.focusPane === "preview" && root.vimMode === "copy")
-                    Qt.callLater(() => root.placePreviewCursorAtStart())
             }
         }
         onExited: {
             root.previewLoading = false
-            if (root.focusPane === "preview" && root.vimMode === "copy")
-                Qt.callLater(() => root.placePreviewCursorAtStart())
+            if (root.focusPane === "preview" && previewEdit) {
+                previewEdit.forceActiveFocus()
+                previewEdit.cursorVisible = true
+            }
         }
     }
 
@@ -653,6 +788,21 @@ PanelWindow {
         transformOrigin: Item.Center
         opacity: 1
         scale: 1
+
+        HoverHandler {
+            enabled: root.keyboardNav
+            acceptedDevices: PointerDevice.Mouse | PointerDevice.TouchPad
+            cursorShape: Qt.BlankCursor
+            onPointChanged: {
+                const p = point.position
+                if (root.navPointer.x < 0) {
+                    root.navPointer = Qt.point(p.x, p.y)
+                    return
+                }
+                if (Math.abs(p.x - root.navPointer.x) > 3 || Math.abs(p.y - root.navPointer.y) > 3)
+                    root.keyboardNav = false
+            }
+        }
 
         RiceOpenAnim {
             id: openAnim
@@ -797,6 +947,7 @@ PanelWindow {
                         currentIndex: root.selectedIndex
                         // Don't auto-scroll to current item — that hides the Today header above it.
                         highlightFollowsCurrentItem: false
+                        keyNavigationWraps: false
                         boundsBehavior: Flickable.StopAtBounds
 
                         delegate: Item {
@@ -829,7 +980,7 @@ PanelWindow {
                                 color: {
                                     if (index === root.selectedIndex)
                                         return Theme.rowSelected
-                                    if (rowMouse.containsMouse)
+                                    if (rowMouse.containsMouse && !root.keyboardNav)
                                         return Theme.rowHover
                                     return "transparent"
                                 }
@@ -905,7 +1056,12 @@ PanelWindow {
                                     anchors.fill: parent
                                     hoverEnabled: true
                                     acceptedButtons: Qt.LeftButton | Qt.RightButton
-                                    onEntered: root.selectedIndex = index
+                                    cursorShape: root.keyboardNav ? Qt.BlankCursor : Qt.ArrowCursor
+                                    onEntered: {
+                                        if (root.keyboardNav)
+                                            return
+                                        root.selectedIndex = index
+                                    }
                                     onClicked: mouse => {
                                         root.selectedIndex = index
                                         root.focusListPane()
@@ -923,7 +1079,9 @@ PanelWindow {
                         Text {
                             anchors.centerIn: parent
                             visible: !root.filtered || root.filtered.length === 0
-                            text: "Nothing found"
+                            text: (indexProc.running || cacheProc.running) && (!root.items || root.items.length === 0)
+                                  ? "Loading…"
+                                  : "Nothing found"
                             color: Theme.textMuted
                             font.family: Theme.fontFamily
                             font.pixelSize: Theme.fontSize
@@ -1040,6 +1198,8 @@ PanelWindow {
                                 boundsBehavior: Flickable.StopAtBounds
                                 interactive: true
                                 flickableDirection: Flickable.VerticalFlick
+                                // TextEdit owns arrows / shift-select; don't scroll the pane instead.
+                                Keys.enabled: false
 
                                 TextEdit {
                                     id: previewEdit
@@ -1048,20 +1208,21 @@ PanelWindow {
                                     font.family: Theme.fontFamily
                                     font.pixelSize: Theme.fontSize
                                     wrapMode: TextEdit.Wrap
-                                    readOnly: !vimEngine.isInsert
-                                    selectByMouse: vimEngine.isInsert || vimEngine.isVisual
+                                    readOnly: true
+                                    selectByMouse: true
+                                    selectByKeyboard: true
                                     persistentSelection: true
                                     activeFocusOnPress: true
-                                    cursorVisible: activeFocus && vimEngine.isInsert
+                                    cursorVisible: activeFocus
                                     selectionColor: Theme.primary
                                     selectedTextColor: Theme.textOnAccent
 
                                     cursorDelegate: Rectangle {
                                         width: 2
                                         color: Theme.primary
-                                        visible: previewEdit.activeFocus && vimEngine.isInsert
+                                        visible: previewEdit.activeFocus
                                         SequentialAnimation on opacity {
-                                            running: previewEdit.activeFocus && vimEngine.isInsert
+                                            running: previewEdit.activeFocus
                                             loops: Animation.Infinite
                                             NumberAnimation { from: 1; to: 0; duration: 530 }
                                             NumberAnimation { from: 0; to: 1; duration: 530 }
@@ -1071,39 +1232,16 @@ PanelWindow {
                                     onActiveFocusChanged: {
                                         if (activeFocus) {
                                             root.focusPane = "preview"
-                                            if (!vimEngine.editor)
-                                                vimEngine.attach(previewEdit, previewFlick)
-                                            vimEngine.syncBlockCursor()
+                                            cursorVisible = true
                                         }
                                     }
 
-                                    onCursorPositionChanged: {
-                                        if (vimEngine.isInsert)
-                                            vimEngine.syncBlockCursor()
-                                    }
-
-                                    onTextChanged: {
-                                        if (root.focusPane === "preview")
-                                            Qt.callLater(() => vimEngine.syncBlockCursor())
-                                    }
+                                    onCursorRectangleChanged: root.ensurePreviewCursorVisible()
 
                                     Keys.onPressed: event => {
-                                        if (root.handleVimKey(event))
+                                        if (root.handleKey(event))
                                             event.accepted = true
                                     }
-                                }
-
-                                // Vim block cursor overlay (copy / visual) — tracks visualHead independently of Qt selection end
-                                Rectangle {
-                                    id: vimBlockCursor
-                                    x: vimEngine.blockX
-                                    y: vimEngine.blockY
-                                    width: vimEngine.blockW
-                                    height: vimEngine.blockH
-                                    visible: vimEngine.blockVisible && !vimEngine.isInsert
-                                    color: Theme.primary
-                                    opacity: vimEngine.isVisual ? 0.95 : 0.88
-                                    z: 10
                                 }
                             }
 
@@ -1312,18 +1450,10 @@ PanelWindow {
                     Text {
                         text: {
                             if (root.filterMenuOpen)
-                                return "↑↓/jk filter  ·  ↵ choose  ·  esc close menu"
-                            if (root.focusPane === "preview") {
-                                const mode = "-- " + root.vimModeLabel + " --"
-                                if (root.vimMode === "insert")
-                                    return mode + "  ·  esc copy  ·  edits → new clip  ·  Super+H list"
-                                if (root.vimMode === "visual")
-                                    return mode + "  ·  hjkl move  ·  y yank  ·  /f search  ·  esc copy"
-                                if (root.vimMode === "search" || root.vimMode === "findchar")
-                                    return mode + "  ·  type…  ·  ↵ go  ·  esc cancel"
-                                return mode + "  ·  hjkl  ·  /? nN  ·  fFtT  ·  i insert  ·  v visual  ·  Super+H list"
-                            }
-                            return "jk list  ·  Super+L preview  ·  ⌃P filter  ·  ⇧↵ mark  ·  ↵ paste"
+                                return "↑↓ filter  ·  ↵ choose  ·  esc close menu"
+                            if (root.focusPane === "preview")
+                                return "⇧←→ select  ·  ⌃C copy  ·  Super+H list"
+                            return "↑↓ list  ·  Super+L preview  ·  ⇧↵ mark  ·  ⌃C copy  ·  ↵ paste"
                         }
                         color: Theme.textMuted
                         font.family: Theme.fontFamily

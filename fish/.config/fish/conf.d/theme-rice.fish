@@ -2,16 +2,16 @@
 # Rice wrappers: cava / peaclock / cbonsai / tty-clock / pipes / glow / gum
 
 set -gx GLAMOUR_STYLE "$HOME/.config/glow/ssot.json"
-set -gx GUM_CONFIRM_SELECTED_FOREGROUND "ffb688"
+set -gx GUM_CONFIRM_SELECTED_FOREGROUND "aabfde"
 set -gx GUM_CONFIRM_PROMPT_FOREGROUND "ebe1d4"
-set -gx GUM_FILTER_INDICATOR_FOREGROUND "ffb688"
-set -gx GUM_FILTER_MATCH_FOREGROUND "ffb688"
-set -gx GUM_FILTER_PROMPT_FOREGROUND "e5bfa9"
-set -gx GUM_INPUT_PROMPT_FOREGROUND "ffb688"
-set -gx GUM_INPUT_CURSOR_FOREGROUND "ffb688"
-set -gx GUM_CHOOSE_SELECTED_FOREGROUND "ffb688"
-set -gx GUM_CHOOSE_CURSOR_FOREGROUND "ffb688"
-set -gx GUM_SPIN_SPINNER_FOREGROUND "ffb688"
+set -gx GUM_FILTER_INDICATOR_FOREGROUND "aabfde"
+set -gx GUM_FILTER_MATCH_FOREGROUND "aabfde"
+set -gx GUM_FILTER_PROMPT_FOREGROUND "b9c7d7"
+set -gx GUM_INPUT_PROMPT_FOREGROUND "aabfde"
+set -gx GUM_INPUT_CURSOR_FOREGROUND "aabfde"
+set -gx GUM_CHOOSE_SELECTED_FOREGROUND "aabfde"
+set -gx GUM_CHOOSE_CURSOR_FOREGROUND "aabfde"
+set -gx GUM_SPIN_SPINNER_FOREGROUND "aabfde"
 
 function cava --wraps cava --description 'cava with SSOT theme'
     command cava $argv
@@ -25,7 +25,7 @@ function cbonsai --wraps cbonsai --description 'cbonsai with SSOT 256-colors'
     if contains -- -k $argv; or contains -- --color $argv
         command cbonsai $argv
     else
-        command cbonsai -k 96,187,223,187 $argv
+        command cbonsai -k 60,187,152,188 $argv
     end
 end
 
@@ -33,7 +33,7 @@ function tty-clock --wraps tty-clock --description 'tty-clock with SSOT ANSI col
     if contains -- -C $argv
         command tty-clock $argv
     else
-        command tty-clock -c -b -C 1 $argv
+        command tty-clock -c -b -C 4 $argv
     end
 end
 
@@ -41,7 +41,7 @@ function pipes.sh --wraps pipes.sh --description 'pipes.sh with SSOT ANSI colors
     if contains -- -c $argv
         command pipes.sh $argv
     else
-        command pipes.sh -t 1 -c 1 -c 3 -c 6 -c 4 $argv
+        command pipes.sh -t 1 -c 4 -c 3 -c 1 -c 6 $argv
     end
 end
 

@@ -2,7 +2,7 @@
 # Update Cursor AppImage in-place (in-app Update button cannot replace AppImages).
 set -euo pipefail
 
-APPDIR="${CURSOR_APPDIR:-$HOME/Applications}"
+APPDIR="${CURSOR_APPDIR:-$HOME/applications}"
 BIN_LINK="${CURSOR_BIN_LINK:-$HOME/.local/bin/cursor}"
 TRACK="${CURSOR_RELEASE_TRACK:-latest}"
 ARCH="$(uname -m)"

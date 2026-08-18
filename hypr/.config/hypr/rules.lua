@@ -93,7 +93,6 @@ local APP_HOME = {
         "8",
         { "org.gnome.Nautilus", "Nautilus", "nautilus" },
     },
-    { "thunar", "^(Thunar|thunar)$", "8", { "Thunar", "thunar" } },
     {
         "telegram",
         "^(org\\.telegram\\.desktop|TelegramDesktop)$",
@@ -136,16 +135,6 @@ for _, app in ipairs(APP_HOME) do
         BOUND_CLASS[c] = true
     end
 end
-
--- Nautilus draws its own CSD chrome; Hypr's border reads as a thick orange/black
--- frame (worse with fractional scale). Same for float menus/popovers.
-hl.window_rule({
-    name = "nautilus-no-border",
-    match = {
-        class = "^(org\\.gnome\\.Nautilus|Nautilus|nautilus)$",
-    },
-    border_size = 0,
-})
 
 -- Telegram RMB menus / media viewer already have their own chrome — Hypr's
 -- active border shows up as a weird thick outline on fractional scale.
@@ -283,6 +272,193 @@ hl.window_rule({
     no_anim = true,
     border_size = 0,
 })
+
+-- Video-translate ⋮ menu, language picker, extension bubbles, etc. are extra
+-- xdg_toplevels on Wayland (same class as the browser). If they map tiled they
+-- get sent to workspace D; if they map floating at 0x0 they land in the dead
+-- layout hole left of DP-3 (DP-2 is configured at 0x0 but often unplugged).
+-- Either way the menu looks like it "opened on another workspace".
+local YANDEX_POPUP_LOG = (os.getenv("XDG_CACHE_HOME") or ((os.getenv("HOME") or "") .. "/.cache"))
+    .. "/yandex-windows.log"
+
+local function yandex_log(msg)
+    local f = io.open(YANDEX_POPUP_LOG, "a")
+    if not f then
+        return
+    end
+    f:write(string.format("%s\t%s\n", os.date("!%Y-%m-%dT%H:%M:%SZ"), msg))
+    f:close()
+end
+
+local function vec_xy(v)
+    if type(v) ~= "table" then
+        return nil, nil
+    end
+    return v.x or v[1], v.y or v[2]
+end
+
+local function yandex_class_of(win)
+    local class = tostring(win.class or ""):lower()
+    return class:find("yandex", 1, true) ~= nil
+end
+
+local function yandex_is_browser_chrome(win)
+    local title = tostring(win.title or "")
+    local initial = tostring(win.initial_title or "")
+    return title:find("Browser", 1, true)
+        or initial:find("Browser", 1, true)
+        or title:find("Браузер", 1, true)
+        or initial:find("Браузер", 1, true)
+end
+
+local function yandex_main_window(except)
+    for _, other in ipairs(hl.get_windows()) do
+        if other.address ~= except.address and yandex_class_of(other) and yandex_is_browser_chrome(other) then
+            return other
+        end
+    end
+    return nil
+end
+
+local function popup_off_monitors(win)
+    local x, y = vec_xy(win.at)
+    local w, h = vec_xy(win.size)
+    if not x or not y then
+        return true
+    end
+    w, h = w or 1, h or 1
+    return hl.get_monitor_at(x + 8, y + 8) == nil
+        and hl.get_monitor_at(x + w / 2, y + h / 2) == nil
+end
+
+local function rescue_yandex_popup(win, why)
+    if type(win) == "table" and win.window then
+        win = win.window
+    end
+    if type(win) ~= "userdata" and type(win) ~= "table" then
+        return
+    end
+    if not yandex_class_of(win) then
+        return
+    end
+    if yandex_weather_spam(win) then
+        return
+    end
+    -- First/main window, or a real second browser window: leave tiled.
+    if yandex_is_browser_chrome(win) or not yandex_main_window(win) then
+        return
+    end
+
+    local ax, ay = vec_xy(win.at)
+    local sx, sy = vec_xy(win.size)
+    yandex_log(string.format(
+        "popup why=%s title=%q initial=%q float=%s at=%s,%s size=%s,%s ws=%s",
+        why,
+        tostring(win.title or ""),
+        tostring(win.initial_title or ""),
+        tostring(win.floating),
+        tostring(ax),
+        tostring(ay),
+        tostring(sx),
+        tostring(sy),
+        win.workspace and tostring(win.workspace.name or win.workspace.id) or "?"
+    ))
+
+    if not win.floating then
+        pcall(function()
+            hl.dispatch(hl.dsp.window.float({ action = "on", window = win }))
+        end)
+    end
+    pcall(function()
+        hl.dispatch(hl.dsp.window.set_prop({ prop = "border_size", value = "0", window = win }))
+    end)
+
+    local parent = yandex_main_window(win)
+    if parent and parent.workspace and (not win.workspace or win.workspace.id ~= parent.workspace.id) then
+        pcall(function()
+            hl.dispatch(hl.dsp.window.move({
+                window = win,
+                workspace = parent.workspace.id,
+                follow = false,
+            }))
+        end)
+    end
+
+    if popup_off_monitors(win) then
+        local cursor = hl.get_cursor_pos()
+        local mon = hl.get_monitor_at_cursor() or (parent and parent.monitor) or hl.get_active_monitor()
+        local tx, ty
+        if cursor then
+            tx, ty = cursor.x, cursor.y
+        elseif mon then
+            tx, ty = (mon.x or 0) + 80, (mon.y or 0) + 80
+        end
+        if tx and ty then
+            -- Keep the menu on the visible output; ⋮ is usually under the cursor.
+            local mw, mh = vec_xy(win.size)
+            mw, mh = mw or 280, mh or 360
+            if mon then
+                local mx, my = mon.x or 0, mon.y or 0
+                local mon_w = (type(mon.size) == "table" and (mon.size.x or mon.size[1])) or mon.width or 1920
+                local mon_h = (type(mon.size) == "table" and (mon.size.y or mon.size[2])) or mon.height or 1080
+                if mon.scale and mon.scale > 1.01 and mon_w >= 2200 then
+                    mon_w = mon_w / mon.scale
+                    mon_h = mon_h / mon.scale
+                end
+                if tx + mw > mx + mon_w - 8 then
+                    tx = mx + mon_w - mw - 8
+                end
+                if ty + mh > my + mon_h - 8 then
+                    ty = my + mon_h - mh - 8
+                end
+                if tx < mx + 8 then
+                    tx = mx + 8
+                end
+                if ty < my + 8 then
+                    ty = my + 8
+                end
+            end
+            pcall(function()
+                hl.dispatch(hl.dsp.window.move({
+                    x = math.floor(tx),
+                    y = math.floor(ty),
+                    relative = false,
+                    window = win,
+                }))
+            end)
+            yandex_log(string.format("popup rescued → %s,%s", tostring(tx), tostring(ty)))
+        else
+            pcall(function()
+                hl.dispatch(hl.dsp.window.center({ window = win }))
+            end)
+            yandex_log("popup rescued → center")
+        end
+    end
+end
+
+hl.on("window.open_early", function(win)
+    rescue_yandex_popup(win, "open_early")
+end)
+hl.on("window.open", function(win)
+    rescue_yandex_popup(win, "open")
+end)
+hl.on("window.title", function(win)
+    rescue_yandex_popup(win, "title")
+end)
+hl.on("window.open", function(win)
+    if type(win) == "table" and win.window then
+        win = win.window
+    end
+    if type(win) ~= "userdata" and type(win) ~= "table" then
+        return
+    end
+    if not yandex_class_of(win) then
+        return
+    end
+    hl.timer(function()
+        rescue_yandex_popup(win, "deferred")
+    end, { timeout = 80, type = "oneshot" })
+end)
 
 -- Zoom: don't block Ctrl+Tab tab switching
 hl.window_rule({

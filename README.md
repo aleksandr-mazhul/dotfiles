@@ -32,7 +32,7 @@ cd ~/dotfiles
 Обои при bootstrap (опционально):
 
 ```bash
-BOOTSTRAP_WALLPAPER=~/Pictures/Wallpapers/nature/foo.jpg ./bootstrap.sh
+BOOTSTRAP_WALLPAPER=~/pictures/wallpapers/nature/foo.jpg ./bootstrap.sh
 ```
 
 После установки: скопировать обои и ключи, `gh auth login`, один раз открыть Zen через `zen-browser`, `exec fish`.
@@ -58,7 +58,7 @@ theme-extract → theme-match → theme-build → palette.toml (SSOT)
 После смены обоев:
 
 ```bash
-apply-wallpaper-theme ~/Pictures/Wallpapers/….jpg
+apply-wallpaper-theme ~/pictures/wallpapers/….jpg
 exec fish   # обновить fish-обёртки (cbonsai, pipes, gum, …)
 ```
 
@@ -198,7 +198,7 @@ dotfiles-register-app <pkg> [--aur] [--rice]
 
 ```bash
 # Сменить обои и перекрасить весь стек
-apply-wallpaper-theme ~/Pictures/Wallpapers/….jpg
+apply-wallpaper-theme ~/pictures/wallpapers/….jpg
 
 # Только перерисовать consumers из текущего palette.toml
 theme-render
@@ -222,7 +222,7 @@ theme-vimium
 | SSH / GPG / `gh` tokens | секреты |
 | Discord, Spotify, JetBrains, VS Code data | тяжёлые и machine-local |
 | Пароль OBS websocket | gitignored |
-| Библиотека обоев | копировать в `~/Pictures/Wallpapers` |
+| Библиотека обоев | копировать в `~/pictures/wallpapers` |
 | `chromium-ffmpeg/` | nested / ignored |
 
 ---

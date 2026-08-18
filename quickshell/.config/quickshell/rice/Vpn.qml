@@ -227,7 +227,9 @@ RicePanel {
             return
         let i = selectedIndex
         for (let n = 0; n < filtered.length; n++) {
-            i = (i + delta + filtered.length) % filtered.length
+            i += delta
+            if (i < 0 || i >= filtered.length)
+                return
             if (isActionable(filtered[i])) {
                 selectedIndex = i
                 listView.positionViewAtIndex(selectedIndex, ListView.Contain)

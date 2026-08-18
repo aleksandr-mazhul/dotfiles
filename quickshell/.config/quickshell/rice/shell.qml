@@ -14,6 +14,7 @@ ShellRoot {
     Calendar { id: calendarPanel }
     Notifications { id: notifications }
     Osd {}
+    ScreenshotFlash { id: screenshotFlash }
     GroupStackBar {}
 
     Variants {
@@ -52,6 +53,8 @@ ShellRoot {
         function close(): void { clipboard.close() }
         function openFilter(): void { clipboard.showFilter() }
         function toggleFilter(): void { clipboard.showFilter() }
+        function focusPreview(): void { clipboard.focusPreviewPane() }
+        function focusList(): void { clipboard.focusListPane() }
     }
 
     IpcHandler {
@@ -134,6 +137,11 @@ ShellRoot {
             notifications.show()
         }
         function closeNotifications(): void { notifications.close() }
+    }
+
+    IpcHandler {
+        target: "screenshot"
+        function flash(): void { screenshotFlash.flash() }
     }
 
     IpcHandler {

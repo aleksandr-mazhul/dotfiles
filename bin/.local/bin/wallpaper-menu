@@ -4,7 +4,7 @@ export PATH="$HOME/.local/bin:/usr/bin:/bin:$PATH"
 export WAYLAND_DISPLAY="${WAYLAND_DISPLAY:-wayland-1}"
 export XDG_RUNTIME_DIR="${XDG_RUNTIME_DIR:-/run/user/$(id -u)}"
 
-WALL_DIR="${WALLPAPER_DIR:-$HOME/Pictures/Wallpapers}"
+WALL_DIR="${WALLPAPER_DIR:-$HOME/pictures/wallpapers}"
 LOG="$HOME/.cache/wallpaper-menu.log"
 CONF="$HOME/.config/wofi/wallpaper"
 mkdir -p "$HOME/.cache" "$CONF"

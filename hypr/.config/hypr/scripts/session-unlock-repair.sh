@@ -143,4 +143,9 @@ if ! pgrep -f 'wl-paste --type image --watch cliphist' >/dev/null 2>&1; then
   disown || true
 fi
 
+# Rebuild clipboard index in the background (idle priority) so Super+Q stays instant.
+log "warming clipboard index"
+"$HOME/.config/hypr/scripts/clipboard-warmup.sh" --now >/dev/null 2>&1 &
+disown || true
+
 log "done"
