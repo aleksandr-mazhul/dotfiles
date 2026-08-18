@@ -4,8 +4,7 @@ import QtQuick.Effects
 // material.shell v2 (ADR-0005): a thin transparent satin-glass plate.
 // The environment reads through it; the compositor provides the blur
 // (Hyprland layerrule on the surface's layer namespace).
-// The edge is light — bright outer rim, refraction line, soft inner rim —
-// which gives the plate physical thickness. Never a drawn frame.
+// The edge is a single soft lens falloff (not stacked 1px frames).
 Item {
     id: root
 
@@ -45,7 +44,7 @@ Item {
         Item {
             anchors.fill: parent
             layer.enabled: true
-            layer.smooth: false
+            layer.smooth: true
             layer.effect: MultiEffect {
                 autoPaddingEnabled: false
                 maskEnabled: true
@@ -58,9 +57,9 @@ Item {
                 anchors.fill: parent
                 radius: root.radius
                 gradient: Gradient {
-                    GradientStop { position: 0.0; color: Qt.rgba(1, 1, 1, 0.07) }
-                    GradientStop { position: 0.45; color: Qt.rgba(1, 1, 1, 0.02) }
-                    GradientStop { position: 1.0; color: Qt.rgba(1, 1, 1, 0.04) }
+                    GradientStop { position: 0.0; color: Qt.rgba(1, 1, 1, 0.05) }
+                    GradientStop { position: 0.40; color: Qt.rgba(1, 1, 1, 0.015) }
+                    GradientStop { position: 1.0; color: Qt.rgba(1, 1, 1, 0.03) }
                 }
             }
 
@@ -80,10 +79,10 @@ Item {
 
             Image {
                 anchors.fill: parent
-                source: Qt.resolvedUrl("../assets/noise.png")
+                source: Qt.resolvedUrl("../assets/satin-noise.png")
                 fillMode: Image.Tile
                 opacity: Tokens.noiseOpacity
-                smooth: false
+                smooth: true
             }
 
             Rectangle {
@@ -105,28 +104,9 @@ Item {
         }
     }
 
-    // Edge = thickness: bright rim → refraction line → soft inner rim.
-    Rectangle {
+    // Edge = thickness: one SDF lens band, inset so corners stay clean.
+    GlassEdge {
         anchors.fill: pane
         radius: root.radius
-        color: "transparent"
-        border.width: 1
-        border.color: Tokens.rimOuter
-    }
-    Rectangle {
-        anchors.fill: pane
-        anchors.margins: 1
-        radius: root.radius - 1
-        color: "transparent"
-        border.width: 1
-        border.color: Tokens.rimLine
-    }
-    Rectangle {
-        anchors.fill: pane
-        anchors.margins: 2
-        radius: root.radius - 2
-        color: "transparent"
-        border.width: 1
-        border.color: Tokens.rimInner
     }
 }

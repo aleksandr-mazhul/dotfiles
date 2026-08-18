@@ -29,7 +29,7 @@ hl.layer_rule({
     name = "rice-popup-glass",
     match = { namespace = "^rice-popup$" },
     blur = true,
-    ignore_alpha = 0.2,
+    ignore_alpha = 0.12,
 })
 
 hl.window_rule({

@@ -5,7 +5,7 @@ import Quickshell.Hyprland
 import "ds" as DS
 
 // Launcher — the reference popup of the design system
-// (~/Projects/desktop-design-system/components/launcher.md).
+// (~/projects/personal/desktop-design-system/components/launcher.md).
 // Presentation is pure composition of ds/ building blocks; this file owns only
 // data & behaviour: built-in commands, app list, scoring, focus-or-launch.
 DS.SearchListPopup {
@@ -30,8 +30,12 @@ DS.SearchListPopup {
         "uuctl": 1,
         "qv4l2": 1,
         "qvidcap": 1,
+        "thunar": 1,
         "thunar-settings": 1,
         "thunar-bulk-rename": 1,
+        "org.kde.dolphin": 1,
+        "com.system76.CosmicFiles": 1,
+        "io.elementary.files": 1,
         "cups": 1  // CUPS web UI duplicate of system-config-printer
     })
 
@@ -455,6 +459,7 @@ DS.SearchListPopup {
             trailingKeys: rowItem.isCommand ? (rowItem.modelData.shortcutKeys || []) : []
             chevron: !rowItem.isHeader && !rowItem.isCommand
             selected: rowItem.index === root.selectedIndex
+            hoverActive: !root.keyboardNav
             onEntered: root.selectedIndex = rowItem.index
             onActivated: {
                 root.selectedIndex = rowItem.index

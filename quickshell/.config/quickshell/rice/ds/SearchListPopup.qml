@@ -24,6 +24,9 @@ PopupSurface {
 
     property alias searchText: search.text
     readonly property alias listView: list
+    // Keyboard ↑/↓ hides the pointer and ignores hover until the mouse moves.
+    property bool keyboardNav: false
+    property point navPointer: Qt.point(-1, -1)
 
     signal activated(var item, int index)
 
@@ -41,16 +44,90 @@ PopupSurface {
         return -1
     }
 
+    function scrollToStart() {
+        const pin = () => {
+            list.contentY = Number(list.originY) || 0
+        }
+        list.forceLayout()
+        pin()
+        Qt.callLater(() => {
+            if (root.selectedIndex === firstSelectable()) {
+                pin()
+                return
+            }
+            const item = list.itemAtIndex(root.selectedIndex)
+            if (!item || !list.contentItem)
+                return
+            const origin = Number(list.originY) || 0
+            const y = item.mapToItem(list.contentItem, 0, 0).y
+            if (y + item.height <= origin + list.height + 1)
+                pin()
+        })
+    }
+
+    function revealIndex(i, delta) {
+        if (i === firstSelectable()) {
+            scrollToStart()
+            return
+        }
+
+        list.forceLayout()
+        const origin = Number(list.originY) || 0
+        const maxY = origin + Math.max(0, list.contentHeight - list.height)
+        const item = list.itemAtIndex(i)
+
+        // Anything that already fits on the first screen stays pinned to the
+        // top — otherwise the first app lands flush with the clip edge.
+        if (item && list.contentItem) {
+            const y = item.mapToItem(list.contentItem, 0, 0).y
+            if (y + item.height <= origin + list.height + 1) {
+                scrollToStart()
+                return
+            }
+        }
+
+        if (!item) {
+            const step = Tokens.rowHeight + list.spacing
+            list.contentY = Math.max(origin, Math.min(maxY, list.contentY + (delta > 0 ? step : -step)))
+            return
+        }
+
+        let cy = list.contentY
+        const topInView = item.mapToItem(list, 0, 0).y
+        const botInView = topInView + item.height
+        if (botInView > list.height)
+            cy += botInView - list.height
+        if (topInView < 0)
+            cy += topInView
+
+        if (delta < 0 && i > 0 && model[i - 1] && model[i - 1].kind === "header") {
+            const header = list.itemAtIndex(i - 1)
+            if (header) {
+                const ht = header.mapToItem(list, 0, 0).y
+                if (ht < 0)
+                    cy += ht
+            } else {
+                cy -= Tokens.sectionHeight + list.spacing
+            }
+        }
+
+        list.contentY = Math.max(origin, Math.min(maxY, cy))
+    }
+
     function moveSelection(delta) {
         const n = model ? model.length : 0
         if (n === 0)
             return
         let i = selectedIndex
         for (let step = 0; step < n; step++) {
-            i = (i + delta + n) % n
+            i += delta
+            if (i < 0 || i >= n)
+                return
             if (canSelect(i)) {
+                keyboardNav = true
+                navPointer = Qt.point(-1, -1)
                 selectedIndex = i
-                list.positionViewAtIndex(i, ListView.Contain)
+                revealIndex(i, delta)
                 return
             }
         }
@@ -69,10 +146,16 @@ PopupSurface {
     }
 
     onModelChanged: clampSelection()
+    onSelectedIndexChanged: {
+        if (selectedIndex === firstSelectable())
+            scrollToStart()
+    }
 
     onPopupOpened: {
         search.text = ""
         selectedIndex = firstSelectable()
+        keyboardNav = false
+        navPointer = Qt.point(-1, -1)
         Qt.callLater(() => search.input.forceActiveFocus())
     }
 
@@ -111,6 +194,7 @@ PopupSurface {
             placeholder: root.placeholder
             hintKeys: root.hintKeys
             keyHandler: root.handleKey
+            pointerHidden: root.keyboardNav
         }
 
         Item {
@@ -121,25 +205,34 @@ PopupSurface {
                 return Math.max(72, Math.min(content, max))
             }
 
-            ListView {
-                id: list
+            Item {
                 anchors.fill: parent
-                anchors.topMargin: 4
                 clip: true
-                spacing: 2
-                model: root.model
-                currentIndex: root.selectedIndex
-                boundsBehavior: Flickable.StopAtBounds
-                delegate: root.rowDelegate
 
-                // no-results: one quiet hint line, nothing else
-                Text {
-                    anchors.centerIn: parent
-                    visible: root.firstSelectable() < 0
-                    text: "Nothing found"
-                    color: Tokens.textTertiary
-                    font.family: Tokens.fontUi
-                    font.pixelSize: Tokens.fontSize
+                ListView {
+                    id: list
+                    anchors.fill: parent
+                    anchors.topMargin: 4
+                    anchors.bottomMargin: 4
+                    clip: false
+                    spacing: 2
+                    model: root.model
+                    currentIndex: root.selectedIndex
+                    boundsBehavior: Flickable.StopAtBounds
+                    highlightFollowsCurrentItem: false
+                    highlightMoveDuration: 0
+                    highlightResizeDuration: 0
+                    keyNavigationWraps: false
+                    delegate: root.rowDelegate
+
+                    Text {
+                        anchors.centerIn: parent
+                        visible: root.firstSelectable() < 0
+                        text: "Nothing found"
+                        color: Tokens.textTertiary
+                        font.family: Tokens.fontUi
+                        font.pixelSize: Tokens.fontSize
+                    }
                 }
             }
 
@@ -156,6 +249,21 @@ PopupSurface {
         FooterHints {
             width: parent.width - 2 * Tokens.paddingSurface
             hints: root.footerHints
+        }
+    }
+
+    HoverHandler {
+        enabled: root.keyboardNav
+        acceptedDevices: PointerDevice.Mouse | PointerDevice.TouchPad
+        cursorShape: Qt.BlankCursor
+        onPointChanged: {
+            const p = point.position
+            if (root.navPointer.x < 0) {
+                root.navPointer = Qt.point(p.x, p.y)
+                return
+            }
+            if (Math.abs(p.x - root.navPointer.x) > 3 || Math.abs(p.y - root.navPointer.y) > 3)
+                root.keyboardNav = false
         }
     }
 }

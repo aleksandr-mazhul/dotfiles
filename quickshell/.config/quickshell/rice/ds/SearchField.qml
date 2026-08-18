@@ -14,6 +14,7 @@ Item {
     property var hintKeys: []
     // Forward keys to the popup's handler.
     property var keyHandler: null
+    property bool pointerHidden: false
 
     implicitHeight: Tokens.searchFieldHeight
 
@@ -64,6 +65,11 @@ Item {
             if (typeof root.keyHandler === "function" && root.keyHandler(event))
                 event.accepted = true
         }
+    }
+
+    HoverHandler {
+        enabled: root.pointerHidden
+        cursorShape: Qt.BlankCursor
     }
 
     Row {

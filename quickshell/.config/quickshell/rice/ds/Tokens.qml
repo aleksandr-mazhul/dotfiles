@@ -3,26 +3,28 @@ import QtQuick
 import ".."
 
 // Design-system tokens — implementation of
-// ~/Projects/desktop-design-system/tokens/tokens.md (Material v2, ADR-0005).
+// ~/projects/personal/desktop-design-system/tokens/tokens.md (Material v2, ADR-0005).
 // Values: Draft until validated on screen. Palette comes from the color SSOT.
 QtObject {
     // ————— Material v2: transparent satin glass —————
-    // Light tint of the palette — the environment must read through the pane.
-    readonly property color shellTint: Qt.rgba(Colors.background.r, Colors.background.g, Colors.background.b, 0.22)
+    // experiment/launcher-matte: airier plate, quieter grain, original edge language.
+    // Tint stays above rice-popup ignore_alpha so Hyprland still frosts.
+    readonly property color shellTint: Qt.rgba(Colors.background.r, Colors.background.g, Colors.background.b, 0.14)
     // Glass levels go LIGHTER upwards (ADR-0005): raised / field are white-based lifts.
     readonly property color raised: Qt.rgba(1, 1, 1, 0.10)
-    readonly property color raisedStrong: Qt.rgba(1, 1, 1, 0.13)
-    readonly property color raisedRim: Qt.rgba(1, 1, 1, 0.12)
-    readonly property color fieldFill: Qt.rgba(1, 1, 1, 0.08)
+    readonly property color raisedStrong: Qt.rgba(1, 1, 1, 0.14)
+    readonly property color raisedRim: Qt.rgba(1, 1, 1, 0.08)
+    readonly property color fieldFill: Qt.rgba(1, 1, 1, 0.07)
     readonly property color fieldRim: Qt.rgba(1, 1, 1, 0.14)
     // Edge of the plate — light, not a drawn frame.
-    readonly property color rimOuter: Qt.rgba(1, 1, 1, 0.27)
+    readonly property color rimOuter: Qt.rgba(1, 1, 1, 0.28)
     readonly property color rimLine: Qt.rgba(0, 0, 0, 0.10)
-    readonly property color rimInner: Qt.rgba(1, 1, 1, 0.07)
-    readonly property color sheen: Qt.rgba(1, 1, 1, 0.04)
-    readonly property color shadow: Qt.rgba(0, 0, 0, 0.28)
+    readonly property color rimInner: Qt.rgba(1, 1, 1, 0.08)
+    readonly property color sheen: Qt.rgba(1, 1, 1, 0.035)
+    // Below ignore_alpha so the drop shadow is not frosted into a second pane.
+    readonly property color shadow: Qt.rgba(0, 0, 0, 0.07)
     readonly property color hairline: Qt.rgba(Colors.text.r, Colors.text.g, Colors.text.b, 0.10)
-    readonly property real noiseOpacity: 0.015
+    readonly property real noiseOpacity: 0.0
 
     // ————— Shape (v2) —————
     readonly property int radiusSurface: 28

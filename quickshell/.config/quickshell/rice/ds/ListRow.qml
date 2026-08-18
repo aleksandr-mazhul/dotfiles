@@ -16,15 +16,20 @@ Item {
     property bool chevron: false
     property bool selected: false
     property Component leading: null
+    // False while the popup is in keyboard-nav: hover pill and pointer
+    // disappear together, and the invisible cursor cannot steal selection.
+    property bool hoverActive: true
 
     signal entered()
     signal activated()
 
     height: Tokens.rowHeight
 
+    readonly property bool pointerOver: hoverActive && mouse.containsMouse
+
     SelectionPill {
         anchors.fill: parent
-        hovered: mouse.containsMouse
+        hovered: root.pointerOver
         selected: root.selected
     }
 
@@ -65,7 +70,7 @@ Item {
         Row {
             visible: root.trailingKeys.length > 0
             spacing: 4
-            opacity: (root.selected || mouse.containsMouse) ? 1.0 : 0.7
+            opacity: (root.selected || root.pointerOver) ? 1.0 : 0.7
             Behavior on opacity {
                 NumberAnimation { duration: Tokens.stateMs }
             }
@@ -83,7 +88,7 @@ Item {
         RiceIcon {
             visible: root.chevron && root.trailingKeys.length === 0
             customSource: Qt.resolvedUrl("../assets/chevron-right.svg")
-            tint: (root.selected || mouse.containsMouse) ? Tokens.textSecondary : Tokens.textTertiary
+            tint: (root.selected || root.pointerOver) ? Tokens.textSecondary : Tokens.textTertiary
             implicitSize: 14
         }
     }
@@ -91,8 +96,8 @@ Item {
     MouseArea {
         id: mouse
         anchors.fill: parent
-        hoverEnabled: true
-        cursorShape: Qt.PointingHandCursor
+        hoverEnabled: root.hoverActive
+        cursorShape: root.hoverActive ? Qt.PointingHandCursor : Qt.BlankCursor
         onEntered: root.entered()
         onClicked: root.activated()
     }

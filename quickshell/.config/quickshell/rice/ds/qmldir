@@ -1,5 +1,6 @@
 singleton Tokens Tokens.qml
 GlassSurface GlassSurface.qml
+GlassEdge GlassEdge.qml
 Hairline Hairline.qml
 SectionLabel SectionLabel.qml
 SelectionPill SelectionPill.qml
