@@ -23,55 +23,79 @@ Item {
     }
 
     Rectangle {
+        id: decoMask
+        anchors.fill: pane
+        radius: root.radius
+        color: "#ffffff"
+        visible: false
+        layer.enabled: true
+    }
+
+    Rectangle {
         id: pane
         anchors.fill: parent
         radius: root.radius
         color: Tokens.shellTint
-        clip: true
+        // Never clip this fill: Qt clip is a bounding rectangle, and the tinted
+        // corner ears get Hyprland frost — a square poking out of the radius.
+        // Content stays here (no layer) so type stays sharp.
 
-        // Satin lift — glass catches light from above; keeps the center calm.
-        Rectangle {
+        // Sheen/lift/noise only: mask to the radius without putting text through
+        // a filtered layer (that made the whole plate look soapy).
+        Item {
             anchors.fill: parent
-            radius: root.radius
-            gradient: Gradient {
-                GradientStop { position: 0.0; color: Qt.rgba(1, 1, 1, 0.07) }
-                GradientStop { position: 0.45; color: Qt.rgba(1, 1, 1, 0.02) }
-                GradientStop { position: 1.0; color: Qt.rgba(1, 1, 1, 0.04) }
+            layer.enabled: true
+            layer.smooth: false
+            layer.effect: MultiEffect {
+                autoPaddingEnabled: false
+                maskEnabled: true
+                maskSource: decoMask
+                maskThresholdMin: 0.5
+                maskSpreadAtMin: 0
             }
-        }
 
-        // Diagonal sheen — almost imperceptible light play across the plate.
-        Rectangle {
-            width: parent.width * 1.8
-            height: parent.height * 0.6
-            x: -parent.width * 0.3
-            y: -parent.height * 0.12
-            rotation: -16
-            gradient: Gradient {
-                GradientStop { position: 0.0; color: "transparent" }
-                GradientStop { position: 0.5; color: Tokens.sheen }
-                GradientStop { position: 1.0; color: "transparent" }
+            Rectangle {
+                anchors.fill: parent
+                radius: root.radius
+                gradient: Gradient {
+                    GradientStop { position: 0.0; color: Qt.rgba(1, 1, 1, 0.07) }
+                    GradientStop { position: 0.45; color: Qt.rgba(1, 1, 1, 0.02) }
+                    GradientStop { position: 1.0; color: Qt.rgba(1, 1, 1, 0.04) }
+                }
             }
-        }
 
-        // Micro-noise kills the "plastic" feel; imperceptible as a layer.
-        Image {
-            anchors.fill: parent
-            source: Qt.resolvedUrl("../assets/noise.png")
-            fillMode: Image.Tile
-            opacity: Tokens.noiseOpacity
-            smooth: false
-        }
+            Rectangle {
+                width: parent.width * 1.8
+                height: parent.height * 0.6
+                x: -parent.width * 0.3
+                y: -parent.height * 0.12
+                rotation: -16
+                color: "transparent"
+                gradient: Gradient {
+                    GradientStop { position: 0.0; color: "transparent" }
+                    GradientStop { position: 0.5; color: Tokens.sheen }
+                    GradientStop { position: 1.0; color: "transparent" }
+                }
+            }
 
-        // Faint bottom shade — the lower edge of the glass volume.
-        Rectangle {
-            anchors.left: parent.left
-            anchors.right: parent.right
-            anchors.bottom: parent.bottom
-            height: 48
-            gradient: Gradient {
-                GradientStop { position: 0.0; color: "transparent" }
-                GradientStop { position: 1.0; color: Qt.rgba(0, 0, 0, 0.05) }
+            Image {
+                anchors.fill: parent
+                source: Qt.resolvedUrl("../assets/noise.png")
+                fillMode: Image.Tile
+                opacity: Tokens.noiseOpacity
+                smooth: false
+            }
+
+            Rectangle {
+                anchors.left: parent.left
+                anchors.right: parent.right
+                anchors.bottom: parent.bottom
+                height: 48
+                color: "transparent"
+                gradient: Gradient {
+                    GradientStop { position: 0.0; color: "transparent" }
+                    GradientStop { position: 1.0; color: Qt.rgba(0, 0, 0, 0.05) }
+                }
             }
         }
 

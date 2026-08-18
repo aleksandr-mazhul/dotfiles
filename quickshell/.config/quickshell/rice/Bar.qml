@@ -23,16 +23,11 @@ PanelWindow {
     property bool fsPolled: false
     readonly property bool fullscreenActive: root.fsPolled
 
+    // Only bar-owned menus keep the island visible. Launcher / clipboard /
+    // wallpaper / vpn are independent overlays and must not summon the bar.
     readonly property bool panelOpen: {
         const active = (p) => !!(p && (p.open || p.surfaceActive || p.visible))
-        if (active(quickSettings) || active(calendar) || active(notifCenter))
-            return true
-        const hubPanels = OverlayHub.panels || []
-        for (let i = 0; i < hubPanels.length; i++) {
-            if (active(hubPanels[i]))
-                return true
-        }
-        return false
+        return active(quickSettings) || active(calendar) || active(notifCenter)
     }
     property bool hovering: false
     property bool revealed: false
