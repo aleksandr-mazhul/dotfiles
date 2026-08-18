@@ -57,11 +57,13 @@ hl.config({
             render_power = 3,
             color = "rgba(1a1a1aee)",
         },
-        -- Stronger frost for liquid-glass apps (kitty background_opacity < 1)
+        -- Kawase needs ≥3 passes or the downsample tiles show through glass.
+        -- noise 0: default dither (~0.012) reads as a grid on dark panes.
         blur = {
             enabled = true,
             size = 8,
-            passes = 2,
+            passes = 3,
+            noise = 0,
             vibrancy = 0.1696,
             new_optimizations = true,
         },
