@@ -31,6 +31,13 @@ Item {
     }
 
     Rectangle {
+        anchors.fill: fill
+        radius: root.pillRadius
+        color: Tokens.selectScrim
+        visible: root.selected
+    }
+
+    Rectangle {
         id: fill
         anchors.fill: parent
         radius: root.pillRadius

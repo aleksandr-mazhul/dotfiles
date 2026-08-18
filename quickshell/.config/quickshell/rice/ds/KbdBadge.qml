@@ -9,7 +9,14 @@ Rectangle {
     radius: 6
     color: Qt.rgba(1, 1, 1, 0.12)
     border.width: 1
-    border.color: Qt.rgba(1, 1, 1, 0.26)
+    border.color: Qt.rgba(1, 1, 1, 0.22 + AdaptiveContrast.contrast * 0.10)
+
+    Rectangle {
+        anchors.fill: parent
+        radius: parent.radius
+        color: Tokens.fieldScrim
+        z: -1
+    }
 
     Rectangle {
         anchors.left: parent.left
@@ -23,14 +30,12 @@ Rectangle {
         }
     }
 
-    Text {
+    QuietText {
         id: label
         anchors.centerIn: parent
         text: key
-        color: Qt.rgba(1, 1, 1, 0.72)
+        color: Qt.rgba(1, 1, 1, 0.78)
         font.family: Tokens.fontUi
         font.pixelSize: Tokens.fontSizeSm - 1
-        style: Text.Outline
-        styleColor: Qt.rgba(0, 0, 0, 0.28)
     }
 }

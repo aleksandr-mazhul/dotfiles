@@ -47,29 +47,27 @@ Item {
             Layout.preferredHeight: Tokens.leadingSize
         }
 
-        Text {
+        QuietText {
             text: root.primary
             color: Tokens.textPrimary
             font.family: Tokens.fontUi
             font.pixelSize: Tokens.fontSize
-            font.weight: Font.Medium
-            style: Text.Outline
-            styleColor: Tokens.textHalo
+            fontWeight: Font.Medium
             elide: Text.ElideRight
             Layout.fillWidth: root.secondary.length === 0
             Layout.maximumWidth: root.secondary.length === 0 ? -1 : Math.round(root.width * 0.55)
+            Layout.fillHeight: true
         }
 
-        Text {
+        QuietText {
             visible: root.secondary.length > 0
             text: root.secondary
             color: Tokens.textSecondary
             font.family: Tokens.fontUi
             font.pixelSize: Tokens.fontSize
-            style: Text.Outline
-            styleColor: Qt.rgba(0, 0, 0, 0.18)
             elide: Text.ElideRight
             Layout.fillWidth: true
+            Layout.fillHeight: true
         }
 
         Row {

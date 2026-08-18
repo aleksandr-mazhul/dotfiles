@@ -22,5 +22,6 @@ Calendar 1.0 Calendar.qml
 CalendarTimeWheel 1.0 CalendarTimeWheel.qml
 Notifications 1.0 Notifications.qml
 Osd 1.0 Osd.qml
+ScreenshotFlash 1.0 ScreenshotFlash.qml
 GroupStackBar 1.0 GroupStackBar.qml
 RiceIcon 1.0 RiceIcon.qml

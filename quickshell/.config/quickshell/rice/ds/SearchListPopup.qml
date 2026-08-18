@@ -232,6 +232,11 @@ PopupSurface {
                 return Math.max(72, Math.min(content, max))
             }
 
+            ContentScrim {
+                anchors.fill: parent
+                radius: Tokens.innerRadius(Tokens.radiusSurface, Tokens.paddingSurface)
+            }
+
             Item {
                 anchors.fill: parent
                 clip: true
@@ -252,7 +257,7 @@ PopupSurface {
                     keyNavigationWraps: false
                     delegate: root.rowDelegate
 
-                    Text {
+                    QuietText {
                         anchors.centerIn: parent
                         visible: root.firstSelectable() < 0
                         text: "Nothing found"

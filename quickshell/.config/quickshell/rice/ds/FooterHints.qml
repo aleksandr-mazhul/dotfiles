@@ -11,6 +11,12 @@ Item {
 
     implicitHeight: Tokens.footerHeight
 
+    ContentScrim {
+        anchors.fill: parent
+        radius: Tokens.radiusMin
+        color: Tokens.footerScrim
+    }
+
     Hairline {
         anchors.left: parent.left
         anchors.right: parent.right
@@ -30,13 +36,11 @@ Item {
                 anchors.verticalCenter: parent.verticalCenter
             }
         }
-        Text {
+        QuietText {
             text: hint.label
             color: Tokens.textSecondary
             font.family: Tokens.fontUi
             font.pixelSize: Tokens.fontSizeSm
-            style: Text.Outline
-            styleColor: Qt.rgba(0, 0, 0, 0.22)
             anchors.verticalCenter: parent.verticalCenter
         }
     }

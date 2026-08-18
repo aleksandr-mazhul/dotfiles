@@ -13,6 +13,8 @@ Item {
     property string fallback: "dialog-information"
     property url customSource: ""
     property bool struck: false
+    property bool halo: false
+    property color haloColor: Qt.rgba(0, 0, 0, 0.32)
     property int implicitSize: 18
     property color tint: Theme.text
 
@@ -97,6 +99,15 @@ Item {
             implicitSize: root.implicitSize
             visible: false
             source: root.resolvedCustom
+        }
+
+        ColorOverlay {
+            anchors.fill: parent
+            anchors.topMargin: 1
+            visible: root.halo
+            source: mono
+            color: root.haloColor
+            cached: true
         }
 
         ColorOverlay {

@@ -9,6 +9,7 @@ layout(std140, binding = 0) uniform buf {
     float radius;
     float itemWidth;
     float itemHeight;
+    float contrast;
 };
 
 float roundedBox(vec2 p, vec2 halfSize, float r) {
@@ -45,5 +46,9 @@ void main() {
     a += rim * topBottom * 0.12;
     a *= inside * qt_Opacity;
 
-    fragColor = vec4(vec3(a), a);
+    // Bright wallpaper: a dark inner lip under the white catch-light.
+    float lip = exp(-pow(inward - 2.4, 2.0) * 0.42) * inside;
+    float darkA = lip * contrast * 0.26 * qt_Opacity;
+
+    fragColor = vec4(vec3(a), a + darkA);
 }

@@ -52,6 +52,7 @@ PanelWindow {
 
     function show() {
         OverlayHub.closeOthers(root)
+        AdaptiveContrast.refresh()
         open = true
         popupOpened()
         openAnim.play()

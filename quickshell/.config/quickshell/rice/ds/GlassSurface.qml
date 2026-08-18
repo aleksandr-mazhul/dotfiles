@@ -69,6 +69,15 @@ Item {
 
     Rectangle {
         anchors.fill: pane
+        anchors.margins: 1
+        radius: Math.max(0, root.radius - 1)
+        color: "transparent"
+        border.width: 1
+        border.color: Tokens.rimInner
+    }
+
+    Rectangle {
+        anchors.fill: pane
         radius: root.radius
         color: "transparent"
         border.width: 1

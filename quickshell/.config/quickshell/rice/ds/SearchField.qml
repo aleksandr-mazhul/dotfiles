@@ -19,6 +19,12 @@ Item {
 
     implicitHeight: Tokens.searchFieldHeight
 
+    Rectangle {
+        anchors.fill: field
+        radius: Tokens.radiusField
+        color: Tokens.searchScrim
+    }
+
     RectangularShadow {
         anchors.fill: field
         offset: Qt.vector2d(0, 0)
@@ -66,6 +72,8 @@ Item {
         customSource: Qt.resolvedUrl("../assets/search.svg")
         tint: Tokens.textIcon
         implicitSize: 16
+        halo: true
+        haloColor: Tokens.iconHalo
     }
 
     TextInput {
@@ -79,18 +87,15 @@ Item {
         font.family: Tokens.fontUi
         font.pixelSize: Tokens.fontSize
         clip: true
-        // Text selection stays monochrome — accent is not used in shell states.
         selectionColor: Tokens.raisedStrong
         selectedTextColor: Tokens.textPrimary
 
-        Text {
+        QuietText {
             anchors.fill: parent
             verticalAlignment: Text.AlignVCenter
             text: root.placeholder
             color: Qt.rgba(1, 1, 1, 0.50)
             font: input.font
-            style: Text.Outline
-            styleColor: Tokens.textHalo
             visible: input.text.length === 0
         }
 

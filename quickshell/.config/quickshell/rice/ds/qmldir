@@ -1,3 +1,4 @@
+singleton AdaptiveContrast AdaptiveContrast.qml
 singleton Tokens Tokens.qml
 GlassSurface GlassSurface.qml
 GlassEdge GlassEdge.qml
@@ -11,3 +12,5 @@ ListRow ListRow.qml
 ScrollIndicator ScrollIndicator.qml
 PopupSurface PopupSurface.qml
 SearchListPopup SearchListPopup.qml
+ContentScrim ContentScrim.qml
+QuietText QuietText.qml

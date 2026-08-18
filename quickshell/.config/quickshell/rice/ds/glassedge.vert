@@ -10,6 +10,7 @@ layout(std140, binding = 0) uniform buf {
     float radius;
     float itemWidth;
     float itemHeight;
+    float contrast;
 };
 
 void main() {

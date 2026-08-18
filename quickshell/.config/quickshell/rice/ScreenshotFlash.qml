@@ -26,7 +26,7 @@ Scope {
         PanelWindow {
             required property var modelData
             screen: modelData
-            visible: root.flashing || flashRect.opacity > 0.02
+            visible: root.flashing
             color: "transparent"
             exclusiveZone: 0
             exclusionMode: ExclusionMode.Ignore

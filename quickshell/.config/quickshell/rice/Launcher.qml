@@ -817,6 +817,8 @@ DS.SearchListPopup {
                     customSource: Qt.resolvedUrl("assets/" + (rowItem.modelData.monoIcon || "app-fallback.svg"))
                     tint: DS.Tokens.textIcon
                     implicitSize: 22
+                    halo: true
+                    haloColor: DS.Tokens.iconHalo
                 }
             }
         }

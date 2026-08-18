@@ -7,6 +7,7 @@ ShaderEffect {
     property real radius: Tokens.radiusSurface
     property real itemWidth: width
     property real itemHeight: height
+    property real contrast: AdaptiveContrast.contrast
 
     fragmentShader: Qt.resolvedUrl("glassedge.frag.qsb")
     vertexShader: Qt.resolvedUrl("glassedge.vert.qsb")

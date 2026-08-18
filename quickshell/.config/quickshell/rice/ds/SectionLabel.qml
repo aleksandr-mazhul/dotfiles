@@ -2,7 +2,7 @@ import QtQuick
 
 // type.section — quiet uppercase group label; grouping is done by air + label,
 // never by boxes (List Pattern).
-Text {
+QuietText {
     property string label: ""
 
     text: label.toUpperCase()
@@ -10,6 +10,4 @@ Text {
     font.family: Tokens.fontUi
     font.pixelSize: Tokens.fontSizeSection
     font.letterSpacing: Tokens.sectionTracking
-    style: Text.Outline
-    styleColor: Qt.rgba(0, 0, 0, 0.22)
 }
