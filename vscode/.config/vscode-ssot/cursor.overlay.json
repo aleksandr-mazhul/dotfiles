@@ -1,0 +1,5 @@
+{
+    "cursor.composer.queueMessageDefaultBehavior": "steer",
+    "update.releaseTrack": "latest",
+    "update.mode": "none"
+}

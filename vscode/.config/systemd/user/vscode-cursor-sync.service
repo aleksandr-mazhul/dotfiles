@@ -1,0 +1,12 @@
+[Unit]
+Description=Apply vscode-ssot to VS Code and Cursor
+After=graphical-session.target
+# Path unit can fire many times; default StartLimitBurst=5 kills the watcher.
+StartLimitIntervalSec=60
+StartLimitBurst=50
+
+[Service]
+Type=oneshot
+# RemainAfterExit would block re-triggers; keep oneshot but raise limits.
+ExecStart=%h/.local/bin/vscode-cursor-sync --auto
+TimeoutStartSec=300

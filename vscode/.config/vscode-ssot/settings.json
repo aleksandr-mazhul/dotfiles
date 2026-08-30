@@ -1,0 +1,170 @@
+{
+    "window.titleBarStyle": "custom",
+    "window.commandCenter": true,
+    "window.closeWhenEmpty": true,
+    "workbench.startupEditor": "none",
+    "workbench.iconTheme": "material-icon-theme",
+    "workbench.colorTheme": "SSOT",
+    "workbench.preferredDarkColorTheme": "SSOT",
+    "window.autoDetectColorScheme": false,
+    "workbench.sideBar.location": "left",
+    "workbench.activityBar.location": "default",
+    "workbench.activityBar.orientation": "vertical",
+    "workbench.tree.indent": 14,
+    "workbench.editor.enablePreview": false,
+    "editor.fontFamily": "'JetBrains Mono', 'Fira Code', 'Cascadia Code', monospace",
+    "editor.fontLigatures": true,
+    "editor.fontSize": 13,
+    "editor.lineHeight": 1.45,
+    "editor.tabSize": 2,
+    "editor.insertSpaces": true,
+    "editor.detectIndentation": true,
+    "editor.formatOnSave": true,
+    "editor.formatOnPaste": false,
+    "editor.bracketPairColorization.enabled": true,
+    "editor.guides.bracketPairs": true,
+    "editor.minimap.enabled": false,
+    "editor.rulers": [
+        100,
+        120
+    ],
+    "editor.stickyScroll.enabled": true,
+    "editor.linkedEditing": true,
+    "editor.inlineSuggest.enabled": true,
+    "editor.suggestSelection": "first",
+    "files.trimTrailingWhitespace": true,
+    "files.insertFinalNewline": true,
+    "files.autoSave": "onFocusChange",
+    "files.exclude": {
+        "**/.git": true,
+        "**/.DS_Store": true,
+        "**/__pycache__": true,
+        "**/.terraform": true,
+        "**/.mypy_cache": true,
+        "**/.pytest_cache": true
+    },
+    "search.exclude": {
+        "**/node_modules": true,
+        "**/.terraform": true,
+        "**/vendor": true,
+        "**/.git": true
+    },
+    "git.enabled": true,
+    "git.autofetch": true,
+    "git.autofetchPeriod": 180,
+    "git.confirmSync": false,
+    "git.enableSmartCommit": true,
+    "git.suggestSmartCommit": true,
+    "git.openRepositoryInParentFolders": "always",
+    "git.autoStash": true,
+    "git.pruneOnFetch": true,
+    "git.fetchOnPull": true,
+    "git.pullBeforeCheckout": true,
+    "git.showPushSuccessNotification": true,
+    "git.decorations.enabled": true,
+    "git.timeline.showAuthor": true,
+    "git.timeline.showDate": true,
+    "git.useEditorAsCommitInput": true,
+    "git.postCommitCommand": "none",
+    "scm.defaultViewMode": "tree",
+    "scm.alwaysShowRepositories": true,
+    "diffEditor.ignoreTrimWhitespace": false,
+    "diffEditor.renderSideBySide": true,
+    "github.gitProtocol": "https",
+    "githubPullRequests.pullBranch": "prompt",
+    "githubPullRequests.createOnPublishBranch": "never",
+    "terminal.integrated.defaultProfile.linux": "fish",
+    "terminal.integrated.profiles.linux": {
+        "fish": {
+            "path": "/usr/bin/fish"
+        },
+        "bash": {
+            "path": "/usr/bin/bash"
+        }
+    },
+    "terminal.integrated.fontFamily": "'JetBrains Mono', 'Fira Code', monospace",
+    "terminal.integrated.fontSize": 13,
+    "terminal.integrated.cursorBlinking": true,
+    "terminal.integrated.copyOnSelection": true,
+    "remote.SSH.useLocalServer": true,
+    "remote.SSH.enableRemoteCommand": true,
+    "remote.SSH.defaultExtensions": [
+        "ms-python.python",
+        "redhat.vscode-yaml",
+        "hashicorp.terraform",
+        "ms-azuretools.vscode-docker"
+    ],
+    "yaml.schemas": {},
+    "yaml.format.enable": true,
+    "yaml.validate": true,
+    "yaml.hover": true,
+    "yaml.completion": true,
+    "[yaml]": {
+        "editor.defaultFormatter": "redhat.vscode-yaml",
+        "editor.tabSize": 2
+    },
+    "[json]": {
+        "editor.defaultFormatter": "vscode.json-language-features",
+        "editor.tabSize": 2
+    },
+    "[jsonc]": {
+        "editor.defaultFormatter": "vscode.json-language-features"
+    },
+    "[terraform]": {
+        "editor.defaultFormatter": "hashicorp.terraform",
+        "editor.tabSize": 2
+    },
+    "[terraform-vars]": {
+        "editor.defaultFormatter": "hashicorp.terraform"
+    },
+    "[dockerfile]": {
+        "editor.defaultFormatter": "ms-azuretools.vscode-docker"
+    },
+    "[shellscript]": {
+        "editor.tabSize": 2,
+        "editor.defaultFormatter": "foxundermoon.shell-format"
+    },
+    "[python]": {
+        "editor.tabSize": 4,
+        "editor.defaultFormatter": "ms-python.black-formatter"
+    },
+    "[go]": {
+        "editor.tabSize": 4,
+        "editor.insertSpaces": false
+    },
+    "[markdown]": {
+        "editor.wordWrap": "on",
+        "editor.quickSuggestions": {
+            "comments": "on",
+            "strings": "on",
+            "other": "on"
+        }
+    },
+    "terraform.languageServer.enable": true,
+    "terraform.experimentalFeatures.validateOnSave": true,
+    "vs-kubernetes": {
+        "vs-kubernetes.crd-code-completion": "enabled"
+    },
+    "ansible.lightspeed.enabled": false,
+    "redhat.telemetry.enabled": false,
+    "telemetry.telemetryLevel": "off",
+    "explorer.confirmDelete": false,
+    "explorer.confirmDragAndDrop": false,
+    "security.workspace.trust.enabled": true,
+    "security.workspace.trust.untrustedFiles": "prompt",
+    "gitlens.hovers.currentLine.over": "line",
+    "gitlens.codeLens.enabled": true,
+    "gitlens.currentLine.enabled": true,
+    "gitlens.statusBar.enabled": true,
+    "gitlens.views.repositories.files.layout": "tree",
+    "errorLens.enabledDiagnosticLevels": [
+        "error",
+        "warning"
+    ],
+    "errorLens.gutterIconsEnabled": true,
+    "shellcheck.enable": true,
+    "shellcheck.run": "onType",
+    "yaml.disableSchemaDetection": [
+        "**/.github/workflows.github/workflows.gitea/workflows.gitea/workflows.forgejo/workflows.forgejo/workflows/*.yaml"
+    ]
+}

@@ -1,0 +1,6 @@
+# Cursor only — all anysphere.* (cursorpyright, remotes, …).
+# Do not copy these into VS Code (Microsoft remotes + Pylance).
+
+anysphere.cursorpyright
+anysphere.remote-containers
+anysphere.remote-ssh

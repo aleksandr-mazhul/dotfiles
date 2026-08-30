@@ -41,6 +41,20 @@ Do all of the following in one session (or explain what you blocked on):
    - Run `theme-render` and verify.
    - Optional fish wrapper → `theme-rice.fish.tmpl` for toys that only take ANSI indices.
 
+VS Code / Cursor: hub is `vscode/.config/vscode-ssot/` (stowed to
+`~/.config/vscode-ssot`). systemd `--user` unit `vscode-cursor-sync.path`
+watches both editors: a plugin or settings/theme change is harvested into
+SSOT and applied to the other app (`vscode-cursor-sync --auto`). Do not copy
+`cursor.*` keys into VS Code. Do not copy `anysphere.*` into VS Code (all
+Anysphere extensions are Cursor-only, including remotes and
+`anysphere.cursorpyright`). Do not copy Microsoft remotes
+(`ms-vscode-remote.*`, `ms-vscode.remote-explorer`) into Cursor. Pylance
+(`ms-python.vscode-pylance`) is VS Code-only; Cursor uses bundled
+`anysphere.cursorpyright`. Remotes / Pylance / cursorpyright go in
+`extensions-code.txt` / `extensions-cursor.txt`. Cursor-only prefs stay in
+`cursor.overlay.json`. Cursor Agents / Tab Stats / Glass chrome are product
+UI and are not mirrored. Color palette for the SSOT theme is still
+`theme-render`.
 
 Cursor AppImage (Linux): install as a **real file**
 `~/applications/Cursor.AppImage` (not a symlink to `Cursor-X.Y.Z.AppImage`).

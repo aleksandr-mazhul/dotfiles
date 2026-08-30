@@ -24,6 +24,7 @@ BOOTSTRAP_WALLPAPER=~/pictures/wallpapers/nature/foo.jpg ./bootstrap.sh
 | Kitty, Fish, Tmux, Starship | `kitty/`, `fish/`, `tmux/`, `starship/` |
 | Kanata + systemd unit | `kanata/` |
 | Theme SSOT templates + pipeline | `theme/`, `bin/.local/bin/theme-*` |
+| VS Code + Cursor (shared settings, keybindings, extension lists) | `vscode/` → `vscode-cursor-sync` + `vscode-cursor-sync.path` + idle timer |
 | Cursor AppImage updater | `bin/` → `cursor` wrapper, `cursor-update` + user timer `cursor-update.timer` |
 | Quickshell rice | `quickshell/` |
 | nvim LazyVim rice | `nvim/` |

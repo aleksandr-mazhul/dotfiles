@@ -28,6 +28,7 @@ packages=(
   theme
   tmux
   vibepanel
+  vscode
   waybar
   waypaper
   wofi

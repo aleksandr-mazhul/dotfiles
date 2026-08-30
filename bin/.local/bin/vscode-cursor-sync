@@ -1,0 +1,1355 @@
+#!/usr/bin/env python3
+"""Hub-and-spoke sync for VS Code and Cursor.
+
+Canonical files live in ~/.config/vscode-ssot (stowed from vscode/).
+`--auto` (systemd path unit) merges the editor that actually diverged from
+SSOT, then applies to both. Editor-only keys (cursor.*, overlays, remotes)
+stay on the matching app.
+"""
+from __future__ import annotations
+
+import argparse
+import fcntl
+import hashlib
+import json
+import os
+import re
+import shutil
+import sqlite3
+import subprocess
+import sys
+import tempfile
+import time
+import urllib.error
+import urllib.request
+import zipfile
+from pathlib import Path
+
+HOME = Path.home()
+SCRIPT = Path(__file__).resolve()
+ROOT = SCRIPT.parents[3]
+if not (ROOT / "vscode").is_dir() and (HOME / "dotfiles" / "vscode").is_dir():
+    ROOT = HOME / "dotfiles"
+
+SSOT_HOME = HOME / ".config" / "vscode-ssot"
+SSOT_REPO = ROOT / "vscode" / ".config" / "vscode-ssot"
+
+CODE_USER = HOME / ".config" / "Code" / "User"
+CURSOR_USER = HOME / ".config" / "Cursor" / "User"
+CODE_EXTS = HOME / ".vscode" / "extensions"
+CURSOR_EXTS = HOME / ".cursor" / "extensions"
+
+CURSOR_KEEP = ("cursor.", "aipopup.")
+CODE_STRIP = ("cursor.", "aipopup.")
+SKIP_IDS = {"dotfiles.dotfiles-ssot"}
+CODE_ONLY_IDS = {"ms-vscode.remote-explorer", "ms-python.vscode-pylance"}
+CODE_ONLY_PREFIXES = ("ms-vscode-remote.",)
+CURSOR_ONLY_PREFIXES = ("anysphere.",)
+# Shipped with Cursor; not on Open VSX / VS Marketplace. Harvest lists them
+# so they stay Cursor-only, but never marketplace-install (that failed systemd).
+CURSOR_BUNDLED_IDS = {"anysphere.cursorpyright"}
+
+FORCE_UNPIN = {
+    "workbench.view.backgroundAgent",
+    "workbench.view.extension.backgroundAgent",
+    # Remote Explorer only exists on VS Code (Microsoft remotes); keep it out of
+    # the activity bar so sidebars match Cursor (Anysphere remotes, no viewlet).
+    "workbench.view.remote",
+}
+
+RUNTIME = Path(os.environ.get("XDG_RUNTIME_DIR") or f"/run/user/{os.getuid()}")
+LOCK_PATH = RUNTIME / "vscode-cursor-sync.lock"
+STAMP_PATH = RUNTIME / "vscode-cursor-sync.stamp"
+STAMP_SKIP_SEC = 2.0
+PENDING_CURSOR_STATE = RUNTIME / "vscode-cursor-sync.pending-cursor-state"
+
+CURSOR_LAYOUT = {
+    "cursor/unifiedAppLayout": "editor",
+    # Prefer classic editor chrome; "lastUsedWindows"/"false" restores Agents.
+    "cursor/userWindowRestorationPreference": "default",
+    "cursor/userOpenAgentsWindowOnStartupPreference": "default",
+}
+
+
+def cursor_theme_keys(theme_id: str) -> dict[str, str]:
+    return {
+        "glass.theme.settingsId": theme_id,
+        "glass.theme.darkSettingsId": theme_id,
+        "glass.theme.lightSettingsId": theme_id,
+        "glass.theme.darkHighContrastSettingsId": theme_id,
+        "glass.theme.lightHighContrastSettingsId": theme_id,
+        "glass.theme.detectColorScheme": "false",
+        "cursor.themeSync.enabled": "false",
+    }
+
+
+def ssot_dir() -> Path:
+    if (SSOT_HOME / "settings.json").is_file():
+        return SSOT_HOME
+    if (SSOT_REPO / "settings.json").is_file():
+        return SSOT_REPO
+    raise SystemExit("vscode-ssot not found (restow the vscode package first)")
+
+
+def strip_jsonc(text: str) -> str:
+    """Best-effort JSONC → JSON (comments + trailing commas)."""
+    out: list[str] = []
+    i = 0
+    n = len(text)
+    in_str = False
+    esc = False
+    while i < n:
+        ch = text[i]
+        if in_str:
+            out.append(ch)
+            if esc:
+                esc = False
+            elif ch == "\\":
+                esc = True
+            elif ch == '"':
+                in_str = False
+            i += 1
+            continue
+        if ch == '"':
+            in_str = True
+            out.append(ch)
+            i += 1
+            continue
+        if ch == "/" and i + 1 < n and text[i + 1] == "/":
+            i += 2
+            while i < n and text[i] not in "\r\n":
+                i += 1
+            continue
+        if ch == "/" and i + 1 < n and text[i + 1] == "*":
+            i += 2
+            while i + 1 < n and not (text[i] == "*" and text[i + 1] == "/"):
+                i += 1
+            i = min(i + 2, n)
+            continue
+        out.append(ch)
+        i += 1
+    cleaned = "".join(out)
+    cleaned = re.sub(r",(\s*[}\]])", r"\1", cleaned)
+    return cleaned
+
+
+def load_json(path: Path, default):
+    if not path.is_file():
+        return default
+    raw = path.read_text()
+    try:
+        return json.loads(raw)
+    except json.JSONDecodeError:
+        try:
+            return json.loads(strip_jsonc(raw))
+        except json.JSONDecodeError:
+            print(f"warn: invalid JSON in {path}", file=sys.stderr)
+            return default
+
+
+def dumps_json(data) -> str:
+    return json.dumps(data, ensure_ascii=False, indent=4) + "\n"
+
+
+def write_json(path: Path, data) -> bool:
+    """Write JSON only if content changed. Returns True if written."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    body = dumps_json(data)
+    if path.is_file() and path.read_text() == body:
+        return False
+    path.write_text(body)
+    return True
+
+
+def copy_if_changed(src: Path, dest: Path) -> bool:
+    if dest.is_file() and src.read_bytes() == dest.read_bytes():
+        return False
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    shutil.copy2(src, dest)
+    return True
+
+
+def read_id_list(path: Path) -> list[str]:
+    if not path.is_file():
+        return []
+    ids: list[str] = []
+    for raw in path.read_text().splitlines():
+        line = raw.split("#", 1)[0].strip()
+        if line:
+            ids.append(line)
+    return ids
+
+
+def split_list_file(path: Path) -> tuple[list[str], list[str]]:
+    if not path.is_file():
+        return [], []
+    header: list[str] = []
+    ids: list[str] = []
+    in_header = True
+    for raw in path.read_text().splitlines():
+        stripped = raw.strip()
+        if in_header:
+            if not stripped or stripped.startswith("#"):
+                header.append(raw.rstrip("\n"))
+                continue
+            in_header = False
+        line = raw.split("#", 1)[0].strip()
+        if line:
+            ids.append(line)
+    while header and header[-1] == "":
+        header.pop()
+    return header, ids
+
+
+def write_id_list(path: Path, header: list[str], ids: list[str]) -> None:
+    seen: set[str] = set()
+    ordered: list[str] = []
+    for eid in ids:
+        key = eid.lower()
+        if key in seen:
+            continue
+        seen.add(key)
+        ordered.append(eid)
+    ordered.sort(key=str.lower)
+    lines = list(header)
+    if lines:
+        lines.append("")
+    lines.extend(ordered)
+    path.write_text("\n".join(lines) + "\n")
+
+
+def which(name: str) -> str | None:
+    return shutil.which(name)
+
+
+def process_running(patterns: tuple[str, ...]) -> bool:
+    try:
+        out = subprocess.check_output(["ps", "-eo", "args="], text=True, timeout=5)
+    except (OSError, subprocess.SubprocessError):
+        return False
+    for line in out.splitlines():
+        low = line.lower()
+        if "vscode-cursor-sync" in low:
+            continue
+        for pat in patterns:
+            if pat.lower() in low:
+                return True
+    return False
+
+
+def code_running() -> bool:
+    return process_running(("/usr/share/code/code", "visual-studio-code", "/usr/bin/code "))
+
+
+def cursor_running() -> bool:
+    return process_running(("cursor.AppImage", "Cursor-", "/usr/share/cursor/cursor"))
+
+
+def ext_ids_from_dir(ext_dir: Path) -> set[str]:
+    found: set[str] = set()
+    manifest = ext_dir / "extensions.json"
+    if manifest.is_file():
+        data = load_json(manifest, [])
+        if isinstance(data, list):
+            for item in data:
+                ident = (item or {}).get("identifier") or {}
+                eid = ident.get("id")
+                if eid:
+                    found.add(eid.lower())
+    if ext_dir.is_dir():
+        for child in ext_dir.iterdir():
+            if not child.is_dir() or child.name.startswith("."):
+                continue
+            pkg = child / "package.json"
+            if pkg.is_file():
+                try:
+                    meta = json.loads(pkg.read_text())
+                    pub = meta.get("publisher")
+                    name = meta.get("name")
+                    if pub and name:
+                        found.add(f"{pub}.{name}".lower())
+                except (OSError, json.JSONDecodeError):
+                    pass
+    found -= SKIP_IDS
+    return found
+
+
+def classify_ext(eid: str) -> str:
+    low = eid.lower()
+    if low in SKIP_IDS:
+        return "skip"
+    if low in CODE_ONLY_IDS or any(low.startswith(p) for p in CODE_ONLY_PREFIXES):
+        return "code"
+    if any(low.startswith(p) for p in CURSOR_ONLY_PREFIXES):
+        return "cursor"
+    return "shared"
+
+
+def is_cursor_bundled(eid: str) -> bool:
+    low = eid.lower()
+    if low in CURSOR_BUNDLED_IDS:
+        return True
+    return low.startswith("anysphere.") and not low.startswith("anysphere.remote-")
+
+
+def merge_settings(
+    existing: dict,
+    shared: dict,
+    overlay: dict,
+    *,
+    strip: tuple[str, ...],
+    keep: tuple[str, ...],
+) -> dict:
+    out: dict = {}
+    if isinstance(existing, dict):
+        for key, value in existing.items():
+            if any(key.startswith(p) for p in keep):
+                out[key] = value
+    out.update(shared)
+    out.update(overlay)
+    for key in list(out):
+        if any(key.startswith(p) for p in strip):
+            del out[key]
+    return out
+
+
+def apply_settings(ssot: Path, dry: bool) -> None:
+    shared = load_json(ssot / "settings.json", {})
+    if not isinstance(shared, dict):
+        shared = {}
+    cursor_overlay = load_json(ssot / "cursor.overlay.json", {})
+    code_overlay = load_json(ssot / "code.overlay.json", {})
+    if not isinstance(cursor_overlay, dict):
+        cursor_overlay = {}
+    if not isinstance(code_overlay, dict):
+        code_overlay = {}
+    keys = ssot / "keybindings.json"
+    snippets = ssot / "snippets"
+
+    targets = [
+        ("VS Code", CODE_USER, code_overlay, CODE_STRIP, ()),
+        ("Cursor", CURSOR_USER, cursor_overlay, (), CURSOR_KEEP),
+    ]
+    for label, user_dir, overlay, strip, keep in targets:
+        dest = user_dir / "settings.json"
+        existing = load_json(dest, {})
+        if not isinstance(existing, dict):
+            existing = {}
+        merged = merge_settings(existing, shared, overlay, strip=strip, keep=keep)
+        if dry:
+            print(f"settings → {label}: {dest} (dry)")
+        else:
+            wrote = write_json(dest, merged)
+            print(f"settings → {label}: {dest}" + ("" if wrote else " (unchanged)"))
+        if keys.is_file():
+            dest_keys = user_dir / "keybindings.json"
+            if dry:
+                print(f"keybindings → {label}: {dest_keys} (dry)")
+            else:
+                wrote = copy_if_changed(keys, dest_keys)
+                print(f"keybindings → {label}: {dest_keys}" + ("" if wrote else " (unchanged)"))
+        if snippets.is_dir():
+            files = [p for p in snippets.iterdir() if p.is_file()]
+            if files:
+                target = user_dir / "snippets"
+                print(f"snippets → {label}: {len(files)} file(s)")
+                if not dry:
+                    target.mkdir(parents=True, exist_ok=True)
+                    for src in files:
+                        copy_if_changed(src, target / src.name)
+
+
+def editor_engine_version(cli: str) -> str | None:
+    # Never pass the Cursor wrapper here: `cursor --version` opens extra windows.
+    if not cli:
+        return None
+    name = Path(cli).name.lower()
+    if name == "cursor":
+        return None
+    try:
+        proc = subprocess.run(
+            [cli, "--version"],
+            check=False,
+            capture_output=True,
+            text=True,
+            timeout=30,
+        )
+    except (OSError, subprocess.TimeoutExpired):
+        return None
+    for line in (proc.stdout or "").splitlines():
+        line = line.strip()
+        if re.match(r"^\d+\.\d+\.\d+", line):
+            return line.split()[0]
+    return None
+
+
+def cursor_engine_version() -> str | None:
+    """VS Code engine Cursor is built on — never launch the AppImage."""
+    sidecar = HOME / "applications" / "Cursor.AppImage.vscode-engine"
+    if sidecar.is_file():
+        text = sidecar.read_text().strip()
+        if re.match(r"^\d+\.\d+\.\d+", text):
+            return text.split()[0]
+    tmp = Path("/tmp")
+    if tmp.is_dir():
+        cands = sorted(
+            tmp.glob("appimage_extracted_*/usr/share/cursor/resources/app/product.json"),
+            key=lambda p: p.stat().st_mtime,
+            reverse=True,
+        )
+        for path in cands:
+            try:
+                meta = json.loads(path.read_text())
+            except (OSError, json.JSONDecodeError):
+                continue
+            v = meta.get("vscodeVersion")
+            if v:
+                return str(v).split()[0]
+    return None
+
+
+def parse_semver(text: str) -> tuple[int, ...]:
+    m = re.match(r"^(\d+)\.(\d+)\.(\d+)", text.strip())
+    if not m:
+        return (0, 0, 0)
+    return tuple(int(x) for x in m.groups())
+
+
+def engine_satisfies(installed_engine: str, requirement: str) -> bool:
+    """Rough ^X.Y.Z / >=X.Y.Z check against engines.vscode."""
+    req = requirement.strip()
+    if not req:
+        return True
+    if req.startswith("^"):
+        want = parse_semver(req[1:])
+        have = parse_semver(installed_engine)
+        if have[0] != want[0]:
+            return have[0] > want[0]
+        return have >= want
+    if req.startswith(">="):
+        return parse_semver(installed_engine) >= parse_semver(req[2:])
+    return parse_semver(installed_engine) >= parse_semver(req)
+
+
+def ext_engine_ok(ext_dir: Path, eid: str, editor_version: str | None) -> bool:
+    if not editor_version:
+        return True
+    low = eid.lower()
+    if not ext_dir.is_dir():
+        return False
+    for child in ext_dir.iterdir():
+        if not child.is_dir() or child.name.startswith("."):
+            continue
+        pkg = child / "package.json"
+        if not pkg.is_file():
+            continue
+        try:
+            meta = json.loads(pkg.read_text())
+        except (OSError, json.JSONDecodeError):
+            continue
+        pub = meta.get("publisher")
+        name = meta.get("name")
+        if not pub or not name or f"{pub}.{name}".lower() != low:
+            continue
+        engines = (meta.get("engines") or {}).get("vscode") or ""
+        return engine_satisfies(editor_version, str(engines))
+    return False
+
+
+def _openvsx_versions(publisher: str, name: str) -> list[str]:
+    url = f"https://open-vsx.org/api/{publisher}/{name}"
+    try:
+        with urllib.request.urlopen(url, timeout=30) as resp:
+            data = json.load(resp)
+    except (urllib.error.URLError, TimeoutError, json.JSONDecodeError, OSError):
+        return []
+    raw = [v for v in (data.get("allVersions") or {}) if v and v != "latest"]
+    def key(v: str) -> tuple:
+        parts = []
+        for p in re.split(r"[.\-+]", v):
+            parts.append((0, int(p)) if p.isdigit() else (1, p))
+        return tuple(parts)
+    try:
+        return sorted(raw, key=key, reverse=True)
+    except TypeError:
+        return list(reversed(raw))
+
+
+def _openvsx_engines(publisher: str, name: str, version: str) -> str:
+    url = f"https://open-vsx.org/api/{publisher}/{name}/{version}"
+    try:
+        with urllib.request.urlopen(url, timeout=20) as resp:
+            data = json.load(resp)
+    except (urllib.error.URLError, TimeoutError, json.JSONDecodeError, OSError):
+        return ""
+    return str((data.get("engines") or {}).get("vscode") or "")
+
+
+def resolve_openvsx_compatible(ext_id: str, editor_version: str) -> str | None:
+    """Newest Open VSX version whose engines.vscode matches editor_version."""
+    if "." not in ext_id:
+        return None
+    publisher, name = ext_id.split(".", 1)
+    for ver in _openvsx_versions(publisher, name)[:40]:
+        eng = _openvsx_engines(publisher, name, ver)
+        if engine_satisfies(editor_version, eng):
+            return ver
+    return None
+
+
+def remove_ext_dirs(extensions_dir: Path, ext_id: str) -> None:
+    low = ext_id.lower()
+    if not extensions_dir.is_dir():
+        return
+    for child in list(extensions_dir.iterdir()):
+        if not child.is_dir() or child.name.startswith("."):
+            continue
+        pkg = child / "package.json"
+        if not pkg.is_file():
+            continue
+        try:
+            meta = json.loads(pkg.read_text())
+        except (OSError, json.JSONDecodeError):
+            continue
+        pub, name = meta.get("publisher"), meta.get("name")
+        if pub and name and f"{pub}.{name}".lower() == low:
+            shutil.rmtree(child, ignore_errors=True)
+
+
+def uninstall_extension(
+    ext_id: str, extensions_dir: Path, dry: bool, *, cli: str, label: str
+) -> None:
+    print(f"  prune {ext_id} ← {label} ({extensions_dir})")
+    if dry:
+        return
+    if cli:
+        cmd = [cli, f"--extensions-dir={extensions_dir}", "--uninstall-extension", ext_id]
+        try:
+            proc = subprocess.run(
+                cmd, check=False, capture_output=True, text=True, timeout=120
+            )
+            out = ((proc.stdout or "") + (proc.stderr or "")).strip()
+            if proc.returncode != 0 and out:
+                last = next(
+                    (ln for ln in reversed(out.splitlines()) if ln.strip()), out
+                )
+                print(f"  warn {ext_id} uninstall via CLI: {last}", file=sys.stderr)
+        except (OSError, subprocess.TimeoutExpired) as exc:
+            print(f"  warn {ext_id} uninstall via CLI: {exc}", file=sys.stderr)
+    remove_ext_dirs(extensions_dir, ext_id)
+
+
+def prune_foreign_extensions(dry: bool) -> None:
+    """Remove wrong-editor extensions (not extra shared ones)."""
+    jobs = [
+        ("VS Code", CODE_EXTS, "cursor", which("code") or "", code_running),
+        # Never call the Cursor AppImage to uninstall — it would relaunch the GUI
+        # from the idle timer. Directory removal is enough after quit.
+        ("Cursor", CURSOR_EXTS, "code", "", cursor_running),
+    ]
+    for label, ext_dir, foreign_kind, cli, running_fn in jobs:
+        if not ext_dir.is_dir():
+            continue
+        foreign = sorted(
+            eid for eid in ext_ids_from_dir(ext_dir) if classify_ext(eid) == foreign_kind
+        )
+        if not foreign:
+            print(f"prune {label}: no foreign extensions")
+            continue
+        if running_fn() and not dry:
+            print(
+                f"prune {label}: skip (app running; "
+                f"{len(foreign)} foreign: {', '.join(foreign)})"
+            )
+            if label == "Cursor":
+                request_cursor_state_apply()
+            continue
+        print(f"prune {label}: {', '.join(foreign)}")
+        for eid in foreign:
+            uninstall_extension(eid, ext_dir, dry, cli=cli, label=label)
+
+
+def install_vsix_openvsx(
+    ext_id: str, version: str, extensions_dir: Path
+) -> bool:
+    publisher, name = ext_id.split(".", 1)
+    url = (
+        f"https://open-vsx.org/api/{publisher}/{name}/{version}/file/"
+        f"{publisher}.{name}-{version}.vsix"
+    )
+    dest = extensions_dir / f"{publisher}.{name}-{version}"
+    try:
+        with tempfile.TemporaryDirectory(prefix="vsix-") as tmp:
+            vsix = Path(tmp) / "ext.vsix"
+            with urllib.request.urlopen(url, timeout=120) as resp, vsix.open("wb") as out:
+                shutil.copyfileobj(resp, out)
+            with zipfile.ZipFile(vsix) as zf:
+                zf.extractall(tmp)
+            ext_root = Path(tmp) / "extension"
+            if not ext_root.is_dir():
+                return False
+            remove_ext_dirs(extensions_dir, ext_id)
+            if dest.exists():
+                shutil.rmtree(dest, ignore_errors=True)
+            shutil.move(str(ext_root), str(dest))
+        return True
+    except (urllib.error.URLError, TimeoutError, OSError, zipfile.BadZipFile) as exc:
+        print(f"  fail {ext_id}@{version} open-vsx: {exc}", file=sys.stderr)
+        return False
+
+
+def install_extension(
+    ext_id: str,
+    extensions_dir: Path,
+    dry: bool,
+    *,
+    cli: str,
+    label: str,
+    editor_version: str | None,
+) -> bool:
+    if not cli and not editor_version:
+        print(f"  skip {ext_id}: CLI for {label} not found", file=sys.stderr)
+        return False
+    print(f"  install {ext_id} → {extensions_dir} via {Path(cli).name if cli else 'open-vsx'}")
+    if dry:
+        return True
+
+    ok = False
+    if cli:
+        cmd = [cli, f"--extensions-dir={extensions_dir}", "--install-extension", ext_id]
+        try:
+            proc = subprocess.run(
+                cmd, check=False, capture_output=True, text=True, timeout=180
+            )
+        except subprocess.TimeoutExpired:
+            print(f"  timeout {ext_id}", file=sys.stderr)
+            proc = None
+        if proc is not None:
+            out = (proc.stdout or "") + (proc.stderr or "")
+            ok = proc.returncode == 0 or "already installed" in out.lower()
+            if not ok:
+                last = next(
+                    (ln for ln in reversed(out.splitlines()) if ln.strip()), out.strip()
+                )
+                print(f"  fail {ext_id}: {last}", file=sys.stderr)
+
+    if editor_version and (
+        not ok or not ext_engine_ok(extensions_dir, ext_id, editor_version)
+    ):
+        pin = resolve_openvsx_compatible(ext_id, editor_version)
+        if not pin:
+            print(
+                f"  warn {ext_id}: no Open VSX build matches {label} {editor_version}",
+                file=sys.stderr,
+            )
+            return False
+        print(f"  pin {ext_id}@{pin} for {label} engine {editor_version}")
+        if not install_vsix_openvsx(ext_id, pin, extensions_dir):
+            return False
+        if not ext_engine_ok(extensions_dir, ext_id, editor_version):
+            print(
+                f"  warn {ext_id}@{pin}: still engine-mismatched for {label}",
+                file=sys.stderr,
+            )
+            return False
+        return True
+
+    return ok
+
+
+def apply_extensions(ssot: Path, dry: bool) -> int:
+    shared = read_id_list(ssot / "extensions.txt")
+    code_only = read_id_list(ssot / "extensions-code.txt")
+    cursor_only = read_id_list(ssot / "extensions-cursor.txt")
+    failed = 0
+
+    prune_foreign_extensions(dry)
+
+    code_cli = which("code")
+    code_ver = editor_engine_version(code_cli) if code_cli else None
+    cursor_ver = cursor_engine_version()
+
+    jobs = []
+    if CODE_EXTS.parent.is_dir() or code_cli:
+        jobs.append(("VS Code", CODE_EXTS, shared + code_only, code_cli or "", code_ver, "cursor"))
+    if CURSOR_EXTS.parent.is_dir() or cursor_ver or (HOME / ".cursor").is_dir():
+        # Never invoke the Cursor AppImage CLI (opens extra windows; --version
+        # is product 3.x not vscodeVersion). Install via Open VSX pins.
+        jobs.append(("Cursor", CURSOR_EXTS, shared + cursor_only, "", cursor_ver, "code"))
+
+    for label, ext_dir, wanted, cli, ver, skip_kind in jobs:
+        ext_dir.mkdir(parents=True, exist_ok=True)
+        wanted = [
+            eid
+            for eid in wanted
+            if classify_ext(eid) not in ("skip", skip_kind)
+        ]
+        have = ext_ids_from_dir(ext_dir)
+        missing = [eid for eid in wanted if eid.lower() not in have]
+        # Also reinstall IDs present on disk but incompatible with engine.
+        broken = [
+            eid
+            for eid in wanted
+            if eid.lower() in have and ver and not ext_engine_ok(ext_dir, eid, ver)
+        ]
+        todo = list(dict.fromkeys(missing + broken))
+        print(
+            f"extensions {label}: {len(have)} installed, "
+            f"{len(missing)} missing, {len(broken)} engine-mismatch"
+        )
+        for eid in todo:
+            kind = classify_ext(eid)
+            if kind == "skip" or kind == skip_kind:
+                print(f"  skip {eid}: {kind}-only, not for {label}")
+                continue
+            if label == "Cursor" and is_cursor_bundled(eid):
+                print(f"  skip {eid}: bundled with Cursor, not marketplace")
+                continue
+            if not install_extension(
+                eid, ext_dir, dry, cli=cli, label=label, editor_version=ver
+            ):
+                failed += 1
+    return failed
+
+
+HARVEST_HEADERS = {
+    "shared": [
+        "# Shared VS Code ↔ Cursor marketplace extensions.",
+        "# Do not list anysphere.* (Cursor-only) or Microsoft remotes / Pylance here.",
+        "# Anysphere vs Microsoft remotes, and Pylance vs cursorpyright, live in",
+        "# extensions-code.txt / extensions-cursor.txt. Theme SSOT is theme-render.",
+    ],
+    "code": [
+        "# VS Code only — Microsoft remotes and Pylance.",
+        "# Do not copy these into Cursor (Anysphere remotes + bundled cursorpyright).",
+    ],
+    "cursor": [
+        "# Cursor only — all anysphere.* (cursorpyright, remotes, …).",
+        "# Do not copy these into VS Code (Microsoft remotes + Pylance).",
+    ],
+}
+
+
+def harvest_extensions(ssot: Path, dry: bool) -> None:
+    files = {
+        "shared": ssot / "extensions.txt",
+        "code": ssot / "extensions-code.txt",
+        "cursor": ssot / "extensions-cursor.txt",
+    }
+    old_by_kind: dict[str, set[str]] = {}
+    # Prefer existing list spelling; dirs contribute lowercase publisher.name.
+    canonical: dict[str, str] = {}
+    for kind, path in files.items():
+        _header, ids = split_list_file(path)
+        old_by_kind[kind] = {eid.lower() for eid in ids}
+        for eid in ids:
+            canonical.setdefault(eid.lower(), eid)
+    for ext_dir in (CODE_EXTS, CURSOR_EXTS):
+        for eid in ext_ids_from_dir(ext_dir):
+            canonical.setdefault(eid.lower(), eid)
+
+    buckets: dict[str, list[str]] = {"shared": [], "code": [], "cursor": []}
+    for eid in canonical.values():
+        kind = classify_ext(eid)
+        if kind == "skip":
+            continue
+        buckets[kind].append(eid)
+
+    moved: list[str] = []
+    for kind, ids in buckets.items():
+        for eid in ids:
+            low = eid.lower()
+            previous = [k for k, old in old_by_kind.items() if low in old]
+            if previous and kind not in previous:
+                moved.append(f"{eid}: {previous[0]} → {kind}")
+            elif not previous:
+                moved.append(f"{eid}: new → {kind}")
+
+    print(
+        "harvest extensions: "
+        + ", ".join(f"{kind}={len(ids)}" for kind, ids in buckets.items())
+    )
+    for line in moved:
+        print(f"  rehome {line}")
+    if dry:
+        return
+    for kind, path in files.items():
+        write_id_list(path, HARVEST_HEADERS[kind], buckets[kind])
+
+
+def vscdb_get(db: Path, key: str):
+    if not db.is_file():
+        return None
+    con = sqlite3.connect(f"file:{db}?mode=ro", uri=True)
+    try:
+        cur = con.cursor()
+        cur.execute("SELECT value FROM ItemTable WHERE key=?", (key,))
+        row = cur.fetchone()
+        return row[0] if row else None
+    finally:
+        con.close()
+
+
+def vscdb_set(db: Path, items: dict[str, str], dry: bool) -> bool:
+    if not db.is_file():
+        print(f"  skip {db}: missing", file=sys.stderr)
+        return False
+    if dry:
+        for key in items:
+            print(f"  would set {key} in {db}")
+        return True
+    try:
+        con = sqlite3.connect(db, timeout=15)
+        cur = con.cursor()
+        for key, value in items.items():
+            cur.execute(
+                "INSERT INTO ItemTable (key, value) VALUES (?, ?) "
+                "ON CONFLICT(key) DO UPDATE SET value=excluded.value",
+                (key, value),
+            )
+        con.commit()
+        con.close()
+    except sqlite3.Error as exc:
+        print(f"  fail {db}: {exc}", file=sys.stderr)
+        return False
+    return True
+
+
+def vscdb_delete(db: Path, keys: list[str], dry: bool) -> bool:
+    if not db.is_file():
+        return False
+    if dry:
+        for key in keys:
+            print(f"  would delete {key} from {db}")
+        return True
+    try:
+        con = sqlite3.connect(db, timeout=15)
+        cur = con.cursor()
+        for key in keys:
+            cur.execute("DELETE FROM ItemTable WHERE key=?", (key,))
+        con.commit()
+        con.close()
+    except sqlite3.Error as exc:
+        print(f"  fail {db}: {exc}", file=sys.stderr)
+        return False
+    return True
+
+
+def clear_extension_bisect(db: Path, dry: bool) -> None:
+    if vscdb_get(db, "extensionBisectState") is None:
+        return
+    print(f"clear extension bisect → {db}")
+    vscdb_delete(db, ["extensionBisectState"], dry)
+
+
+def merge_pinned_viewlets(canonical: list, live) -> list:
+    by_id = {
+        item.get("id"): item
+        for item in canonical
+        if isinstance(item, dict) and item.get("id")
+    }
+    merged = [dict(item) for item in canonical if isinstance(item, dict)]
+    if isinstance(live, list):
+        for item in live:
+            if not isinstance(item, dict):
+                continue
+            vid = item.get("id")
+            if vid and vid not in by_id:
+                extra = dict(item)
+                extra["pinned"] = False
+                extra["visible"] = False
+                merged.append(extra)
+    for item in merged:
+        if item.get("id") in FORCE_UNPIN:
+            item["pinned"] = False
+            item["visible"] = False
+    # Stable visual order: pinned first (SSOT order), then the rest.
+    pinned = [i for i in merged if i.get("pinned")]
+    rest = [i for i in merged if not i.get("pinned")]
+    ordered = pinned + rest
+    for idx, item in enumerate(ordered):
+        item["order"] = idx
+    return ordered
+
+
+def request_cursor_state_apply() -> None:
+    try:
+        PENDING_CURSOR_STATE.write_text("1\n")
+    except OSError as exc:
+        print(f"warn: could not write pending cursor state: {exc}", file=sys.stderr)
+
+
+def clear_cursor_state_pending() -> None:
+    try:
+        PENDING_CURSOR_STATE.unlink(missing_ok=True)
+    except OSError:
+        pass
+
+
+def cursor_state_pending() -> bool:
+    return PENDING_CURSOR_STATE.is_file()
+
+
+def pull_activity_bar(ssot: Path, dry: bool) -> None:
+    db = CODE_USER / "globalStorage" / "state.vscdb"
+    raw = vscdb_get(db, "workbench.activity.pinnedViewlets2")
+    if not raw:
+        print("pull activity bar: VS Code pin list missing, skip")
+        return
+    try:
+        pins = json.loads(raw)
+    except json.JSONDecodeError:
+        print("pull activity bar: invalid JSON in VS Code state, skip", file=sys.stderr)
+        return
+    if not isinstance(pins, list):
+        print("pull activity bar: unexpected shape, skip", file=sys.stderr)
+        return
+    # Keep SSOT pin *set* from Code, but normalize order / FORCE_UNPIN so Cursor
+    # and Code sidebars stay aligned.
+    existing = load_json(ssot / "activity-bar.json", {})
+    canonical = existing.get("pinnedViewlets") if isinstance(existing, dict) else None
+    if isinstance(canonical, list) and canonical:
+        # Prefer SSOT pin flags/order; absorb any new ids from live Code as unpinned.
+        pins = merge_pinned_viewlets(canonical, pins)
+    else:
+        pins = merge_pinned_viewlets(pins, None)
+    dest = ssot / "activity-bar.json"
+    print(f"pull activity bar → {dest}")
+    if not dry:
+        write_json(dest, {"pinnedViewlets": pins})
+
+
+def apply_activity_bar(ssot: Path, dry: bool) -> None:
+    data = load_json(ssot / "activity-bar.json", {})
+    pins = data.get("pinnedViewlets") if isinstance(data, dict) else None
+    if not isinstance(pins, list) or not pins:
+        print("activity bar: no pinnedViewlets in SSOT, skip")
+        return
+    targets = [
+        ("VS Code", CODE_USER / "globalStorage" / "state.vscdb", code_running()),
+        ("Cursor", CURSOR_USER / "globalStorage" / "state.vscdb", cursor_running()),
+    ]
+    for label, db, running in targets:
+        if running and not dry:
+            print(f"activity bar → {label}: skip (app running; would be overwritten on quit)")
+            if label == "Cursor":
+                request_cursor_state_apply()
+            continue
+        live_raw = vscdb_get(db, "workbench.activity.pinnedViewlets2")
+        live = None
+        if live_raw:
+            try:
+                live = json.loads(live_raw)
+            except json.JSONDecodeError:
+                live = None
+        merged = merge_pinned_viewlets(pins, live)
+        print(f"activity bar → {label}: {db}")
+        vscdb_set(db, {"workbench.activity.pinnedViewlets2": json.dumps(merged, ensure_ascii=False)}, dry)
+
+
+def apply_cursor_layout(dry: bool) -> None:
+    if cursor_running() and not dry:
+        print("cursor layout: skip (Cursor running; would be overwritten on quit)")
+        request_cursor_state_apply()
+        return
+    db = CURSOR_USER / "globalStorage" / "state.vscdb"
+    print(f"cursor layout → editor (classic): {db}")
+    vscdb_set(db, CURSOR_LAYOUT, dry)
+    clear_extension_bisect(db, dry)
+    code_db = CODE_USER / "globalStorage" / "state.vscdb"
+    if not (code_running() and not dry):
+        clear_extension_bisect(code_db, dry)
+
+
+def patch_json_keys(path: Path, updates: dict, dry: bool) -> None:
+    data = load_json(path, {})
+    if not isinstance(data, dict):
+        data = {}
+    before = dumps_json(data)
+    data.update(updates)
+    after = dumps_json(data)
+    print(f"patch {path}: {', '.join(updates)}")
+    if dry or before == after:
+        return
+    path.write_text(after)
+
+
+def apply_cursor_theme(ssot: Path, dry: bool) -> None:
+    shared = load_json(ssot / "settings.json", {})
+    theme = "SSOT"
+    if isinstance(shared, dict) and shared.get("workbench.colorTheme"):
+        theme = str(shared["workbench.colorTheme"])
+    keys = cursor_theme_keys(theme)
+    print(f"cursor glass theme → {theme}")
+    if cursor_running() and not dry:
+        print("  skip vscdb/storage glass patch (Cursor running; apply after quit)")
+        request_cursor_state_apply()
+        return
+    vscdb_set(CURSOR_USER / "globalStorage" / "state.vscdb", keys, dry)
+    storage = CURSOR_USER / "globalStorage" / "storage.json"
+    if storage.is_file():
+        patch_json_keys(
+            storage,
+            {
+                "glass.theme.settingsId": theme,
+                "glass.theme.darkSettingsId": theme,
+                "glass.theme.lightSettingsId": theme,
+                "glass.theme.darkHighContrastSettingsId": theme,
+                "glass.theme.lightHighContrastSettingsId": theme,
+                "glass.theme.detectColorScheme": False,
+            },
+            dry,
+        )
+
+
+def apply_pending_cursor_state(ssot: Path, dry: bool) -> None:
+    """Flush layout/theme/activity/prune/bisect into Cursor after quit."""
+    if not cursor_state_pending():
+        return
+    if cursor_running() and not dry:
+        print("pending cursor state: still running, keep flag")
+        return
+    print("pending cursor state: applying layout/theme/activity/prune")
+    apply_cursor_layout(dry)  # also clears extensionBisectState
+    apply_cursor_theme(ssot, dry)
+    apply_activity_bar(ssot, dry)
+    prune_foreign_extensions(dry)
+    if not dry and not cursor_running():
+        clear_cursor_state_pending()
+
+
+def print_extension_parity() -> None:
+    code = ext_ids_from_dir(CODE_EXTS)
+    cur = ext_ids_from_dir(CURSOR_EXTS)
+    only_code = sorted(code - cur)
+    only_cur = sorted(cur - code)
+    print(
+        f"extension parity: Code={len(code)} Cursor={len(cur)} "
+        f"(only-code={len(only_code)} only-cursor={len(only_cur)})"
+    )
+    for eid in only_code:
+        kind = classify_ext(eid)
+        tag = {"code": "code-only", "cursor": "cursor-only"}.get(kind, "unexpected")
+        print(f"  only Code [{tag}]: {eid}")
+    for eid in only_cur:
+        kind = classify_ext(eid)
+        tag = {"code": "code-only", "cursor": "cursor-only"}.get(kind, "unexpected")
+        print(f"  only Cursor [{tag}]: {eid}")
+
+
+def ensure_ssot_registered(ext_dir: Path, dry: bool) -> None:
+    dest = ext_dir / "dotfiles-ssot"
+    if not (dest / "package.json").is_file():
+        return
+    obsolete = ext_dir / ".obsolete"
+    if obsolete.is_file() and not dry:
+        try:
+            data = load_json(obsolete, {})
+            if isinstance(data, dict) and any("dotfiles-ssot" in str(k) for k in data):
+                cleaned = {
+                    k: v
+                    for k, v in data.items()
+                    if "dotfiles-ssot" not in str(k).lower()
+                }
+                write_json(obsolete, cleaned)
+                print(f"cleared obsolete marker → {obsolete}")
+        except Exception as exc:
+            print(f"warn: could not clean {obsolete}: {exc}", file=sys.stderr)
+
+    manifest = ext_dir / "extensions.json"
+    items = load_json(manifest, [])
+    if not isinstance(items, list):
+        items = []
+    eid = "dotfiles.dotfiles-ssot"
+    for item in items:
+        ident = (item or {}).get("identifier") or {}
+        if str(ident.get("id") or "").lower() == eid:
+            return
+    entry = {
+        "identifier": {"id": eid},
+        "version": "0.0.1",
+        "location": {"$mid": 1, "path": str(dest), "scheme": "file"},
+        "relativeLocation": "dotfiles-ssot",
+    }
+    print(f"register {eid} → {manifest}")
+    if dry:
+        return
+    items.append(entry)
+    write_json(manifest, items)
+
+
+def overlay_keys(ssot: Path, which: str) -> set[str]:
+    name = "cursor.overlay.json" if which == "cursor" else "code.overlay.json"
+    data = load_json(ssot / name, {})
+    if isinstance(data, dict):
+        return set(data.keys())
+    return set()
+
+
+def strip_editor_only(live: dict, extra_keys: set[str] | None = None) -> dict:
+    out = dict(live)
+    for key in list(out):
+        if any(key.startswith(p) for p in CODE_STRIP):
+            del out[key]
+        elif extra_keys and key in extra_keys:
+            del out[key]
+    return out
+
+
+def shared_fingerprint(data: dict) -> str:
+    body = json.dumps(data, sort_keys=True, ensure_ascii=False, separators=(",", ":"))
+    return hashlib.sha256(body.encode()).hexdigest()
+
+
+def pull_from_user(
+    user_dir: Path,
+    label: str,
+    ssot: Path,
+    dry: bool,
+    *,
+    activity: bool,
+    overlay: set[str],
+) -> None:
+    live = load_json(user_dir / "settings.json", {})
+    if not isinstance(live, dict):
+        raise SystemExit(f"{label} settings.json missing or invalid")
+    live = strip_editor_only(live, overlay)
+    dest = ssot / "settings.json"
+    print(f"pull {label} settings → {dest}")
+    if not dry:
+        write_json(dest, live)
+    keys_src = user_dir / "keybindings.json"
+    if keys_src.is_file():
+        print(f"pull {label} keybindings → {ssot / 'keybindings.json'}")
+        if not dry:
+            copy_if_changed(keys_src, ssot / "keybindings.json")
+    if activity:
+        pull_activity_bar(ssot, dry)
+
+
+def pull_from_code(ssot: Path, dry: bool) -> None:
+    pull_from_user(
+        CODE_USER,
+        "VS Code",
+        ssot,
+        dry,
+        activity=True,
+        overlay=overlay_keys(ssot, "code"),
+    )
+
+
+def pull_from_cursor(ssot: Path, dry: bool) -> None:
+    pull_from_user(
+        CURSOR_USER,
+        "Cursor",
+        ssot,
+        dry,
+        activity=False,
+        overlay=overlay_keys(ssot, "cursor"),
+    )
+
+
+def newest_mtime(paths: list[Path]) -> float:
+    times = [p.stat().st_mtime for p in paths if p.is_file()]
+    return max(times) if times else 0.0
+
+
+def load_stamp() -> dict:
+    if not STAMP_PATH.is_file():
+        return {}
+    try:
+        return json.loads(STAMP_PATH.read_text())
+    except json.JSONDecodeError:
+        return {}
+
+
+def recently_applied_echo() -> bool:
+    """Skip only if watched files are still exactly what we last wrote."""
+    stamp = load_stamp()
+    hashes = stamp.get("hashes") if isinstance(stamp, dict) else None
+    if not isinstance(hashes, dict) or not hashes:
+        return False
+    if (time.time() - STAMP_PATH.stat().st_mtime) > 30:
+        return False
+    for rel, digest in hashes.items():
+        path = Path(rel)
+        if not path.is_file():
+            return False
+        body = path.read_bytes()
+        if hashlib.sha256(body).hexdigest() != digest:
+            return False
+    return True
+
+
+def acquire_lock():
+    RUNTIME.mkdir(parents=True, exist_ok=True)
+    fd = os.open(LOCK_PATH, os.O_CREAT | os.O_RDWR, 0o600)
+    try:
+        fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+    except BlockingIOError:
+        os.close(fd)
+        return None
+    return fd
+
+
+def mark_applied() -> None:
+    RUNTIME.mkdir(parents=True, exist_ok=True)
+    watched = [
+        CODE_USER / "settings.json",
+        CODE_USER / "keybindings.json",
+        CURSOR_USER / "settings.json",
+        CURSOR_USER / "keybindings.json",
+        CODE_EXTS / "extensions.json",
+        CURSOR_EXTS / "extensions.json",
+    ]
+    hashes = {}
+    for path in watched:
+        if path.is_file():
+            hashes[str(path)] = hashlib.sha256(path.read_bytes()).hexdigest()
+    STAMP_PATH.write_text(json.dumps({"ts": time.time(), "hashes": hashes}) + "\n")
+
+
+def live_shared_dict(user_dir: Path, ssot: Path, which: str) -> dict:
+    live = load_json(user_dir / "settings.json", {})
+    if not isinstance(live, dict):
+        return {}
+    return strip_editor_only(live, overlay_keys(ssot, which))
+
+
+def auto_pull(ssot: Path, dry: bool) -> None:
+    shared = load_json(ssot / "settings.json", {})
+    if not isinstance(shared, dict):
+        shared = {}
+    ssot_fp = shared_fingerprint(shared)
+
+    code_live = live_shared_dict(CODE_USER, ssot, "code")
+    cursor_live = live_shared_dict(CURSOR_USER, ssot, "cursor")
+    code_fp = shared_fingerprint(code_live)
+    cursor_fp = shared_fingerprint(cursor_live)
+
+    code_diff = code_fp != ssot_fp
+    cursor_diff = cursor_fp != ssot_fp
+    code_m = newest_mtime([CODE_USER / "settings.json", CODE_USER / "keybindings.json"])
+    cursor_m = newest_mtime(
+        [CURSOR_USER / "settings.json", CURSOR_USER / "keybindings.json"]
+    )
+
+    if not code_diff and not cursor_diff:
+        print("auto: settings already match SSOT, skip pull")
+        return
+    if code_diff and not cursor_diff:
+        print("auto: VS Code diverged from SSOT")
+        pull_from_code(ssot, dry)
+        return
+    if cursor_diff and not code_diff:
+        print("auto: Cursor diverged from SSOT")
+        pull_from_cursor(ssot, dry)
+        return
+    # Both diverged — pick newer mtime, but never if both equal to each other
+    # via overlay pollution (fingerprints differ from SSOT but equal each other).
+    if code_fp == cursor_fp:
+        print("auto: both editors match each other but not SSOT → prefer VS Code")
+        pull_from_code(ssot, dry)
+        return
+    if code_m >= cursor_m:
+        print("auto: both diverged; VS Code mtime wins")
+        pull_from_code(ssot, dry)
+    else:
+        print("auto: both diverged; Cursor mtime wins")
+        pull_from_cursor(ssot, dry)
+
+
+def apply_all(ssot: Path, dry: bool, *, settings: bool, activity: bool, extensions: bool) -> int:
+    apply_pending_cursor_state(ssot, dry)
+    if settings:
+        apply_settings(ssot, dry)
+        apply_cursor_layout(dry)
+        apply_cursor_theme(ssot, dry)
+        ensure_ssot_registered(CODE_EXTS, dry)
+        ensure_ssot_registered(CURSOR_EXTS, dry)
+    if activity:
+        apply_activity_bar(ssot, dry)
+    failed = 0
+    if extensions:
+        failed = apply_extensions(ssot, dry)
+        print_extension_parity()
+    return failed
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--from-code", action="store_true")
+    parser.add_argument("--from-cursor", action="store_true")
+    parser.add_argument("--auto", action="store_true")
+    parser.add_argument("--harvest-extensions", action="store_true")
+    parser.add_argument("--skip-settings", action="store_true")
+    parser.add_argument("--skip-extensions", action="store_true")
+    parser.add_argument("--skip-activity-bar", action="store_true")
+    parser.add_argument(
+        "--apply-cursor-state",
+        action="store_true",
+        help="Force layout/theme/activity into Cursor (for session start / after quit)",
+    )
+    parser.add_argument("-n", "--dry-run", action="store_true")
+    args = parser.parse_args()
+
+    ssot = ssot_dir()
+    print(f"canonical: {ssot}")
+
+    lock_fd = None
+    if args.auto:
+        if recently_applied_echo():
+            print("auto: skip (echo of our last apply)")
+            return 0
+        lock_fd = acquire_lock()
+        if lock_fd is None:
+            print("auto: skip (locked)")
+            return 0
+
+    failed = 0
+    try:
+        if args.apply_cursor_state:
+            request_cursor_state_apply()
+            apply_pending_cursor_state(ssot, args.dry_run)
+            if not args.from_code and not args.from_cursor and not args.auto:
+                print("done")
+                return 0
+
+        if args.auto:
+            auto_pull(ssot, args.dry_run)
+            harvest_extensions(ssot, args.dry_run)
+        else:
+            if args.from_code and args.from_cursor:
+                raise SystemExit("use only one of --from-code / --from-cursor")
+            if args.from_code:
+                pull_from_code(ssot, args.dry_run)
+            if args.from_cursor:
+                pull_from_cursor(ssot, args.dry_run)
+            if args.harvest_extensions:
+                harvest_extensions(ssot, args.dry_run)
+
+        failed = apply_all(
+            ssot,
+            args.dry_run,
+            settings=not args.skip_settings,
+            activity=not args.skip_activity_bar,
+            extensions=not args.skip_extensions,
+        )
+        if args.auto and not args.dry_run:
+            mark_applied()
+    finally:
+        if lock_fd is not None:
+            fcntl.flock(lock_fd, fcntl.LOCK_UN)
+            os.close(lock_fd)
+
+    if failed:
+        print(f"done with {failed} extension install error(s)", file=sys.stderr)
+        if args.auto:
+            return 0
+        return 1
+    print("done")
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())
