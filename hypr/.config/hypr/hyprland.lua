@@ -210,7 +210,10 @@ hl.device({
     accel_profile = "adaptive",
 })
 
+local session_apps = require("session-apps")
+
 hl.on("hyprland.start", function()
+    session_apps.begin_restore()
     -- VPN first — no delay; script retries until helper is ready.
     hl.exec_cmd("~/.config/hypr/scripts/vpn-autostart.sh")
     -- Rice owns notifications; stop swaync if it grabbed the bus.

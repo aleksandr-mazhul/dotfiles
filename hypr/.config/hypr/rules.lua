@@ -22,12 +22,11 @@ hl.layer_rule({
     ignore_alpha = 0.2,
 })
 
--- DS popup surfaces (launcher & future popups): one glass pane, NO fullscreen
--- dim (design-system anti-pattern #6 — dim kills the material). The layer is
--- fully transparent outside the pane, so ignore_alpha frosts only the glass.
+-- DS popup surface (launcher + wallpaper / VPN / clipboard pages):
+-- one glass sheet, no fullscreen dim. Pages share namespace rice-popup.
 hl.layer_rule({
     name = "rice-popup-glass",
-    match = { namespace = "^rice-popup$" },
+    match = { namespace = "^rice-(popup|clipboard)$" },
     blur = true,
     ignore_alpha = 0.03,
 })
@@ -65,75 +64,20 @@ hl.window_rule({
 -- App → workspace (ported from macos yabai scripts/rules.sh + spaces.sh)
 -- Labels/indices: W=1 C=2 V=3 D=4 G=5 X=6 Z=7 E=8 T=9 I=10 P=11 Q=12 U=13 Y=14 R=15 A=16
 --
--- Only TILE the first/main window to the home workspace. Floating children
--- (Telegram RMB menus, media viewer, dialogs) stay on the current workspace.
--- If the app was moved off its home, new windows follow the existing instance
--- (see window.open handler below) — so popups never "fly" to the home letter.
+-- Do NOT pin tiled windows with a persistent workspace rule — that would undo
+-- session restore. Floating children stay put (unset). Tiled placement is
+-- sibling → restore snapshot (login only) → APP_HOME, in the handler below.
 -- =============================================================================
 
-local APP_HOME = {
-    -- name, class regex (Hyprland PCRE), workspace id, exact classes for Lua follow-handler
-    { "webstorm", "^jetbrains-webstorm$", "1", { "jetbrains-webstorm" } },
-    { "clion", "^jetbrains-clion$", "2", { "jetbrains-clion" } },
-    { "cursor", "^(cursor|Cursor)$", "2", { "cursor", "Cursor" } },
-    { "firefox", "^(firefox|Firefox)$", "3", { "firefox", "Firefox" } },
-    { "zen", "^(zen|zen-browser|Zen|Zen-browser)$", "3", { "zen", "zen-browser", "Zen", "Zen-browser" } },
-    { "yandex", "^[Yy]andex.?[Bb]rowser$", "4", { "yandex-browser", "Yandex-browser" } },
-    {
-        "chrome",
-        "^(google-chrome|Google-chrome|chromium|Chromium|brave-browser|Brave-browser)$",
-        "5",
-        { "google-chrome", "Google-chrome", "chromium", "Chromium", "brave-browser", "Brave-browser" },
-    },
-    { "claude", "^com\\.anthropic\\.Claude$", "6", { "com.anthropic.Claude" } },
-    { "kitty", "^kitty$", "7", { "kitty" } },
-    {
-        "nautilus",
-        "^(org\\.gnome\\.Nautilus|Nautilus|nautilus)$",
-        "8",
-        { "org.gnome.Nautilus", "Nautilus", "nautilus" },
-    },
-    {
-        "telegram",
-        "^(org\\.telegram\\.desktop|TelegramDesktop)$",
-        "9",
-        { "org.telegram.desktop", "TelegramDesktop" },
-    },
-    { "discord", "^(discord|Discord)$", "10", { "discord", "Discord" } },
-    {
-        "preview",
-        "^(org\\.gnome\\.Evince|evince|org\\.gnome\\.Loupe|loupe|eog|org\\.kde\\.okular|okular|imv)$",
-        "11",
-        { "org.gnome.Evince", "evince", "org.gnome.Loupe", "loupe", "eog", "org.kde.okular", "okular", "imv" },
-    },
-    { "spotify", "^(spotify|Spotify)$", "13", { "spotify", "Spotify" } },
-    { "zoom", "^(zoom|Zoom)$", "14", { "zoom", "Zoom" } },
-    { "obs", "^(com\\.obsproject\\.Studio|obs)$", "14", { "com.obsproject.Studio", "obs" } },
-    { "obsidian", "^(obsidian|Obsidian)$", "15", { "obsidian", "Obsidian" } },
-    {
-        "thunderbird",
-        "^(thunderbird|Thunderbird|org\\.mozilla\\.Thunderbird)$",
-        "16",
-        { "thunderbird", "Thunderbird", "org.mozilla.Thunderbird" },
-    },
-}
+local apps = require("apps")
+local session_apps = require("session-apps")
 
-local BOUND_CLASS = {}
-for _, app in ipairs(APP_HOME) do
-    local name, class_re, ws, classes = app[1], app[2], app[3], app[4]
+for _, app in ipairs(apps.catalog) do
     hl.window_rule({
-        name = name .. "-to-" .. ws,
-        match = { class = class_re, float = false },
-        workspace = ws,
-    })
-    hl.window_rule({
-        name = name .. "-float-stay",
-        match = { class = class_re, float = true },
+        name = app.id .. "-float-stay",
+        match = { class = app.class_re, float = true },
         workspace = "unset",
     })
-    for _, c in ipairs(classes) do
-        BOUND_CLASS[c] = true
-    end
 end
 
 -- Telegram RMB menus / media viewer already have their own chrome — Hypr's
@@ -152,24 +96,45 @@ hl.window_rule({
 
 -- Q (12): Wolfram — Mac-only; no Linux rule
 
--- If an app instance already exists (possibly moved off its home), keep new
--- windows of that class on the same workspace as the existing one.
-hl.on("window.open", function(win)
-    -- Event may pass the window directly or a table with .window
+local function unwrap_window(win)
     if type(win) == "table" and win.window then
         win = win.window
     end
     if type(win) ~= "userdata" and type(win) ~= "table" then
-        return
+        return nil
     end
-    local class = win.class
-    if not class or not BOUND_CLASS[class] then
-        return
-    end
+    return win
+end
 
+local function move_to_workspace_silent(win, ws_id)
+    if not ws_id then
+        return
+    end
+    local cur = win.workspace
+    if cur and cur.id == ws_id then
+        return
+    end
+    local ok = pcall(function()
+        hl.dispatch(hl.dsp.window.move({
+            window = win,
+            workspace = ws_id,
+            silent = true,
+        }))
+    end)
+    if not ok then
+        pcall(function()
+            hl.dispatch(hl.dsp.window.move({
+                window = win,
+                workspace = ws_id,
+            }))
+        end)
+    end
+end
+
+local function sibling_workspace_id(win, class)
     local best = nil
     local best_hist = nil
-    for _, other in ipairs(hl.get_windows()) do
+    for _, other in ipairs(hl.get_windows() or {}) do
         if other.address ~= win.address and other.class == class and other.workspace then
             local hist = other.focus_history_id or 999999
             if best == nil or hist < best_hist then
@@ -179,32 +144,47 @@ hl.on("window.open", function(win)
         end
     end
     if not best or not best.workspace then
+        return nil
+    end
+    return best.workspace.id
+end
+
+-- During restore: snapshot target only (never APP_HOME / splash siblings).
+-- After restore: sibling (popups stay with the parent) else default home letter.
+local function place_catalog_window(win)
+    win = unwrap_window(win)
+    if not win then
+        return
+    end
+    local class = win.class
+    local app = apps.app_for_class(class)
+    if not app then
         return
     end
 
-    local target = best.workspace
-    local cur = win.workspace
-    if cur and target and cur.id == target.id then
+    if session_apps.is_restoring() then
+        local target = session_apps.restore_workspace(app.id)
+        if target then
+            move_to_workspace_silent(win, target)
+        end
         return
     end
 
-    -- Silent: don't yank the view when a popup/dialog follows the parent app.
-    local ok = pcall(function()
-        hl.dispatch(hl.dsp.window.move({
-            window = win,
-            workspace = target.id,
-            silent = true,
-        }))
-    end)
-    if not ok then
-        pcall(function()
-            hl.dispatch(hl.dsp.window.move({
-                window = win,
-                workspace = target.id,
-            }))
-        end)
+    local sibling = sibling_workspace_id(win, class)
+    if sibling then
+        move_to_workspace_silent(win, sibling)
+        return
     end
-end)
+
+    if win.floating then
+        return
+    end
+
+    move_to_workspace_silent(win, app.workspace)
+end
+
+hl.on("window.open_early", place_catalog_window)
+hl.on("window.open", place_catalog_window)
 
 -- =============================================================================
 -- Float / unmanaged (yabai manage=off + dialogs + Windscribe from aerospace)
