@@ -17,15 +17,13 @@ Item {
 
     implicitWidth: fg.implicitWidth
     implicitHeight: Math.max(fg.implicitHeight, fg.font.pixelSize + 4)
-    width: implicitWidth
-    height: implicitHeight
 
     Text {
         id: sh2
-        x: fg.x
-        y: fg.y + 2
         width: fg.width
         height: fg.height
+        x: fg.x
+        y: fg.y + 2
         text: fg.text
         font: fg.font
         elide: fg.elide
@@ -40,10 +38,10 @@ Item {
 
     Text {
         id: sh
-        x: fg.x
-        y: fg.y + 1
         width: fg.width
         height: fg.height
+        x: fg.x
+        y: fg.y + 1
         text: fg.text
         font: fg.font
         elide: fg.elide
@@ -58,9 +56,11 @@ Item {
 
     Text {
         id: fg
-        anchors.left: parent.left
-        anchors.right: parent.right
-        anchors.verticalCenter: parent.verticalCenter
+        // Do not stretch with left+right anchors: that collapses implicitWidth to 0
+        // and the chip/dropdown labels vanish. Size to the host when a parent
+        // (Layout / anchors) assigned a width; otherwise keep the text's own size.
+        width: parent.width > 0 ? parent.width : implicitWidth
+        height: parent.height > 0 ? parent.height : implicitHeight
         elide: root.elide
         wrapMode: root.wrapMode
         maximumLineCount: root.maximumLineCount

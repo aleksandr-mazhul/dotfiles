@@ -1162,6 +1162,8 @@ PanelWindow {
                     // Logitech USB dongle → the JBL Flip on this machine
                     if (/usb headset/i.test(label) || /logitech_logitech_usb_headset/i.test(label))
                         label = "JBL Flip 4"
+                    if (/fifine/i.test(label))
+                        label = "soundcore"
                     rows.push({
                         id: p[0],
                         label: label,

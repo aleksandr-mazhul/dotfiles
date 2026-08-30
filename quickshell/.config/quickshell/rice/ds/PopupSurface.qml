@@ -18,6 +18,7 @@ PanelWindow {
     property real anchorY: 0.22
     // function(event) -> bool; runs before the default Esc-close.
     property var keyHandler: null
+    property bool parked: false
 
     default property alias content: inner.data
     readonly property Item paneItem: pane
@@ -25,6 +26,7 @@ PanelWindow {
     // "opened"/"closed" collide with superclass signals — hence the popup prefix.
     signal popupOpened()
     signal popupClosed()
+    signal resumed()
 
     visible: open
     color: "transparent"
@@ -50,16 +52,23 @@ PanelWindow {
             show()
     }
 
-    function show() {
-        OverlayHub.closeOthers(root)
+    function present() {
         AdaptiveContrast.refresh()
+        parked = false
         open = true
         popupOpened()
         openAnim.play()
     }
 
-    function close() {
-        if (!open)
+    function show() {
+        OverlayHub.closeOthers(root)
+        present()
+    }
+
+    function hide() {
+        const notify = open || parked
+        parked = false
+        if (!notify)
             return
         openAnim.stop()
         open = false
@@ -68,17 +77,46 @@ PanelWindow {
         popupClosed()
     }
 
+    function park() {
+        if (!open)
+            return
+        parked = true
+        openAnim.stop()
+        open = false
+        pane.opacity = 1
+        pane.scale = 1
+    }
+
+    function resume() {
+        parked = false
+        AdaptiveContrast.refresh()
+        open = true
+        resumed()
+        openAnim.play()
+    }
+
+    function close() {
+        hide()
+        OverlayHub.dropStack(root)
+    }
+
+    function popView() {
+        return false
+    }
+
     function handleKey(event) {
         if (typeof keyHandler === "function" && keyHandler(event))
             return true
         if (event.key === Qt.Key_Escape) {
-            close()
+            if (typeof root.popView === "function" && root.popView())
+                return true
+            root.close()
             return true
         }
         return false
     }
 
-    // Click-away closes; sits behind the pane.
+    // Click-away dismisses the whole stack (Raycast: outside click closes).
     MouseArea {
         anchors.fill: parent
         onClicked: root.close()
@@ -89,13 +127,32 @@ PanelWindow {
         anchors.horizontalCenter: parent.horizontalCenter
         y: Math.round(root.height * root.anchorY)
         width: Math.min(root.surfaceWidth, Math.max(480, root.width - 80))
-        height: inner.children.length > 0 ? inner.children[0].implicitHeight : 0
+        height: {
+            const kids = inner.children
+            for (let i = 0; i < kids.length; i++) {
+                const c = kids[i]
+                if (c.visible)
+                    return Math.max(0, c.implicitHeight)
+            }
+            return 0
+        }
         transformOrigin: Item.Center
+        Keys.onPressed: event => {
+            if (event.key !== Qt.Key_Escape)
+                return
+            if (root.handleKey(event))
+                event.accepted = true
+        }
 
         RiceOpenAnim {
             id: openAnim
             target: pane
             fromScale: 0.98
+        }
+
+        MouseArea {
+            anchors.fill: parent
+            // Absorb clicks on empty glass so they do not close the popup.
         }
 
         GlassSurface {

@@ -33,6 +33,8 @@ Rectangle {
     QuietText {
         id: label
         anchors.centerIn: parent
+        width: implicitWidth
+        height: implicitHeight
         text: key
         color: Qt.rgba(1, 1, 1, 0.78 + AdaptiveContrast.contrast * 0.12)
         font.family: Tokens.fontUi

@@ -14,6 +14,30 @@ DS.SearchListPopup {
     property var commands: []
     property var apps: []
     property var filtered: []
+    property var audioSinks: []
+    property var audioSources: []
+    // "" = root launcher; audio / wallpaper / vpn / clipboard live on viewStack.
+    property var viewStack: []
+    // Kind that opened this session (hotkey). Empty = entered via launcher home.
+    // Esc nesting is counted from this entry, not from the launcher search page.
+    property string sessionRoot: ""
+    readonly property var currentView: {
+        const s = viewStack
+        return s && s.length ? s[s.length - 1] : null
+    }
+    readonly property string pageKind: currentView && currentView.kind ? currentView.kind : ""
+    readonly property string audioMode: (currentView && currentView.kind === "audio")
+        ? currentView.role
+        : ""
+    readonly property bool canPop: {
+        if (!viewStack || viewStack.length === 0)
+            return false
+        if (sessionRoot && viewStack.length === 1)
+            return false
+        return true
+    }
+    homeVisible: pageKind === "" || pageKind === "audio"
+    surfaceWidth: 960
     // Candidates awaiting Exec-binary existence check (id → entry).
     property var pendingApps: []
     // Coalesce applyFilter() so ListView.setModel is not called from a key
@@ -64,40 +88,352 @@ DS.SearchListPopup {
         "cups": 1  // CUPS web UI duplicate of system-config-printer
     })
 
-    placeholder: "Search apps & commands…"
-    hintKeys: ["alt", "O"]
+    placeholder: audioMode === "sink"
+        ? "Search output devices…"
+        : (audioMode === "source" ? "Search input devices…" : "Search apps & commands…")
+    hintKeys: audioMode ? [] : ["alt", "O"]
     model: filtered
     maxRows: 8
-    surfaceWidth: 960
+    footerHints: audioMode ? [
+        { keys: ["↑", "↓"], label: "Navigate" },
+        { keys: ["⏎"], label: "Select" }
+    ] : [
+        { keys: ["↑", "↓"], label: "Navigate" },
+        { keys: ["⏎"], label: "Open" }
+    ]
+    closeHint: canPop
+        ? ({ keys: ["esc"], label: "Back" })
+        : ({ keys: ["esc"], label: "Close" })
+    selectable: function (item) {
+        return !!(item && item.kind !== "header" && item.kind !== "empty")
+    }
 
     Component.onCompleted: {
         buildCommands()
         loadApps()
+        refreshAudioDevices()
     }
     onPopupOpened: {
+        viewStack = []
+        sessionRoot = ""
         // EN for search typing; restore previous layout on close.
         // eh-layout-sync keeps Ergohaven firmware in step with Hyprland.
         Quickshell.execDetached(["bash", "-lc", "~/.config/hypr/scripts/launcher-layout.sh open"])
         refreshRunning()
         buildCommands()
         loadApps()
+        refreshAudioDevices()
         applyFilter()
+        const pending = pendingPage
+        pendingPage = ""
+        if (pending) {
+            enterPage(pending)
+            sessionRoot = pending
+        }
     }
     onPopupClosed: {
+        if (wallpaperPage)
+            wallpaperPage.leave()
+        if (vpnPage)
+            vpnPage.leave()
+        if (clipboardPage)
+            clipboardPage.leave()
+        viewStack = []
+        sessionRoot = ""
+        pendingPage = ""
         Quickshell.execDetached(["bash", "-lc", "~/.config/hypr/scripts/launcher-layout.sh close"])
     }
     onSearchTextChanged: applyFilter()
     onActivated: (item, index) => {
-        recordUsage(item)
+        if (item && item.drill) {
+            enterAudioMode(item.drill)
+            return
+        }
+        if (item && item.page) {
+            recordUsage(item)
+            enterPage(item.page)
+            return
+        }
+        recordUsage(item && item.kind === "device" ? audioCommandFor(item) : item)
         let action = null
-        if (item && item.kind === "command")
+        if (item && item.kind === "device")
+            action = () => setAudioDevice(item)
+        else if (item && item.kind === "command")
             action = item.action
         else if (item)
             action = () => focusOrLaunch(item)
-        // Instant close, then run action (no close-anim wait).
         close()
         if (typeof action === "function")
             action()
+    }
+
+    customKeyHandler: event => {
+        if (!root.canPop)
+            return false
+        if ((event.key === Qt.Key_Backspace || event.key === Qt.Key_Back)
+                && String(root.searchText).length === 0) {
+            root.popView()
+            return true
+        }
+        return false
+    }
+
+    function leaveTop() {
+        if (!viewStack || viewStack.length === 0)
+            return
+        const leaving = viewStack[viewStack.length - 1]
+        viewStack = viewStack.slice(0, -1)
+        if (leaving && leaving.kind === "wallpaper")
+            wallpaperPage.leave()
+        else if (leaving && leaving.kind === "vpn")
+            vpnPage.leave()
+        else if (leaving && leaving.kind === "clipboard")
+            clipboardPage.leave()
+    }
+
+    function popView() {
+        if (!root.canPop)
+            return false
+        leaveTop()
+        searchText = ""
+        keyboardNav = true
+        navPointer = Qt.point(-1, -1)
+        applyFilter()
+        Qt.callLater(() => {
+            if (!root.homeVisible)
+                return
+            root.selectFirst()
+            root.focusSearch()
+        })
+        return true
+    }
+
+    function pageItem(kind) {
+        if (kind === "wallpaper")
+            return wallpaperPage
+        if (kind === "vpn")
+            return vpnPage
+        if (kind === "clipboard")
+            return clipboardPage
+        return null
+    }
+
+    function enterPage(kind) {
+        if (kind === "sink" || kind === "source") {
+            enterAudioMode(kind)
+            return
+        }
+        const page = pageItem(kind)
+        if (!page)
+            return
+        viewStack = viewStack.concat([{ kind: kind }])
+        searchText = ""
+        keyboardNav = true
+        navPointer = Qt.point(-1, -1)
+        if (typeof page.enter === "function")
+            page.enter()
+        Qt.callLater(() => {
+            if (typeof page.selectFirst === "function")
+                page.selectFirst()
+        })
+    }
+
+    function openPage(kind) {
+        if (open) {
+            if (pageKind === kind)
+                return
+            const replaceRoot = !!sessionRoot
+            while (viewStack.length)
+                leaveTop()
+            enterPage(kind)
+            if (replaceRoot)
+                sessionRoot = kind
+            return
+        }
+        pendingPage = kind
+        show()
+    }
+
+    function togglePage(kind) {
+        if (open && pageKind === kind) {
+            close()
+            return
+        }
+        openPage(kind)
+    }
+
+    function clipboardFocusPreview() {
+        if (pageKind !== "clipboard")
+            return
+        clipboardPage.focusPreviewPane()
+    }
+
+    function clipboardFocusList() {
+        if (pageKind !== "clipboard")
+            return
+        clipboardPage.focusListPane()
+    }
+
+    function toggleFilter() {
+        if (pageKind === "wallpaper") {
+            wallpaperPage.toggleFilter()
+            return
+        }
+        if (pageKind === "clipboard") {
+            clipboardPage.toggleFilter()
+            return
+        }
+        if (hasFilter)
+            toggleFilterMenu()
+    }
+
+    function prettyAudioLabel(label, role) {
+        const raw = String(label || "").trim()
+        if (/usb headset/i.test(raw) || /logitech_logitech_usb_headset/i.test(raw))
+            return "JBL Flip 4"
+        // USB dongle reports as fifine; the cans on this jack are Soundcore.
+        if (role === "sink" && /fifine|soundcore/i.test(raw))
+            return "soundcore"
+        return raw
+    }
+
+    function isJblFlip(blob) {
+        return /jbl|flip\s*\d|logitech.*usb.?headset|usb headset/i.test(blob)
+    }
+
+    function skipAudioDevice(role, raw) {
+        const blob = String(raw || "")
+        if (role === "source") {
+            if (/^monitor of\b/i.test(blob))
+                return true
+            // No real capture path — onboard analog + speaker dongle.
+            if (/built-in audio/i.test(blob) || isJblFlip(blob))
+                return true
+            return false
+        }
+        // HDMI / S/PDIF are not usable speakers on this desk.
+        if (/hdmi|iec958|s\/pdif|built-in audio digital/i.test(blob))
+            return true
+        return false
+    }
+
+    function audioTypeLabel(role, name, raw) {
+        if (role === "source")
+            return "Microphone"
+        const blob = String(name || "") + " " + String(raw || "")
+        if (isJblFlip(blob))
+            return "Speaker"
+        if (/fifine|soundcore|anqer|anker|q35|headphone|earphone|airpod|buds/i.test(blob))
+            return "Headphones"
+        return "Speaker"
+    }
+
+    function parseAudioRows(text, role) {
+        const rows = []
+        const lines = String(text || "").split("\n")
+        for (let i = 0; i < lines.length; i++) {
+            const line = lines[i].trim()
+            if (!line)
+                continue
+            const p = line.split("|")
+            if (p.length < 3)
+                continue
+            const raw = p[1]
+            if (skipAudioDevice(role, raw))
+                continue
+            const name = prettyAudioLabel(raw, role)
+            const current = p[2] === "1"
+            const type = audioTypeLabel(role, name, raw)
+            rows.push({
+                kind: "device",
+                role: role,
+                wpId: p[0],
+                id: role + ":" + p[0],
+                name: name,
+                genericName: type,
+                current: current,
+                keywords: [raw, name, type, role === "source" ? "mic" : "speaker"],
+                monoIcon: role === "source"
+                    ? "cmd-audio-in.svg"
+                    : (type === "Headphones" ? "icon-headphones.svg" : "cmd-audio-out.svg")
+            })
+        }
+        rows.sort((a, b) => {
+            if (a.current !== b.current)
+                return a.current ? -1 : 1
+            return (a.name || "").localeCompare(b.name || "", undefined, { sensitivity: "base" })
+        })
+        return rows
+    }
+
+    function refreshAudioDevices() {
+        if (!sinkListProc.running)
+            sinkListProc.running = true
+        if (!sourceListProc.running)
+            sourceListProc.running = true
+    }
+
+    function enterAudioMode(role) {
+        viewStack = viewStack.concat([{ kind: "audio", role: role === "source" ? "source" : "sink" }])
+        searchText = ""
+        keyboardNav = true
+        navPointer = Qt.point(-1, -1)
+        refreshAudioDevices()
+        applyFilter()
+        Qt.callLater(() => root.selectFirst())
+    }
+
+    function audioCommandFor(item) {
+        const id = item && item.role === "source" ? "audio-input" : "audio-output"
+        for (let i = 0; i < commands.length; i++) {
+            if (commands[i].id === id)
+                return commands[i]
+        }
+        return { kind: "command", id: id }
+    }
+
+    function setAudioDevice(item) {
+        if (!item || !item.wpId)
+            return
+        Quickshell.execDetached(["wpctl", "set-default", String(item.wpId)])
+    }
+
+    function filterAudioList(list, q) {
+        const rows = list || []
+        if (!q)
+            return rows.slice()
+        const scored = []
+        for (let i = 0; i < rows.length; i++) {
+            const s = entryScore(rows[i], q)
+            if (s > 0)
+                scored.push({ entry: rows[i], score: s })
+        }
+        scored.sort((a, b) => b.score - a.score || (a.entry.current ? -1 : 1))
+        return scored.map(x => x.entry)
+    }
+
+    Process {
+        id: sinkListProc
+        command: ["bash", "-lc", "~/.config/hypr/scripts/qs-audio-devices.sh sinks"]
+        stdout: StdioCollector {
+            onStreamFinished: {
+                root.audioSinks = root.parseAudioRows(text, "sink")
+                if (root.open)
+                    root.applyFilter()
+            }
+        }
+    }
+
+    Process {
+        id: sourceListProc
+        command: ["bash", "-lc", "~/.config/hypr/scripts/qs-audio-devices.sh sources"]
+        stdout: StdioCollector {
+            onStreamFinished: {
+                root.audioSources = root.parseAudioRows(text, "source")
+                if (root.open)
+                    root.applyFilter()
+            }
+        }
     }
 
     // Launch frecency — not in git; Quickshell.stateDir is per-machine.
@@ -494,7 +830,7 @@ DS.SearchListPopup {
                 keywords: ["clipboard", "clip", "paste", "буфер", "история"],
                 monoIcon: "cmd-clipboard.svg",
                 shortcutKeys: ["super", "Q"],
-                action: () => OverlayHub.open("clipboard")
+                page: "clipboard"
             },
             {
                 kind: "command",
@@ -504,7 +840,7 @@ DS.SearchListPopup {
                 keywords: ["wallpaper", "wall", "фон", "обои", "theme"],
                 monoIcon: "cmd-wallpaper.svg",
                 shortcutKeys: ["super", "W"],
-                action: () => OverlayHub.open("wallpaper")
+                page: "wallpaper"
             },
             {
                 kind: "command",
@@ -514,7 +850,25 @@ DS.SearchListPopup {
                 keywords: ["vpn", "mullvad", "wireguard", "proxy"],
                 monoIcon: "cmd-vpn.svg",
                 shortcutKeys: ["super", "V"],
-                action: () => OverlayHub.open("vpn")
+                page: "vpn"
+            },
+            {
+                kind: "command",
+                id: "audio-output",
+                name: "Audio Output",
+                genericName: "Set speakers or headphones",
+                keywords: ["audio", "output", "sink", "speaker", "speakers", "headphones", "headset", "sound", "hdmi", "bluetooth", "volume", "звук", "вывод", "колонки"],
+                monoIcon: "cmd-audio-out.svg",
+                drill: "sink"
+            },
+            {
+                kind: "command",
+                id: "audio-input",
+                name: "Audio Input",
+                genericName: "Set microphone",
+                keywords: ["audio", "input", "source", "mic", "microphone", "record", "звук", "микрофон", "вход"],
+                monoIcon: "cmd-audio-in.svg",
+                drill: "source"
             }
         ]
     }
@@ -687,6 +1041,8 @@ DS.SearchListPopup {
         let idScore = 0
         if (entry.kind === "command") {
             idScore = fieldScore(entry.id || "", q)
+        } else if (entry.kind === "device") {
+            idScore = 0
         } else {
             const ids = idFields(entry)
             for (let i = 0; i < ids.length; i++)
@@ -711,10 +1067,12 @@ DS.SearchListPopup {
     function applyFilterNow() {
         const q = searchText.trim().toLowerCase()
         if (q) {
-            // Lock hover before swapping the model so a rebuilt row under the
-            // cursor cannot steal the top (best) match.
             keyboardNav = true
             navPointer = Qt.point(-1, -1)
+        }
+        if (audioMode === "sink" || audioMode === "source") {
+            filtered = filterAudioList(audioMode === "sink" ? audioSinks : audioSources, q)
+            return
         }
         if (!q) {
             // Sections per List Pattern: quiet labels, no boxes (ref #8 naming).
@@ -726,7 +1084,7 @@ DS.SearchListPopup {
             filtered = out
         } else {
             const scored = []
-            const pool = commands.concat(apps)
+            const pool = commands.concat(apps, audioSinks, audioSources)
             for (let i = 0; i < pool.length; i++) {
                 const entry = pool[i]
                 const s = entryScore(entry, q)
@@ -766,6 +1124,9 @@ DS.SearchListPopup {
 
         readonly property bool isHeader: !!(modelData && modelData.kind === "header")
         readonly property bool isCommand: !!(modelData && modelData.kind === "command")
+        readonly property bool isDevice: !!(modelData && modelData.kind === "device")
+        readonly property bool isDrill: !!(modelData && (modelData.drill || modelData.page))
+        readonly property bool isCurrent: !!(isDevice && modelData && modelData.current)
 
         width: ListView.view ? ListView.view.width : 0
         height: isHeader ? DS.Tokens.sectionHeight : DS.Tokens.rowHeight
@@ -794,9 +1155,10 @@ DS.SearchListPopup {
             anchors.fill: parent
             primary: rowItem.isHeader ? "" : (rowItem.modelData.name || rowItem.modelData.id || "")
             secondary: rowItem.isHeader ? "" : (rowItem.modelData.genericName || "")
-            trailingKeys: rowItem.isCommand ? (rowItem.modelData.shortcutKeys || []) : []
-            chevron: !rowItem.isHeader && !rowItem.isCommand
+            trailingKeys: (rowItem.isCommand && !rowItem.isDrill) ? (rowItem.modelData.shortcutKeys || []) : []
+            chevron: rowItem.isDrill || (!rowItem.isHeader && !rowItem.isCommand && !rowItem.isDevice)
             selected: rowItem.index === root.selectedIndex
+            muted: rowItem.isCurrent
             hoverActive: !root.keyboardNav
             onEntered: root.selectedIndex = rowItem.index
             onActivated: {
@@ -804,9 +1166,7 @@ DS.SearchListPopup {
                 root.activateSelected()
             }
 
-            // Commands are chrome → our mono glyph set; apps are content → their
-            // own (possibly colorful) icons, falling back to our glyph.
-            leading: rowItem.isCommand ? cmdIcon : appIconSlot
+            leading: (rowItem.isCommand || rowItem.isDevice) ? cmdIcon : appIconSlot
         }
 
         Component {
@@ -847,4 +1207,29 @@ DS.SearchListPopup {
             }
         }
     }
+
+    Wallpaper {
+        id: wallpaperPage
+        host: root
+        width: parent.width
+        visible: root.pageKind === "wallpaper"
+    }
+
+    Vpn {
+        id: vpnPage
+        host: root
+        width: parent.width
+        visible: root.pageKind === "vpn"
+    }
+
+    Clipboard {
+        id: clipboardPage
+        host: root
+        width: parent.width
+        visible: root.pageKind === "clipboard"
+    }
+
+    readonly property alias clipboard: clipboardPage
+    readonly property alias wallpaper: wallpaperPage
+    readonly property alias vpn: vpnPage
 }

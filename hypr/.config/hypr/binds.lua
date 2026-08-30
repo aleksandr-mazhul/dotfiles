@@ -564,8 +564,8 @@ hl.bind(secondMod .. " + X", function()
 end)
 -- Alt+J is movefocus down only (legacy togglesplit conflicted with the same key)
 
--- Super+H/L never reach the layer (compositor owns Super). When clipboard is
--- open, retarget the pane; otherwise pass through (kitty → nvim tree/code).
+-- Super+H/L never reach the layer (compositor owns Super). When the launcher
+-- clipboard page is showing (rice-popup), retarget list/preview; otherwise pass.
 local function rice_layer_open(ns)
     local layers = hl.get_layers()
     if not layers then

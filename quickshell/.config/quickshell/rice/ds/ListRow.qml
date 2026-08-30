@@ -15,6 +15,7 @@ Item {
     // Navigation affordance (apps, submenus).
     property bool chevron: false
     property bool selected: false
+    property bool muted: false
     property Component leading: null
     // False while the popup is in keyboard-nav: hover pill and pointer
     // disappear together, and the invisible cursor cannot steal selection.
@@ -31,6 +32,7 @@ Item {
         anchors.fill: parent
         hovered: root.pointerOver
         selected: root.selected
+        muted: root.muted
     }
 
     RowLayout {

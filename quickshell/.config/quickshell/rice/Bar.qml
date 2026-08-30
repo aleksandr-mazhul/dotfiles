@@ -23,8 +23,8 @@ PanelWindow {
     property bool fsPolled: false
     readonly property bool fullscreenActive: root.fsPolled
 
-    // Only bar-owned menus keep the island visible. Launcher / clipboard /
-    // wallpaper / vpn are independent overlays and must not summon the bar.
+    // Only bar-owned menus keep the island visible. Launcher pages
+    // (clipboard / wallpaper / vpn) live in rice-popup and must not summon the bar.
     readonly property bool panelOpen: {
         const active = (p) => !!(p && (p.open || p.surfaceActive || p.visible))
         return active(quickSettings) || active(calendar) || active(notifCenter)
