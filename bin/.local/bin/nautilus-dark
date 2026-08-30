@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# System uses Graphite, but Graphite GTK4 breaks Nautilus sidebar — run stock libadwaita dark
+# System uses Graphite, but Graphite GTK4 breaks Nautilus sidebar — run stock libadwaita dark.
+# Colors come from ~/.config/gtk-4.0/gtk.css (theme-render / palette.toml).
 unset GTK_THEME
 export GTK_THEME=
 export ADW_DISABLE_PORTAL=1

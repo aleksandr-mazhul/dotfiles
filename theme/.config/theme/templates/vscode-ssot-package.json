@@ -1,0 +1,20 @@
+{
+  "name": "dotfiles-ssot",
+  "displayName": "Dotfiles SSOT",
+  "description": "Wallpaper-driven palette from ~/.config/theme/palette.toml",
+  "version": "0.0.1",
+  "publisher": "dotfiles",
+  "engines": {
+    "vscode": "^1.80.0"
+  },
+  "categories": ["Themes"],
+  "contributes": {
+    "themes": [
+      {
+        "label": "SSOT",
+        "uiTheme": "vs-dark",
+        "path": "./themes/ssot-color-theme.json"
+      }
+    ]
+  }
+}
