@@ -211,6 +211,35 @@ hl.device({
     accel_profile = "adaptive",
 })
 
+
+-- Kanata already grabs the real keyboards and emits a virtual "kanata" device.
+-- If Hyprland also listens to the physical HID interfaces (Ergohaven has TWO
+-- Keyboard endpoints: event5 + event9), one tap becomes 2–4 characters.
+-- Consumer Control is NOT grabbed by kanata — volume/brightness XF86 keys live
+-- there, so those nodes must stay enabled.
+for _, name in ipairs({
+    "fifine-microphone",
+    "compx-vgn-dragonfly-4k-receiver",
+    "compx-vgn-dragonfly-4k-receiver-system-control",
+    "ergohaven-k:03-v3/v4",
+    "ergohaven-k:03-v3/v4-system-control",
+    "ergohaven-k:03-v3/v4-keyboard",
+}) do
+    hl.device({
+        name = name,
+        enabled = false,
+    })
+end
+for _, name in ipairs({
+    "ergohaven-k:03-v3/v4-consumer-control",
+    "compx-vgn-dragonfly-4k-receiver-consumer-control",
+}) do
+    hl.device({
+        name = name,
+        enabled = true,
+    })
+end
+
 local session_apps = require("session-apps")
 
 hl.on("hyprland.start", function()

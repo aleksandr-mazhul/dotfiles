@@ -1,0 +1,13 @@
+[Unit]
+Description=Swallow extra HID keyboards (Hyprland duplicate-key fix)
+After=kanata.service
+Wants=kanata.service
+
+[Service]
+Type=simple
+ExecStart=%h/.local/bin/hid-kbd-swallow.py
+Restart=on-failure
+RestartSec=2
+
+[Install]
+WantedBy=default.target
