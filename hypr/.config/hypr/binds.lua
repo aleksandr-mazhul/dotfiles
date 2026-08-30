@@ -51,6 +51,33 @@ local function is_tabbed_app(class)
         or class:find("nautilus", 1, true)
 end
 
+local function is_code_like(class)
+    class = string.lower(class or "")
+    return class == "cursor"
+        or class == "code"
+        or class == "code-oss"
+        or class == "code - oss"
+        or class:find("cursor", 1, true) ~= nil
+end
+
+-- VS Code / Cursor title: "{file} - {folder} - {app}" vs empty "{folder} - {app}".
+-- Agents/Glass chats usually have no app suffix — leave those to the app.
+local function editor_has_file_tab(title)
+    title = (title or ""):gsub("^●%s*", ""):gsub("^•%s*", "")
+    if title == "" then
+        return false
+    end
+    local app = title:match(" %- (Cursor)$")
+        or title:match(" %- (Visual Studio Code)$")
+        or title:match(" %- (Code %- OSS)$")
+        or title:match(" %- (Code)$")
+    if not app then
+        return false
+    end
+    local rest = title:sub(1, #title - #app - 3)
+    return rest:find(" %- ", 1, true) ~= nil
+end
+
 -- Zoom keeps respawning the Workplace/Home dashboard if you closewindow it
 -- during a call. Stash it on special:zoom instead (toggle back: Alt+S style
 -- won't show it — use Super+… or focus from zoom; Ctrl+W again restores).
@@ -75,6 +102,17 @@ end
 local function zoom_home_on_special(win)
     local ws = win.workspace
     return ws and (ws.name == "special:zoom" or (type(ws.id) == "number" and ws.id < 0 and tostring(ws.name or ""):find("zoom", 1, true)))
+end
+
+local function zoom_has_meeting()
+    for _, w in ipairs(hl.get_windows()) do
+        local class = string.lower(w.class or "")
+        local title = w.title or ""
+        if (class == "zoom" or class:find("zoom", 1, true)) and (title == "Meeting" or title:find("^Meeting ")) then
+            return true
+        end
+    end
+    return false
 end
 
 local function stash_zoom_home(win)
@@ -119,13 +157,24 @@ hl.bind("CTRL + W", function()
     if not focused then
         return
     end
+    -- Cursor/VS Code empty workbench (logo, no tabs) ignores Ctrl+W. Close it
+    -- here; pass through when a file tab is actually open.
+    if is_code_like(focused.class) then
+        if editor_has_file_tab(focused.title) then
+            hl.dispatch(hl.dsp.pass({ window = focused }))
+        else
+            hl.dispatch(hl.dsp.window.close({ window = focused }))
+        end
+        return
+    end
     -- Like macOS: apps with tabs handle Cmd/Ctrl+W themselves (close tab)
     if is_tabbed_app(focused.class) then
         hl.dispatch(hl.dsp.pass({ window = focused }))
         return
     end
-    -- Zoom Home: hide ↔ restore without closewindow (avoids respawn loop).
-    if is_zoom_home(focused) then
+    -- Zoom Home: during a call, hide ↔ restore (closewindow respawns it).
+    -- With no meeting, actually close — otherwise Workplace can never be quit.
+    if is_zoom_home(focused) and zoom_has_meeting() then
         if zoom_home_on_special(focused) then
             restore_zoom_home(focused)
         else
@@ -134,7 +183,7 @@ hl.bind("CTRL + W", function()
         return
     end
     hl.dispatch(hl.dsp.window.close({ window = focused }))
-end)
+end, { dont_inhibit = true })
 
 hl.bind("CTRL + Q", function()
     local focused = hl.get_active_window()
@@ -145,6 +194,18 @@ hl.bind("CTRL + Q", function()
     local class = focused.class
     if not class or class == "" then
         hl.dispatch(hl.dsp.window.close({ window = focused }))
+        return
+    end
+
+    -- Native Wayland Zoom often ignores xdg_toplevel.close (no CSD / tray linger).
+    local lclass = string.lower(class)
+    if lclass == "zoom" or lclass:find("zoom", 1, true) then
+        local pid = focused.pid
+        if pid and pid > 1 then
+            hl.dispatch(hl.dsp.exec_cmd("kill " .. tostring(pid)))
+        else
+            hl.dispatch(hl.dsp.window.close({ window = focused }))
+        end
         return
     end
 
@@ -520,7 +581,7 @@ end
 
 local function clipboard_pane_or_pass(action)
     return function()
-        if rice_layer_open("rice-clipboard") then
+        if rice_layer_open("rice-popup") then
             hl.dispatch(hl.dsp.exec_cmd("qs -c rice ipc call clipboard " .. action))
             return
         end

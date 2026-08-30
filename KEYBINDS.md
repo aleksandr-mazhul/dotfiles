@@ -32,7 +32,7 @@ VPN has no hotkey — use launcher (`vpn`) or QuickSettings.
 
 | Keys | Action |
 | --- | --- |
-| Ctrl+W | Close tab (tabbed apps) / close window |
+| Ctrl+W | Close tab; if no tabs left, close the window (editors / tabbed apps) |
 | Ctrl+Q | Quit all windows of focused app |
 | Super+Shift+Q | Force-kill focused window |
 | Ctrl+N | New window of focused app |
