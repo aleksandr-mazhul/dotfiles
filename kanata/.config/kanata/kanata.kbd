@@ -24,6 +24,8 @@
 ;;   kitty also binds Ctrl+Page_Up/Down → tmux prev/next window.
 ;;
 ;; Tip: disable HRM in Vial on this machine — let kanata own the holds.
+;;
+;; Text snippets (US layout): type /map → email. Shift+/ stays ?.
 
 (defcfg
   process-unmapped-keys yes
@@ -51,6 +53,7 @@
   j k l scln
   lctl rctl
   left right up down
+  /
 )
 
 (defalias
@@ -78,6 +81,19 @@
   hrctl (tap-hold-release $tap-time $hold-time k @prctl)
   ralt  (tap-hold-release $tap-time $hold-time l ralt)
   rmet  (tap-hold-release $tap-time $hold-time scln rmet)
+
+  ;; /map → email. Modifiers (incl. HRM) keep a normal / (? , Ctrl+/).
+  slseq (switch
+    (lsft rsft lctl rctl lmet rmet lalt ralt) / break
+    () (macro (sequence 1200 visible-backspaced) 10 /) break
+  )
+)
+
+(defvirtualkeys
+  snip-map (macro m a p Digit0 Digit7 Digit1 Digit0 Digit2 Digit0 Digit0 Digit7 S-Digit2 g m a i l . c o m)
+)
+(defseq
+  snip-map (/ m a p)
 )
 
 (deflayer base
@@ -86,6 +102,7 @@
   @rsft @hrctl @ralt @rmet
   @plctl @prctl
   left right up down
+  @slseq
 )
 
 (deflayer mctl
@@ -94,6 +111,7 @@
   _ _ _ _
   _ _
   @linebeg @lineend @docbeg @docend
+  _
 )
 
 ;; Alt/Opt word motion — global overrides (reliable in Telegram / Qt / GTK).
