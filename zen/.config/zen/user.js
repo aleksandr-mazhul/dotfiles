@@ -1,5 +1,7 @@
 // Sidebar: Ctrl+S toggles expanded <-> thin strip (see zen-toggle-sidebar shortcut)
 // Compact: Ctrl+Shift+D toggles; startup hides ONLY the top URL bar (not the tab sidebar)
+// userChrome.css (tab hover/selected highlight, glass chrome) — required for chrome/
+user_pref("toolkit.legacyUserProfileCustomizations.stylesheets", true);
 user_pref("zen.view.compact.enable-at-startup", true);
 user_pref("zen.view.compact.hide-toolbar", true);
 user_pref("zen.view.compact.hide-tabbar", false);
