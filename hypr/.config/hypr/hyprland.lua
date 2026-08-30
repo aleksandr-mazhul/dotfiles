@@ -119,9 +119,10 @@ hl.config({
         kb_options = "grp:win_space_toggle,grp:ctrl_space_toggle",
         kb_rules = "",
         follow_mouse = 1,
-        -- Mac-like key repeat: brightness hold ramps ~16 steps without feeling frantic
+        -- Mac-like key repeat: delay must be > a firm second tap (~300ms).
+        -- 250ms made "qq" type "qqq" — compositor repeat fired on the second press.
         repeat_rate = 25,
-        repeat_delay = 250,
+        repeat_delay = 550,
         -- Mac-like pointer feel; slower base + adaptive accel
         sensitivity = -0.72,
         accel_profile = "adaptive",
