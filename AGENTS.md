@@ -41,6 +41,24 @@ Do all of the following in one session (or explain what you blocked on):
    - Run `theme-render` and verify.
    - Optional fish wrapper → `theme-rice.fish.tmpl` for toys that only take ANSI indices.
 
+
+Cursor AppImage (Linux): install as a **real file**
+`~/applications/Cursor.AppImage` (not a symlink to `Cursor-X.Y.Z.AppImage`).
+Launch via stowed `~/.local/bin/cursor` (sets `APPIMAGE_EXTRACT_AND_RUN=1` so
+the on-disk AppImage is not FUSE-mounted; `cursor-update` can replace it).
+
+Auto-update: user timer `cursor-update.timer` runs `cursor-update --apply`
+hourly (`CURSOR_UPDATE_POLICY=newest`). That does a **full download** replace,
+which works when in-app AppImageUpdate cannot (signed→unsigned rollback —
+“couldn't finish installing”). Track comes from `cursor.overlay.json`
+(`update.releaseTrack`, rice default `latest`) or `CURSOR_RELEASE_TRACK`.
+In-app AppImageUpdate (zsync) is unreliable (signed↔unsigned, empty `.upd_info`);
+rice sets `update.mode` to `none` in `cursor.overlay.json` and uses the timer
+instead. `cursor-update --check` prints remote version/signature/would-update.
+Do **not** set `update.releaseTrack` to `dev` casually. Under FUSE
+(`.mount_Cursor`) refuse replace; under extract-and-run atomic replace is
+OK — fully quit and relaunch to load the new build.
+
 5. **Binds / rules**
    - Hyprland: `hypr/.config/hypr/binds.lua` / `rules.lua` only when needed.
    - Kanata: `kanata/.config/kanata/kanata.kbd` for OS-level remaps.

@@ -76,6 +76,11 @@ if [[ -f "$HOME/.config/systemd/user/kanata.service" ]]; then
     echo "warn: kanata.service failed to start (user must be in 'input' group; re-login)" >&2
   }
 fi
+if [[ -f "$HOME/.config/systemd/user/cursor-update.timer" ]]; then
+  systemctl --user enable --now cursor-update.timer || {
+    echo "warn: cursor-update.timer failed to enable" >&2
+  }
+fi
 
 if [[ "$(getent passwd "$USER" | cut -d: -f7)" != "$(command -v fish)" ]] \
   && command -v fish >/dev/null 2>&1; then
@@ -115,6 +120,7 @@ Restored automatically:
   • all stowed configs (Hypr, Kitty, Fish, Kanata, Tmux, nvim, QS, theme, Zen shortcuts, …)
   • kanata user service (if permitted)
   • SSOT colors (if a wallpaper was available)
+  • Cursor AppImage hourly updater (`cursor-update.timer`; binary via `cursor-update --apply`)
 
 NOT restored (by design — secrets / machine-local):
   • Browser profiles (Zen cookies/logins) — only shortcuts + user.js

@@ -1,0 +1,10 @@
+[Unit]
+Description=Update Cursor AppImage via full download (cursor-update)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+Environment=CURSOR_UPDATE_POLICY=newest
+# Prefer track from cursor.overlay.json; fallback inside script is latest.
+ExecStart=%h/.local/bin/cursor-update --apply
