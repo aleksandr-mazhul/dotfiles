@@ -24,6 +24,8 @@ VPN has no hotkey — use launcher (`vpn`) or QuickSettings.
 | Super+Shift+W | Random wallpaper |
 | Super+Alt+W | Waypaper |
 | Alt+O | App launcher |
+| Super+E | Files (Nautilus); focus if already open |
+| Super+X | ChatGPT; focus if already open |
 | Ctrl+P | Overlay type filter (panel footers) |
 
 ## Windows

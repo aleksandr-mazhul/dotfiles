@@ -452,6 +452,55 @@ hl.bind(secondMod .. " + SHIFT + TAB", hl.dsp.group.prev())
 -- Quickshell rice overlays (shared RicePanel design)
 hl.bind(secondMod .. " + Q", hl.dsp.exec_cmd("qs -c rice ipc call clipboard toggle"))
 hl.bind(mainMod .. " + O", hl.dsp.exec_cmd(p.menu))
+
+local apps = require("apps")
+
+local function focus_or_launch(id, cmd)
+    local app = apps.by_id[id]
+    local class_set = {}
+    if app then
+        for _, class in ipairs(app.classes) do
+            class_set[class] = true
+            class_set[string.lower(class)] = true
+        end
+    end
+    local best = nil
+    local best_hist = nil
+    for _, win in ipairs(hl.get_windows() or {}) do
+        local class = win.class or ""
+        if class_set[class] or class_set[string.lower(class)] then
+            if win.mapped ~= false and not win.hidden and not win.floating then
+                local hist = win.focus_history_id or 999999
+                if not best or hist < best_hist then
+                    best = win
+                    best_hist = hist
+                end
+            end
+        end
+    end
+    if best then
+        local focused = pcall(function()
+            hl.dispatch(hl.dsp.focus({ window = best }))
+        end)
+        if not focused then
+            focused = pcall(function()
+                hl.dispatch(hl.dsp.focus({ window = "address:" .. tostring(best.address) }))
+            end)
+        end
+        if not focused and best.workspace and best.workspace.id then
+            hl.dispatch(hl.dsp.focus({ workspace = best.workspace.id }))
+        end
+        return
+    end
+    hl.dispatch(hl.dsp.exec_cmd(cmd))
+end
+
+hl.bind(secondMod .. " + E", function()
+    focus_or_launch("nautilus", p.fileManager)
+end)
+hl.bind(secondMod .. " + X", function()
+    focus_or_launch("chatgpt", p.chatgpt)
+end)
 -- Alt+J is movefocus down only (legacy togglesplit conflicted with the same key)
 
 -- Super+H/L never reach the layer (compositor owns Super). When clipboard is

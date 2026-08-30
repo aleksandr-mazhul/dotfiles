@@ -12,6 +12,7 @@ local terminal = "kitty"
 local fileManager = home .. "/.local/bin/nautilus-dark --new-window"
 local menu = "qs -c rice ipc call launcher toggle"
 local browser = "zen-browser"
+local chatgpt = "chatgpt"
 
 -- Expose for binds.lua
 programs = {
@@ -19,6 +20,7 @@ programs = {
     fileManager = fileManager,
     menu = menu,
     browser = browser,
+    chatgpt = chatgpt,
 }
 
 hl.env("XCURSOR_THEME", "macOS")
@@ -210,7 +212,6 @@ hl.device({
     sensitivity = -0.72,
     accel_profile = "adaptive",
 })
-
 
 -- Kanata already grabs the real keyboards and emits a virtual "kanata" device.
 -- If Hyprland also listens to the physical HID interfaces (Ergohaven has TWO
