@@ -7,11 +7,11 @@
 	defaultBranch = main
 [pull]
 	rebase = false
-	ff = false
 [fetch]
 	prune = true
 [rebase]
 	autoStash = true
+	autoSquash = true
 [color]
 	ui = auto
 [color "decorate"]
@@ -25,8 +25,8 @@
 [diff]
 	colorMoved = zebra
 [merge]
-	ff = false
 	conflictstyle = zdiff3
+	ff = false
 [core]
 	editor = nvim
 	pager = delta
@@ -52,3 +52,9 @@
 	# Longer history when needed
 	lga = log --graph --oneline --decorate --all
 	last = log -1 HEAD
+[credential "https://origin.cursor.com/git"]
+	helper = 
+	helper = !/home/stranger/.local/bin/origin credential-helper
+[credential "https://origin.cursor.com"]
+	helper = 
+	helper = !/home/stranger/.local/bin/origin credential-helper
