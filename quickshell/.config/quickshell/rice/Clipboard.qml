@@ -334,6 +334,19 @@ Item {
         searchField.forceActiveFocus()
     }
 
+    function refocusInput() {
+        if (filterMenuOpen) {
+            searchField.forceActiveFocus()
+            return
+        }
+        if (focusPane === "preview" && previewEdit) {
+            previewEdit.forceActiveFocus()
+            previewEdit.cursorVisible = true
+            return
+        }
+        searchField.forceActiveFocus()
+    }
+
     function focusPreviewPane() {
         if (!selectedItem || selectedItem.isImage)
             return

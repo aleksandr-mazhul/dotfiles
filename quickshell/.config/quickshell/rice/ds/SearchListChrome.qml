@@ -220,6 +220,14 @@ Item {
         })
     }
 
+    function refocusInput() {
+        if (filterMenuOpen) {
+            focusSearch()
+            return
+        }
+        focusSearch()
+    }
+
     function enter() {
         search.text = ""
         selectFirst()

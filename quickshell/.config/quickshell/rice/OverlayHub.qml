@@ -243,4 +243,23 @@ QtObject {
             launcher.toggleFilter()
         }
     }
+
+    function refocusOpen() {
+        for (let i = 0; i < panels.length; i++) {
+            const p = panels[i]
+            if (!p || !p.open)
+                continue
+            if (typeof p.grabFocus === "function") {
+                p.grabFocus()
+                return
+            }
+            if (typeof p.refocusInput === "function") {
+                p.refocusInput()
+                return
+            }
+            return
+        }
+        if (launcher && launcher.open && typeof launcher.grabFocus === "function")
+            launcher.grabFocus()
+    }
 }

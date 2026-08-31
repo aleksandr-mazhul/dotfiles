@@ -40,6 +40,7 @@ ShellRoot {
         target: "overlay"
         function filter(): void { OverlayHub.toggleFilter() }
         function toggleFilter(): void { OverlayHub.toggleFilter() }
+        function refocus(): void { OverlayHub.refocusOpen() }
         function open(id: string): void { OverlayHub.open(id) }
     }
 
@@ -59,6 +60,10 @@ ShellRoot {
         function toggle(): void { launcher.toggle() }
         function open(): void { launcher.show() }
         function close(): void { launcher.close() }
+        function refocus(): void {
+            if (launcher.open)
+                launcher.grabFocus()
+        }
     }
 
     IpcHandler {

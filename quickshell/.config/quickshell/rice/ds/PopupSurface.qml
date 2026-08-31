@@ -1,6 +1,7 @@
 import QtQuick
 import Quickshell
 import Quickshell.Wayland
+import Quickshell.Hyprland
 import ".."
 
 // Popup Surface pattern: one floating glass sheet, no fullscreen dim behind
@@ -19,6 +20,8 @@ PanelWindow {
     // function(event) -> bool; runs before the default Esc-close.
     property var keyHandler: null
     property bool parked: false
+    // Optional: refocus the active input after compositor focus is restored.
+    property var refocusHandler: null
 
     default property alias content: inner.data
     readonly property Item paneItem: pane
@@ -35,7 +38,7 @@ PanelWindow {
     focusable: true
     WlrLayershell.layer: WlrLayer.Overlay
     WlrLayershell.namespace: "rice-popup"
-    WlrLayershell.keyboardFocus: open ? WlrKeyboardFocus.OnDemand : WlrKeyboardFocus.None
+    WlrLayershell.keyboardFocus: open ? WlrKeyboardFocus.Exclusive : WlrKeyboardFocus.None
     anchors {
         left: true
         right: true
@@ -44,6 +47,14 @@ PanelWindow {
     }
 
     Component.onCompleted: OverlayHub.register(root)
+
+    function grabFocus() {
+        Qt.callLater(() => {
+            root.forceActiveFocus()
+            if (typeof refocusHandler === "function")
+                refocusHandler()
+        })
+    }
 
     function toggle() {
         if (open)
@@ -58,6 +69,7 @@ PanelWindow {
         open = true
         popupOpened()
         openAnim.play()
+        grabFocus()
     }
 
     function show() {
@@ -93,6 +105,7 @@ PanelWindow {
         open = true
         resumed()
         openAnim.play()
+        grabFocus()
     }
 
     function close() {
@@ -120,6 +133,34 @@ PanelWindow {
     MouseArea {
         anchors.fill: parent
         onClicked: root.close()
+    }
+
+    // Hyprland: keep keyboard on this popup across workspace switches.
+    HyprlandFocusGrab {
+        id: focusGrab
+        windows: [root]
+        active: root.open && !root.parked
+        onCleared: {
+            // Outside click clears the grab — dismiss unless already closing.
+            if (root.open)
+                root.close()
+        }
+    }
+
+    Connections {
+        target: Hyprland
+        function onFocusedWorkspaceChanged() {
+            if (!root.open || root.parked)
+                return
+            // Re-arm after workspace switch (compositor may briefly drop layer focus).
+            focusGrab.active = false
+            Qt.callLater(() => {
+                if (!root.open)
+                    return
+                focusGrab.active = true
+                root.grabFocus()
+            })
+        }
     }
 
     Item {

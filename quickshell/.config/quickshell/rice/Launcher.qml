@@ -11,6 +11,24 @@ import "ds" as DS
 DS.SearchListPopup {
     id: root
 
+    refocusHandler: function () { root.refocusInput() }
+
+    function refocusInput() {
+        if (pageKind === "clipboard") {
+            clipboardPage.refocusInput()
+            return
+        }
+        if (pageKind === "wallpaper") {
+            wallpaperPage.refocusInput()
+            return
+        }
+        if (pageKind === "vpn") {
+            vpnPage.refocusInput()
+            return
+        }
+        focusSearch()
+    }
+
     property var commands: []
     property var apps: []
     property var filtered: []
