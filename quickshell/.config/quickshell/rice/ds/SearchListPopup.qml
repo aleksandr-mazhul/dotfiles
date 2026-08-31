@@ -26,7 +26,6 @@ PopupSurface {
     property alias filterPlaceholder: chrome.filterPlaceholder
     property alias filterMenuOpen: chrome.filterMenuOpen
     property alias filterHighlight: chrome.filterHighlight
-    property alias pendingOpenFilter: chrome.pendingOpenFilter
     readonly property alias hasFilter: chrome.hasFilter
     property alias searchText: chrome.searchText
     readonly property alias listView: chrome.listView

@@ -47,8 +47,8 @@ Item {
 
                 SelectionPill {
                     anchors.fill: parent
-                    hovered: rowMouse.containsMouse
-                    selected: index === root.highlight || (modelData && modelData.value === root.currentValue)
+                    hovered: rowMouse.containsMouse && index !== root.highlight
+                    selected: index === root.highlight
                 }
 
                 QuietText {

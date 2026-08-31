@@ -33,7 +33,6 @@ PanelWindow {
     property bool filterMenuOpen: false
     property int filterHighlight: 0
     property string filterPlaceholder: "Filter"
-    property bool pendingOpenFilter: false
 
     // Return true from customKeyHandler(event) to consume the key.
     property var customKeyHandler: null
@@ -91,16 +90,10 @@ PanelWindow {
         Qt.callLater(() => root.scrollToStart())
         openAnim.play()
         Qt.callLater(() => {
-            if (pendingOpenFilter && hasFilter) {
-                pendingOpenFilter = false
-                openFilterMenu()
-            } else {
-                pendingOpenFilter = false
-                if (showSearch)
-                    searchField.forceActiveFocus()
-                else
-                    focusCatcher.forceActiveFocus()
-            }
+            if (showSearch)
+                searchField.forceActiveFocus()
+            else
+                focusCatcher.forceActiveFocus()
         })
     }
 
@@ -111,23 +104,17 @@ PanelWindow {
         open = false
         searchField.text = ""
         filterMenuOpen = false
-        pendingOpenFilter = false
         dim.opacity = 0
         panel.opacity = 1
         panel.scale = 1
         panelClosed()
     }
 
-    // Shared filter entry (Ctrl+P): toggle filter if open; otherwise open with filter menu.
+    // Ctrl+P — toggle filter only when this panel is already open.
     function toggleFilter() {
-        if (!hasFilter)
+        if (!hasFilter || !open)
             return
-        if (open) {
-            toggleFilterMenu()
-            return
-        }
-        pendingOpenFilter = true
-        show()
+        toggleFilterMenu()
     }
 
     function openFilter() {
@@ -734,13 +721,9 @@ PanelWindow {
                         Layout.fillWidth: true
                         height: 34
                         radius: Theme.radiusSm
-                        color: {
-                            if (index === root.filterHighlight)
-                                return Theme.glassTileActiveHover
-                            if (modelData.value === root.filterValue)
-                                return Theme.glassSurfaceHover
-                            return "transparent"
-                        }
+                        color: index === root.filterHighlight
+                            ? Theme.glassTileActiveHover
+                            : "transparent"
                         Behavior on color {
                             ColorAnimation { duration: Theme.hoverMs; easing.type: Easing.OutCubic }
                         }

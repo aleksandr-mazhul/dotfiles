@@ -283,6 +283,10 @@ DS.SearchListPopup {
             clipboardPage.toggleFilter()
             return
         }
+        if (pageKind === "vpn") {
+            vpnPage.toggleFilter()
+            return
+        }
         if (hasFilter)
             toggleFilterMenu()
     }

@@ -41,7 +41,6 @@ Item {
     property string filterPlaceholder: "Filter"
     property bool filterMenuOpen: false
     property int filterHighlight: 0
-    property bool pendingOpenFilter: false
     readonly property bool hasFilter: filterOptions && filterOptions.length > 0
     readonly property string filterLabelText: {
         if (!hasFilter)
@@ -229,19 +228,13 @@ Item {
         filterMenuOpen = false
         pageEntered()
         Qt.callLater(() => {
-            if (root.pendingOpenFilter && root.hasFilter) {
-                root.pendingOpenFilter = false
-                root.openFilterMenu()
-            } else {
-                root.pendingOpenFilter = false
+            if (search && search.input)
                 search.input.forceActiveFocus()
-            }
         })
     }
 
     function leave() {
         filterMenuOpen = false
-        pendingOpenFilter = false
         pageLeft()
     }
 
@@ -276,17 +269,9 @@ Item {
     }
 
     function toggleFilter() {
-        if (!hasFilter)
+        if (!hasFilter || !open)
             return
-        if (open) {
-            toggleFilterMenu()
-            return
-        }
-        pendingOpenFilter = true
-        if (host && pageId && typeof host.openPage === "function")
-            host.openPage(pageId)
-        else
-            show()
+        toggleFilterMenu()
     }
 
     function showFilter() {
@@ -437,7 +422,7 @@ Item {
                 id: search
                 anchors.left: parent.left
                 anchors.right: filterChip.visible ? filterChip.left : parent.right
-                anchors.rightMargin: filterChip.visible ? 8 : 0
+                anchors.rightMargin: filterChip.visible ? Tokens.gapInline : 0
                 height: parent.height
                 placeholder: root.placeholder
                 hintKeys: root.hintKeys
@@ -445,58 +430,14 @@ Item {
                 pointerHidden: root.keyboardNav
             }
 
-            Item {
+            FilterChip {
                 id: filterChip
                 visible: root.hasFilter
                 anchors.right: parent.right
-                anchors.top: parent.top
-                anchors.bottom: parent.bottom
-                width: visible ? Math.max(118, chipRow.implicitWidth + 20) : 0
-
-                Rectangle {
-                    anchors.fill: parent
-                    radius: Tokens.radiusField
-                    color: Tokens.fieldFill
-                    border.width: 1
-                    border.color: root.filterMenuOpen ? Tokens.focusRim : Tokens.fieldRim
-                }
-
-                Row {
-                    id: chipRow
-                    anchors.centerIn: parent
-                    spacing: 6
-
-                    QuietText {
-                        text: root.filterLabelText
-                        color: Tokens.textPrimary
-                        font.family: Tokens.fontUi
-                        font.pixelSize: Tokens.fontSizeSm
-                        width: implicitWidth
-                        height: implicitHeight
-                        anchors.verticalCenter: parent.verticalCenter
-                    }
-                    KbdBadge {
-                        key: "ctrl"
-                        anchors.verticalCenter: parent.verticalCenter
-                    }
-                    KbdBadge {
-                        key: "P"
-                        anchors.verticalCenter: parent.verticalCenter
-                    }
-                    QuietText {
-                        text: "☰"
-                        color: Tokens.textTertiary
-                        font.pixelSize: Tokens.fontSizeSm
-                        anchors.verticalCenter: parent.verticalCenter
-                    }
-                }
-
-                MouseArea {
-                    anchors.fill: parent
-                    hoverEnabled: true
-                    cursorShape: Qt.PointingHandCursor
-                    onClicked: root.toggleFilterMenu()
-                }
+                anchors.verticalCenter: parent.verticalCenter
+                label: root.filterLabelText
+                menuOpen: root.filterMenuOpen
+                onClicked: root.toggleFilterMenu()
             }
         }
 

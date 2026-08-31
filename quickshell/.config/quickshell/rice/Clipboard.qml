@@ -20,7 +20,6 @@ Item {
     property int selectedIndex: 0
     property bool filterMenuOpen: false
     property int filterHighlight: 0
-    property bool pendingOpenFilter: false
     property bool keyboardNav: false
     property point navPointer: Qt.point(-1, -1)
     // While true, list rebuilds (index/cache) always land on the newest item.
@@ -114,19 +113,14 @@ Item {
         Qt.callLater(() => {
             if (root.pinNewest)
                 root.selectNewest()
-            if (pendingOpenFilter) {
-                pendingOpenFilter = false
-                openFilterMenu()
-            } else if (searchField) {
+            if (searchField)
                 searchField.forceActiveFocus()
-            }
         })
     }
 
     function leave() {
         searchField.text = ""
         filterMenuOpen = false
-        pendingOpenFilter = false
         markedLines = []
         focusPane = "list"
         previewFullText = ""
@@ -141,13 +135,8 @@ Item {
     }
 
     function showFilter() {
-        if (visible && open) {
+        if (visible && open)
             toggleFilterMenu()
-            return
-        }
-        pendingOpenFilter = true
-        if (host && typeof host.openPage === "function")
-            host.openPage("clipboard")
     }
 
     function toggleFilter() {
@@ -890,69 +879,13 @@ Item {
                 onTextChanged: root.applyFilter()
             }
 
-            Item {
+            DS.FilterChip {
                 id: filterChip
                 anchors.right: parent.right
                 anchors.verticalCenter: parent.verticalCenter
-                width: filterChipRow.implicitWidth + 14
-                height: 22
-                readonly property bool active: root.filterMenuOpen || chipMouse.containsMouse
-
-                Rectangle {
-                    anchors.fill: parent
-                    radius: 6
-                    color: Qt.rgba(1, 1, 1, (filterChip.active ? 0.12 : 0.07)
-                        * (1 - DS.AdaptiveContrast.contrast * 0.75))
-                    border.width: 1
-                    border.color: root.filterMenuOpen
-                        ? DS.Tokens.focusRim
-                        : Qt.rgba(1, 1, 1, 0.22 + DS.AdaptiveContrast.contrast * 0.10)
-
-                    Rectangle {
-                        anchors.left: parent.left
-                        anchors.right: parent.right
-                        anchors.top: parent.top
-                        height: Math.round(parent.height * 0.45)
-                        radius: parent.radius
-                        gradient: Gradient {
-                            GradientStop { position: 0.0; color: Qt.rgba(1, 1, 1, 0.10) }
-                            GradientStop { position: 1.0; color: "transparent" }
-                        }
-                    }
-                }
-
-                Row {
-                    id: filterChipRow
-                    anchors.centerIn: parent
-                    spacing: 3
-
-                    DS.QuietText {
-                        text: root.typeFilterLabel
-                        color: filterChip.active ? DS.Tokens.textPrimary : DS.Tokens.textSecondary
-                        font.family: DS.Tokens.fontUi
-                        font.pixelSize: DS.Tokens.fontSizeSm - 1
-                        width: implicitWidth
-                        height: implicitHeight
-                        anchors.verticalCenter: parent.verticalCenter
-                    }
-                    DS.QuietText {
-                        text: "˅"
-                        color: DS.Tokens.textTertiary
-                        font.family: DS.Tokens.fontUi
-                        font.pixelSize: 10
-                        width: implicitWidth
-                        height: implicitHeight
-                        anchors.verticalCenter: parent.verticalCenter
-                    }
-                }
-
-                MouseArea {
-                    id: chipMouse
-                    anchors.fill: parent
-                    hoverEnabled: true
-                    cursorShape: Qt.PointingHandCursor
-                    onClicked: root.toggleFilterMenu()
-                }
+                label: root.typeFilterLabel
+                menuOpen: root.filterMenuOpen
+                onClicked: root.toggleFilterMenu()
             }
         }
 

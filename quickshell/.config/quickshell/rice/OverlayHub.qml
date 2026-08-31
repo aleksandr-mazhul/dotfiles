@@ -218,18 +218,18 @@ QtObject {
             p.show()
     }
 
-    // Contextual filter: toggle burger on the open overlay; else open clipboard + filter.
+    // Contextual filter: toggle only on an already-open overlay / launcher page.
     function toggleFilter() {
         for (let i = 0; i < panels.length; i++) {
             const p = panels[i]
             if (!p || !p.open)
                 continue
-            if (typeof p.toggleFilter === "function") {
-                p.toggleFilter()
-                return
-            }
             if (typeof p.toggleFilterMenu === "function") {
                 p.toggleFilterMenu()
+                return
+            }
+            if (typeof p.toggleFilter === "function") {
+                p.toggleFilter()
                 return
             }
             if (typeof p.showFilter === "function") {
@@ -238,10 +238,8 @@ QtObject {
             }
             return
         }
-        // Nothing open — clipboard filter is a launcher page.
-        if (launcher && launcher.clipboard && typeof launcher.clipboard.showFilter === "function") {
-            launcher.clipboard.showFilter()
-            return
+        if (launcher && launcher.open && typeof launcher.toggleFilter === "function") {
+            launcher.toggleFilter()
         }
     }
 }

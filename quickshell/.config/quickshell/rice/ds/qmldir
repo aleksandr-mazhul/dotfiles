@@ -16,3 +16,4 @@ SearchListPopup SearchListPopup.qml
 ContentScrim ContentScrim.qml
 QuietText QuietText.qml
 FilterDropdown FilterDropdown.qml
+FilterChip FilterChip.qml
