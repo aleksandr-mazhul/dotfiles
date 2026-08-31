@@ -1,8 +1,11 @@
 #!/usr/bin/env bash
 # System uses Graphite, but Graphite GTK4 breaks Nautilus sidebar — run stock libadwaita dark.
 # Colors come from ~/.config/gtk-4.0/gtk.css (theme-render / palette.toml).
+# ADW_DISABLE_PORTAL skips the settings portal — without ADW_DEBUG_COLOR_SCHEME
+# libadwaita falls back to a light stylesheet and the glass overlay cannot win.
 unset GTK_THEME
 export GTK_THEME=
 export ADW_DISABLE_PORTAL=1
+export ADW_DEBUG_COLOR_SCHEME=prefer-dark
 export GTK_APPLICATION_PREFER_DARK_THEME=1
 exec /usr/bin/nautilus "$@"
