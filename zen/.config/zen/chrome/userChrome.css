@@ -1,26 +1,28 @@
 @import url("autoscroll.css");
 
-/* Zen liquid-glass chrome
- * Sidebar / tabstrip frosted look (faux-glass + optional compositor frost).
+/* Zen optical-glass chrome (slice 8 / ADR-0006, ADR-0010)
+ * Sidebar / tabstrip / menus: CSS backdrop-filter on chrome only.
+ * Content stays opaque (see browser[transparent] rule). Compositor never frosts the page.
  * Requires: toolkit.legacyUserProfileCustomizations.stylesheets = true
  *
- * Active tab uses the same look as :hover so keyboard cycle (Ctrl+PgUp/Dn)
- * always shows which tab is current.
+ * Hover ≠ selected. Keyboard cycle (Ctrl+PgUp/Dn) stays legible because
+ * selected is raisedStrong + rim; hover is raised fill without rim.
  */
 :root {
-  --sand-bg: #181316;
-  --sand-surface: #1d181c;
-  --sand-container: #292126;
-  --sand-high: #342931;
-  --sand-primary: #ffb688;
-  --sand-text: #ebe1d4;
-  --sand-muted: #d1c5b4;
-  --sand-outline: #c4a882;
-  --sand-glass: rgba(24, 19, 22, 0.52);
-  --sand-glass-strong: rgba(29, 24, 28, 0.62);
-  --sand-glass-edge: rgba(196, 168, 130, 0.28);
-  --sand-glass-blur: 28px;
-  --sand-tab-hover-bg: rgba(41, 33, 38, 0.45);
+  --ds-shell-tint: rgba(255, 255, 255, 0.038);
+  --ds-rim-outer: rgba(255, 255, 255, 0.42);
+  --ds-raised-fill: rgba(255, 255, 255, 0.04);
+  --ds-raised-strong: rgba(255, 255, 255, 0.06);
+  --ds-raised-rim: rgba(255, 255, 255, 0.34);
+  --ds-field-fill: rgba(255, 255, 255, 0.055);
+  --ds-field-rim: rgba(255, 255, 255, 0.26);
+  --ds-blur: 16px;
+  --ds-text-primary: rgba(255, 255, 255, 0.94);
+  --ds-text-secondary: rgba(255, 255, 255, 0.62);
+  --ds-text-halo: rgba(0, 0, 0, 0.3);
+  --ds-radius-surface: 30px;
+  --ds-radius-field: 18px;
+  --ds-radius-element: 14px;
 }
 
 /* —— Main vertical sidebar / tab strip —— */
@@ -54,14 +56,14 @@ toolbar#TabsToolbar,
   background-color: transparent !important;
 }
 
-/* Frosted sidebar panel */
+/* Frosted sidebar plate — single shell tint; CSS blur is chrome-local */
 #navigator-toolbox,
 #zen-sidebar,
 #sidebar-box {
-  background: var(--sand-glass) !important;
-  backdrop-filter: blur(var(--sand-glass-blur)) saturate(140%) !important;
-  -moz-backdrop-filter: blur(var(--sand-glass-blur)) saturate(140%) !important;
-  border-inline-end: 1px solid var(--sand-glass-edge) !important;
+  background: var(--ds-shell-tint) !important;
+  backdrop-filter: blur(var(--ds-blur)) !important;
+  -moz-backdrop-filter: blur(var(--ds-blur)) !important;
+  border-inline-end: 1px solid var(--ds-rim-outer) !important;
 }
 
 /* Expanded / compact tab strip inside sidebar */
@@ -72,22 +74,31 @@ toolbar#TabsToolbar,
   background: transparent !important;
 }
 
-/* Tabs — idle transparent; hover/selected share one glass highlight */
 .tabbrowser-tab {
-  color: var(--sand-text) !important;
+  color: var(--ds-text-secondary) !important;
 }
 
 .tabbrowser-tab .tab-background {
   background: transparent !important;
   border: 1px solid transparent !important;
-  border-radius: 10px !important;
+  border-radius: var(--ds-radius-element) !important;
   margin-block: 2px !important;
-  transition: background 120ms ease, border-color 120ms ease !important;
+  transition:
+    background 120ms ease,
+    border-color 120ms ease !important;
   box-shadow: none !important;
 }
 
-/* Hover + keyboard-selected + multiselect + tablist keyboard focus */
-.tabbrowser-tab:is(:hover, [selected], [visuallyselected], [multiselected])
+/* Hover — quieter than selected; no rim */
+.tabbrowser-tab:hover:not([selected]):not([visuallyselected]):not([multiselected])
+  > .tab-stack
+  > .tab-background {
+  background: var(--ds-raised-fill) !important;
+  border-color: transparent !important;
+}
+
+/* Selected / keyboard-focus — raisedStrong + rim */
+.tabbrowser-tab:is([selected], [visuallyselected], [multiselected])
   > .tab-stack
   > .tab-background,
 .tabbrowser-tab > .tab-stack > .tab-background:is([selected], [multiselected]),
@@ -95,43 +106,40 @@ toolbar#TabsToolbar,
   .tabbrowser-tab.tablist-keyboard-focus
   > .tab-stack
   > .tab-background {
-  background: var(--sand-tab-hover-bg) !important;
-  border-color: var(--sand-glass-edge) !important;
+  background: var(--ds-raised-strong) !important;
+  border-color: var(--ds-raised-rim) !important;
 }
 
-.tab-label,
-.tab-icon-image {
-  color: var(--sand-text) !important;
-  fill: var(--sand-muted) !important;
-  opacity: 0.95 !important;
+.tab-label {
+  color: var(--ds-text-secondary) !important;
+  font-weight: 500 !important;
+  text-shadow: 0 1px 2px var(--ds-text-halo) !important;
 }
 
 .tabbrowser-tab:is([selected], [visuallyselected]) .tab-label {
-  color: var(--sand-primary) !important;
-  font-weight: 600 !important;
+  color: var(--ds-text-primary) !important;
 }
 
 /* Essentials / workspace buttons */
 #zen-essentials .tabbrowser-tab .tab-background,
 .zen-workspace-button,
 #zen-workspaces-button {
-  border-radius: 10px !important;
+  border-radius: var(--ds-radius-element) !important;
 }
 
-/* URL bar — floating glass pill when visible */
-#urlbar-background,
+/* URL bar — field on already-blurred chrome; no extra blur.
+ * Expanded breakout overlay over pages keeps Zen defaults. */
 #urlbar:not([breakout][breakout-extend]) > #urlbar-background {
-  background: var(--sand-glass-strong) !important;
-  backdrop-filter: blur(var(--sand-glass-blur)) saturate(140%) !important;
-  -moz-backdrop-filter: blur(var(--sand-glass-blur)) saturate(140%) !important;
-  border: 1px solid var(--sand-glass-edge) !important;
-  border-radius: 12px !important;
+  background: var(--ds-field-fill) !important;
+  border: 1px solid var(--ds-field-rim) !important;
+  border-radius: var(--ds-radius-field) !important;
   box-shadow: none !important;
 }
 
-#urlbar-input,
-#urlbar-input-container {
-  color: var(--sand-text) !important;
+#urlbar:not([breakout][breakout-extend]) #urlbar-input,
+#urlbar:not([breakout][breakout-extend]) #urlbar-input-container {
+  color: var(--ds-text-primary) !important;
+  text-shadow: 0 1px 2px var(--ds-text-halo) !important;
 }
 
 /* Context menus / panels — not the autoscroll origin disc,
@@ -141,14 +149,22 @@ panel:not(.autoscroller):not(#autoscroller),
 #appMenu-popup,
 .panel-arrowcontent,
 richlistbox {
-  --panel-background: var(--sand-glass-strong) !important;
-  --arrowpanel-background: var(--sand-glass-strong) !important;
-  background: var(--sand-glass-strong) !important;
-  backdrop-filter: blur(20px) saturate(130%) !important;
-  -moz-backdrop-filter: blur(20px) saturate(130%) !important;
-  border: 1px solid var(--sand-glass-edge) !important;
-  border-radius: 12px !important;
-  color: var(--sand-text) !important;
+  --panel-background: var(--ds-shell-tint) !important;
+  --arrowpanel-background: var(--ds-shell-tint) !important;
+  background: var(--ds-shell-tint) !important;
+  backdrop-filter: blur(var(--ds-blur)) !important;
+  -moz-backdrop-filter: blur(var(--ds-blur)) !important;
+  border: 1px solid var(--ds-rim-outer) !important;
+  border-radius: var(--ds-radius-surface) !important;
+  color: var(--ds-text-primary) !important;
+  text-shadow: 0 1px 2px var(--ds-text-halo) !important;
+}
+
+menupopup:not(.in-menulist) menuitem:hover,
+menupopup:not(.in-menulist) .subviewbutton:hover,
+#appMenu-popup .subviewbutton:hover {
+  background: var(--ds-raised-fill) !important;
+  border-radius: var(--ds-radius-element) !important;
 }
 
 /* Content area: keep page opaque; remove forced chrome wash if present */
