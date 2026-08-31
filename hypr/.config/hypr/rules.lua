@@ -33,7 +33,7 @@ hl.layer_rule({
     name = "rice-glass-blur-notifications",
     match = { namespace = "^rice-notifications$" },
     blur = true,
-    ignore_alpha = 0.2,
+    ignore_alpha = 0.03,
 })
 
 -- DS popup surface (launcher + wallpaper / VPN / clipboard pages):

@@ -3,7 +3,9 @@ import QtQuick
 import QtQuick.Layouts
 import Quickshell
 import Quickshell.Wayland
+import Quickshell.Hyprland
 import Quickshell.Services.Notifications
+import "ds" as DS
 
 PanelWindow {
     id: root
@@ -38,8 +40,45 @@ PanelWindow {
         }
     }
 
-    function toggle() { open = !open }
-    function show() { open = true }
+    function sceneGeom(outsideBand) {
+        const scr = root.screen
+        const ox = scr ? Math.round(scr.x) : 0
+        const oy = scr ? Math.round(scr.y) : 0
+        const sw = scr ? Math.round(scr.width) : 0
+        const w = Math.round(root.implicitWidth)
+        let h = Math.round(root.implicitHeight)
+        if (w < 32)
+            return ""
+        if (h < 32)
+            h = 420
+        let gx = ox + sw - root.margins.right - w
+        let gy = oy + root.margins.top
+        if (gx < 0)
+            gx = 0
+        if (gy < 0)
+            gy = 0
+        if (outsideBand) {
+            const band = 28
+            const by = Math.max(0, gy - band)
+            return gx + "," + by + " " + w + "x" + band
+        }
+        return gx + "," + gy + " " + w + "x" + h
+    }
+
+    function refreshScene(outsideBand) {
+        DS.AdaptiveContrast.refresh(root.sceneGeom(!!outsideBand))
+    }
+
+    function toggle() {
+        if (open)
+            close()
+        else
+            show()
+    }
+    function show() {
+        root.refreshScene(false)
+        open = true
+    }
     function close() { open = false }
 
     function dismissAll() {
@@ -88,13 +127,17 @@ PanelWindow {
         right: Theme.barMargin
     }
 
-    Rectangle {
+    Connections {
+        target: Hyprland
+        function onFocusedWorkspaceChanged() {
+            if (root.open)
+                root.refreshScene(true)
+        }
+    }
+
+    Item {
         id: panel
         anchors.fill: parent
-        color: Theme.glassBackground
-        radius: Theme.radiusLg
-        border.width: 1
-        border.color: Theme.glassBorder
         focus: root.open
         transformOrigin: Item.TopRight
         opacity: 1
@@ -104,16 +147,6 @@ PanelWindow {
                 root.close()
                 event.accepted = true
             }
-        }
-
-        // Soft inner highlight — Apple-like glass edge without heavy chrome
-        Rectangle {
-            anchors.fill: parent
-            anchors.margins: 1
-            radius: Theme.radiusLg - 1
-            color: "transparent"
-            border.width: 1
-            border.color: Theme.glassBorderSubtle
         }
 
         RiceOpenAnim {
@@ -128,233 +161,214 @@ PanelWindow {
             toScale: 0.96
         }
 
-        ColumnLayout {
+        DS.GlassSurface {
             anchors.fill: parent
-            anchors.margins: 12
-            spacing: 10
+            radius: DS.Tokens.radiusSurface
 
-            RowLayout {
-                Layout.fillWidth: true
+            ColumnLayout {
+                anchors.fill: parent
+                anchors.margins: DS.Tokens.paddingSurface
                 spacing: 8
 
-                Text {
-                    text: "Notifications"
-                    color: Theme.text
-                    font.family: Theme.fontFamily
-                    font.pixelSize: Theme.fontSizeLg
-                    font.bold: true
+                RowLayout {
                     Layout.fillWidth: true
-                }
-
-                // DND / mute
-                Rectangle {
-                    Layout.preferredWidth: 28
-                    Layout.preferredHeight: 28
-                    radius: 8
-                    color: {
-                        if (root.dnd)
-                            return dndMouse.containsMouse ? Theme.glassTileActiveHover : Theme.glassTileActive
-                        return dndMouse.containsMouse ? Theme.glassSurfaceHover : "transparent"
-                    }
-                    Behavior on color {
-                        ColorAnimation { duration: Theme.hoverMs; easing.type: Easing.OutCubic }
-                    }
-                    RiceIcon {
-                        anchors.centerIn: parent
-                        customSource: Qt.resolvedUrl(root.dnd ? "assets/notif-bell-off.svg" : "assets/notif-bell.svg")
-                        tint: root.dnd ? Theme.primary : Theme.text
-                        implicitSize: 16
-                        scale: dndMouse.containsMouse ? 1.1 : 1.0
-                        Behavior on scale {
-                            NumberAnimation { duration: 90; easing.type: Easing.OutCubic }
-                        }
-                    }
-                    MouseArea {
-                        id: dndMouse
-                        anchors.fill: parent
-                        hoverEnabled: true
-                        cursorShape: Qt.PointingHandCursor
-                        onClicked: OverlayHub.notifDnd = !OverlayHub.notifDnd
-                    }
-                }
-
-                // Clear all
-                Rectangle {
-                    Layout.preferredWidth: 28
-                    Layout.preferredHeight: 28
-                    radius: 8
-                    color: clearMouse.containsMouse ? Theme.glassSurfaceHover : "transparent"
-                    Behavior on color {
-                        ColorAnimation { duration: Theme.hoverMs; easing.type: Easing.OutCubic }
-                    }
-                    RiceIcon {
-                        anchors.centerIn: parent
-                        customSource: Qt.resolvedUrl("assets/notif-clear.svg")
-                        tint: Theme.text
-                        implicitSize: 16
-                        scale: clearMouse.containsMouse ? 1.1 : 1.0
-                        Behavior on scale {
-                            NumberAnimation { duration: 90; easing.type: Easing.OutCubic }
-                        }
-                    }
-                    MouseArea {
-                        id: clearMouse
-                        anchors.fill: parent
-                        hoverEnabled: true
-                        cursorShape: Qt.PointingHandCursor
-                        onClicked: root.dismissAll()
-                    }
-                }
-
-                // Close panel
-                Rectangle {
-                    Layout.preferredWidth: 28
-                    Layout.preferredHeight: 28
-                    radius: 8
-                    color: closeMouse.containsMouse ? Theme.glassSurfaceHover : "transparent"
-                    Behavior on color {
-                        ColorAnimation { duration: Theme.hoverMs; easing.type: Easing.OutCubic }
-                    }
-                    RiceIcon {
-                        anchors.centerIn: parent
-                        customSource: Qt.resolvedUrl("assets/close.svg")
-                        tint: closeMouse.containsMouse ? Theme.text : Theme.textMuted
-                        implicitSize: 14
-                        scale: closeMouse.containsMouse ? 1.1 : 1.0
-                        Behavior on scale {
-                            NumberAnimation { duration: 90; easing.type: Easing.OutCubic }
-                        }
-                    }
-                    MouseArea {
-                        id: closeMouse
-                        anchors.fill: parent
-                        hoverEnabled: true
-                        cursorShape: Qt.PointingHandCursor
-                        onClicked: root.close()
-                    }
-                }
-            }
-
-            Text {
-                visible: root.dnd
-                text: "Do not disturb — new notifications are blocked"
-                color: Theme.primary
-                font.family: Theme.fontFamily
-                font.pixelSize: Theme.fontSizeSm
-                Layout.fillWidth: true
-                wrapMode: Text.Wrap
-            }
-
-            ListView {
-                Layout.fillWidth: true
-                Layout.fillHeight: true
-                clip: true
-                spacing: 10
-                model: notifServer.trackedNotifications
-
-                delegate: Rectangle {
-                    id: notifCard
-                    required property var modelData
-                    readonly property bool hovered: cardHover.containsMouse
-                    width: ListView.view.width
-                    // Taller cards: padding + min body area
-                    height: Math.max(88, col.implicitHeight + 28)
-                    radius: Theme.radiusMd
-                    color: notifCard.hovered ? Theme.glassSurfaceHover : Theme.glassSurface
-                    border.width: 1
-                    border.color: Theme.glassBorderSubtle
-                    Behavior on color {
-                        ColorAnimation { duration: Theme.hoverMs; easing.type: Easing.OutCubic }
-                    }
-
-                    MouseArea {
-                        id: cardHover
-                        anchors.fill: parent
-                        hoverEnabled: true
-                        acceptedButtons: Qt.NoButton
-                    }
-
-                    ColumnLayout {
-                        id: col
-                        anchors.left: parent.left
-                        anchors.right: parent.right
-                        anchors.top: parent.top
-                        anchors.margins: 14
-                        spacing: 8
-
-                        RowLayout {
-                            Layout.fillWidth: true
-                            spacing: 8
-
-                            Text {
-                                text: modelData.summary || modelData.appName || "Notification"
-                                color: Theme.text
-                                font.family: Theme.fontFamily
-                                font.pixelSize: Theme.fontSize
-                                font.bold: true
-                                elide: Text.ElideRight
-                                Layout.fillWidth: true
-                            }
-
-                            Rectangle {
-                                Layout.preferredWidth: 24
-                                Layout.preferredHeight: 24
-                                radius: 6
-                                color: cardClose.containsMouse ? Theme.glassSurfaceHover : "transparent"
-                                Behavior on color {
-                                    ColorAnimation { duration: Theme.hoverMs; easing.type: Easing.OutCubic }
-                                }
-                                RiceIcon {
-                                    anchors.centerIn: parent
-                                    customSource: Qt.resolvedUrl("assets/close.svg")
-                                    tint: cardClose.containsMouse ? Theme.text : Theme.textMuted
-                                    implicitSize: 12
-                                    scale: cardClose.containsMouse ? 1.1 : 1.0
-                                    Behavior on scale {
-                                        NumberAnimation { duration: 90; easing.type: Easing.OutCubic }
-                                    }
-                                }
-                                MouseArea {
-                                    id: cardClose
-                                    anchors.fill: parent
-                                    hoverEnabled: true
-                                    cursorShape: Qt.PointingHandCursor
-                                    onClicked: modelData.dismiss()
-                                }
-                            }
-                        }
-
-                        Text {
-                            visible: !!(modelData.body && modelData.body.length)
-                            text: modelData.body || ""
-                            color: Theme.textMuted
-                            font.family: Theme.fontFamily
-                            font.pixelSize: Theme.fontSizeSm
-                            wrapMode: Text.Wrap
-                            Layout.fillWidth: true
-                            lineHeight: 1.25
-                        }
-                    }
-                }
-
-                ColumnLayout {
-                    anchors.centerIn: parent
-                    visible: root.unread === 0
                     spacing: 8
 
-                    RiceIcon {
-                        Layout.alignment: Qt.AlignHCenter
-                        customSource: Qt.resolvedUrl(root.dnd ? "assets/notif-bell-off.svg" : "assets/notif-bell.svg")
-                        tint: Theme.textMuted
-                        implicitSize: 28
+                    Item { Layout.fillWidth: true }
+
+                    Rectangle {
+                        Layout.preferredWidth: 28
+                        Layout.preferredHeight: 28
+                        radius: DS.Tokens.radiusMin
+                        color: root.dnd
+                            ? DS.Tokens.raisedStrong
+                            : (dndMouse.containsMouse ? DS.Tokens.raised : "transparent")
+                        border.width: root.dnd ? 1 : 0
+                        border.color: DS.Tokens.raisedRim
+                        Behavior on color {
+                            ColorAnimation { duration: DS.Tokens.stateMs; easing.type: Easing.OutCubic }
+                        }
+
+                        RiceIcon {
+                            anchors.centerIn: parent
+                            customSource: Qt.resolvedUrl(root.dnd ? "assets/notif-bell-off.svg" : "assets/notif-bell.svg")
+                            tint: dndMouse.containsMouse ? DS.Tokens.textPrimary : DS.Tokens.textIcon
+                            implicitSize: 16
+                            scale: dndMouse.containsMouse ? 1.1 : 1.0
+                            Behavior on scale {
+                                NumberAnimation { duration: 90; easing.type: Easing.OutCubic }
+                            }
+                        }
+                        MouseArea {
+                            id: dndMouse
+                            anchors.fill: parent
+                            hoverEnabled: true
+                            cursorShape: Qt.PointingHandCursor
+                            onClicked: OverlayHub.notifDnd = !OverlayHub.notifDnd
+                        }
                     }
 
-                    Text {
-                        Layout.alignment: Qt.AlignHCenter
+                    Rectangle {
+                        Layout.preferredWidth: 28
+                        Layout.preferredHeight: 28
+                        radius: DS.Tokens.radiusMin
+                        color: clearMouse.containsMouse ? DS.Tokens.raised : "transparent"
+                        Behavior on color {
+                            ColorAnimation { duration: DS.Tokens.stateMs; easing.type: Easing.OutCubic }
+                        }
+                        RiceIcon {
+                            anchors.centerIn: parent
+                            customSource: Qt.resolvedUrl("assets/notif-clear.svg")
+                            tint: clearMouse.containsMouse ? DS.Tokens.textPrimary : DS.Tokens.textIcon
+                            implicitSize: 16
+                            scale: clearMouse.containsMouse ? 1.1 : 1.0
+                            Behavior on scale {
+                                NumberAnimation { duration: 90; easing.type: Easing.OutCubic }
+                            }
+                        }
+                        MouseArea {
+                            id: clearMouse
+                            anchors.fill: parent
+                            hoverEnabled: true
+                            cursorShape: Qt.PointingHandCursor
+                            onClicked: root.dismissAll()
+                        }
+                    }
+
+                    Rectangle {
+                        Layout.preferredWidth: 28
+                        Layout.preferredHeight: 28
+                        radius: DS.Tokens.radiusMin
+                        color: closeMouse.containsMouse ? DS.Tokens.raised : "transparent"
+                        Behavior on color {
+                            ColorAnimation { duration: DS.Tokens.stateMs; easing.type: Easing.OutCubic }
+                        }
+                        RiceIcon {
+                            anchors.centerIn: parent
+                            customSource: Qt.resolvedUrl("assets/close.svg")
+                            tint: closeMouse.containsMouse ? DS.Tokens.textPrimary : DS.Tokens.textIcon
+                            implicitSize: 14
+                            scale: closeMouse.containsMouse ? 1.1 : 1.0
+                            Behavior on scale {
+                                NumberAnimation { duration: 90; easing.type: Easing.OutCubic }
+                            }
+                        }
+                        MouseArea {
+                            id: closeMouse
+                            anchors.fill: parent
+                            hoverEnabled: true
+                            cursorShape: Qt.PointingHandCursor
+                            onClicked: root.close()
+                        }
+                    }
+                }
+
+                ListView {
+                    Layout.fillWidth: true
+                    Layout.fillHeight: true
+                    clip: true
+                    spacing: 8
+                    model: notifServer.trackedNotifications
+
+                    delegate: Rectangle {
+                        id: notifCard
+                        required property var modelData
+                        readonly property bool hovered: cardHover.containsMouse
+                        width: ListView.view.width
+                        height: Math.max(col.implicitHeight + 28, DS.Tokens.rowHeight)
+                        radius: DS.Tokens.innerRadius(DS.Tokens.radiusSurface, DS.Tokens.paddingSurface)
+                        color: notifCard.hovered ? DS.Tokens.raised : "transparent"
+                        border.width: notifCard.hovered ? 1 : 0
+                        border.color: DS.Tokens.raisedRim
+                        Behavior on color {
+                            ColorAnimation { duration: DS.Tokens.stateMs; easing.type: Easing.OutCubic }
+                        }
+
+                        MouseArea {
+                            id: cardHover
+                            anchors.fill: parent
+                            hoverEnabled: true
+                            acceptedButtons: Qt.NoButton
+                        }
+
+                        Rectangle {
+                            id: dismissBtn
+                            anchors.right: parent.right
+                            anchors.top: parent.top
+                            anchors.topMargin: 10
+                            anchors.rightMargin: 10
+                            width: 24
+                            height: 24
+                            radius: DS.Tokens.radiusMin
+                            color: cardClose.containsMouse ? DS.Tokens.raised : "transparent"
+                            Behavior on color {
+                                ColorAnimation { duration: DS.Tokens.stateMs; easing.type: Easing.OutCubic }
+                            }
+                            RiceIcon {
+                                anchors.centerIn: parent
+                                customSource: Qt.resolvedUrl("assets/close.svg")
+                                tint: cardClose.containsMouse ? DS.Tokens.textPrimary : DS.Tokens.textIcon
+                                implicitSize: 12
+                                scale: cardClose.containsMouse ? 1.1 : 1.0
+                                Behavior on scale {
+                                    NumberAnimation { duration: 90; easing.type: Easing.OutCubic }
+                                }
+                            }
+                            MouseArea {
+                                id: cardClose
+                                anchors.fill: parent
+                                hoverEnabled: true
+                                cursorShape: Qt.PointingHandCursor
+                                onClicked: modelData.dismiss()
+                            }
+                        }
+
+                        ColumnLayout {
+                            id: col
+                            anchors.left: parent.left
+                            anchors.right: dismissBtn.left
+                            anchors.top: parent.top
+                            anchors.leftMargin: 14
+                            anchors.rightMargin: 8
+                            anchors.topMargin: 14
+                            spacing: 8
+
+                            DS.QuietText {
+                                text: modelData.summary || modelData.appName || "Notification"
+                                color: DS.Tokens.textPrimary
+                                font.family: DS.Tokens.fontUi
+                                font.pixelSize: DS.Tokens.fontSize
+                                fontWeight: Font.Medium
+                                elide: Text.ElideRight
+                                Layout.fillWidth: true
+                                Layout.preferredWidth: 0
+                            }
+
+                            DS.QuietText {
+                                visible: !!(modelData.body && modelData.body.length)
+                                text: modelData.body || ""
+                                color: DS.Tokens.textSecondary
+                                font.family: DS.Tokens.fontUi
+                                font.pixelSize: DS.Tokens.fontSizeSm
+                                wrapMode: Text.Wrap
+                                maximumLineCount: 3
+                                Layout.fillWidth: true
+                                Layout.preferredWidth: 0
+                            }
+                        }
+                    }
+
+                    DS.QuietText {
+                        anchors.centerIn: parent
+                        width: parent.width - 24
+                        visible: root.unread === 0
                         text: root.dnd ? "Muted — nothing will appear here" : "No notifications"
-                        color: Theme.textMuted
-                        font.family: Theme.fontFamily
-                        font.pixelSize: Theme.fontSize
+                        color: DS.Tokens.textSecondary
+                        font.family: DS.Tokens.fontUi
+                        font.pixelSize: DS.Tokens.fontSize
+                        wrapMode: Text.Wrap
+                        maximumLineCount: 3
+                        horizontalAlignment: Text.AlignHCenter
                     }
                 }
             }
