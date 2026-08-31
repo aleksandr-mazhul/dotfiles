@@ -276,19 +276,35 @@ DS.SearchListPopup {
 
     function toggleFilter() {
         if (pageKind === "wallpaper") {
-            wallpaperPage.toggleFilter()
+            wallpaperPage.toggleFilterMenu()
             return
         }
         if (pageKind === "clipboard") {
-            clipboardPage.toggleFilter()
+            clipboardPage.toggleFilterMenu()
             return
         }
         if (pageKind === "vpn") {
-            vpnPage.toggleFilter()
+            vpnPage.toggleFilterMenu()
             return
         }
         if (hasFilter)
             toggleFilterMenu()
+    }
+
+    function toggleFilterMenu() {
+        if (pageKind === "wallpaper") {
+            wallpaperPage.toggleFilterMenu()
+            return
+        }
+        if (pageKind === "clipboard") {
+            clipboardPage.toggleFilterMenu()
+            return
+        }
+        if (pageKind === "vpn") {
+            vpnPage.toggleFilterMenu()
+            return
+        }
+        chrome.toggleFilterMenu()
     }
 
     function prettyAudioLabel(label, role) {

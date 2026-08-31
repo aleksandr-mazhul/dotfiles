@@ -224,12 +224,13 @@ QtObject {
             const p = panels[i]
             if (!p || !p.open)
                 continue
-            if (typeof p.toggleFilterMenu === "function") {
-                p.toggleFilterMenu()
-                return
-            }
+            // Prefer page-aware routing (Launcher → clipboard/wallpaper/vpn).
             if (typeof p.toggleFilter === "function") {
                 p.toggleFilter()
+                return
+            }
+            if (typeof p.toggleFilterMenu === "function") {
+                p.toggleFilterMenu()
                 return
             }
             if (typeof p.showFilter === "function") {

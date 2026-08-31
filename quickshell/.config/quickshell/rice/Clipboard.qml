@@ -134,17 +134,17 @@ Item {
             host.close()
     }
 
-    function showFilter() {
-        if (visible && open)
+    function toggleFilter() {
+        if (visible && host && host.open)
             toggleFilterMenu()
     }
 
-    function toggleFilter() {
-        showFilter()
+    function showFilter() {
+        toggleFilter()
     }
 
     function openFilter() {
-        showFilter()
+        toggleFilter()
     }
 
     function syncFilterHighlight() {
