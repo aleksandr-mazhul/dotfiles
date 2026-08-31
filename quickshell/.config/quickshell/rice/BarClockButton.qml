@@ -1,5 +1,6 @@
 import QtQuick
 import QtQuick.Layouts
+import "ds" as DS
 
 BarIsland {
     id: root
@@ -8,11 +9,11 @@ BarIsland {
     property string timeText: ""
 
     content: [
-        Text {
+        DS.QuietText {
             text: root.timeText
-            color: Theme.text
-            font.family: Theme.fontFamily
-            font.pixelSize: Theme.fontSizeSm
+            color: DS.Tokens.textPrimary
+            font.family: DS.Tokens.fontUi
+            font.pixelSize: DS.Tokens.fontSizeSm
         }
     ]
 

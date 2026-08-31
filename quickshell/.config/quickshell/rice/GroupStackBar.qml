@@ -77,8 +77,8 @@ Scope {
                     width: Math.max(2, modelData.w)
                     height: Math.max(3, modelData.h)
                     radius: 1
-                    color: modelData.active ? Theme.primary
-                        : Qt.rgba(Theme.primary.r, Theme.primary.g, Theme.primary.b, 0.45)
+                    color: modelData.active ? Qt.rgba(1, 1, 1, 0.94)
+                        : Qt.rgba(1, 1, 1, 0.38)
                 }
             }
         }

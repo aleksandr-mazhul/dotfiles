@@ -1,5 +1,6 @@
 import QtQuick
 import QtQuick.Layouts
+import "ds" as DS
 
 BarIsland {
     id: root
@@ -12,6 +13,7 @@ BarIsland {
             implicitSize: 16
             Layout.preferredWidth: 16
             Layout.preferredHeight: 16
+            tint: DS.Tokens.textIcon
         }
     ]
 }

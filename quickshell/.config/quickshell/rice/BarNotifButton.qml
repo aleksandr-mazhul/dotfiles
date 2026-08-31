@@ -1,5 +1,6 @@
 import QtQuick
 import QtQuick.Layouts
+import "ds" as DS
 
 BarIsland {
     id: root
@@ -11,7 +12,7 @@ BarIsland {
     content: [
         RiceIcon {
             customSource: Qt.resolvedUrl(root.muted ? "assets/notif-bell-off.svg" : "assets/notif-bell.svg")
-            tint: root.muted ? Theme.primary : "#ffffff"
+            tint: DS.Tokens.textIcon
             struck: false
             implicitSize: 16
             Layout.preferredWidth: 16
@@ -22,16 +23,18 @@ BarIsland {
             Layout.preferredWidth: Math.max(16, badge.implicitWidth + 6)
             Layout.preferredHeight: 16
             radius: 8
-            color: Theme.primary
+            color: DS.Tokens.raisedStrong
+            border.width: 1
+            border.color: DS.Tokens.raisedRim
 
-            Text {
+            DS.QuietText {
                 id: badge
                 anchors.centerIn: parent
                 text: root.unread > 99 ? "99+" : String(root.unread)
-                color: Theme.textOnAccent
-                font.family: Theme.fontFamily
+                color: DS.Tokens.textPrimary
+                font.family: DS.Tokens.fontUi
                 font.pixelSize: 10
-                font.bold: true
+                fontBold: true
             }
         }
     ]
