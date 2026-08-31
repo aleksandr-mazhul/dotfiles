@@ -1,5 +1,6 @@
 import QtQuick
 import QtQuick.Layouts
+import "ds" as DS
 
 // Compact HH:MM stepper — chevrons + mouse wheel.
 Item {
@@ -9,6 +10,7 @@ Item {
     property int minute: 0
     property string label: ""
     readonly property int minuteStep: 5
+    readonly property int wellRadius: DS.Tokens.innerRadius(DS.Tokens.radiusSurface, DS.Tokens.paddingSurface)
 
     function bumpHour(delta) {
         hour = (hour + delta + 24) % 24
@@ -36,6 +38,41 @@ Item {
         minute = mm
     }
 
+    component Chevron: Item {
+        id: ch
+        property string glyph: ""
+        property bool hovered: mouse.containsMouse
+        signal clicked()
+        implicitWidth: lab.implicitWidth
+        implicitHeight: lab.implicitHeight
+        Layout.alignment: Qt.AlignHCenter
+
+        DS.QuietText {
+            id: lab
+            anchors.centerIn: parent
+            text: ch.glyph
+            color: ch.hovered ? DS.Tokens.textPrimary : DS.Tokens.textTertiary
+            font.family: DS.Tokens.fontUi
+            font.pixelSize: DS.Tokens.fontSizeSm
+            scale: ch.hovered ? 1.2 : 1.0
+            Behavior on color {
+                ColorAnimation { duration: DS.Tokens.stateMs; easing.type: Easing.OutCubic }
+            }
+            Behavior on scale {
+                NumberAnimation { duration: 90; easing.type: Easing.OutCubic }
+            }
+        }
+
+        MouseArea {
+            id: mouse
+            anchors.fill: parent
+            anchors.margins: -10
+            hoverEnabled: true
+            cursorShape: Qt.PointingHandCursor
+            onClicked: ch.clicked()
+        }
+    }
+
     implicitWidth: 148
     implicitHeight: col.implicitHeight
     Layout.fillWidth: true
@@ -46,166 +83,95 @@ Item {
         anchors.right: parent.right
         spacing: 6
 
-        Text {
+        DS.QuietText {
             text: root.label
-            color: Theme.textMuted
-            font.family: Theme.fontFamily
-            font.pixelSize: Theme.fontSizeSm
+            color: DS.Tokens.textSecondary
+            font.family: DS.Tokens.fontUi
+            font.pixelSize: DS.Tokens.fontSizeSm
             Layout.alignment: Qt.AlignHCenter
         }
 
         Rectangle {
             Layout.fillWidth: true
             Layout.preferredHeight: 88
-            radius: Theme.radiusMd
-            color: Theme.glassSurface
+            radius: root.wellRadius
+            color: DS.Tokens.fieldFill
             border.width: 1
-            border.color: Theme.glassBorderSubtle
+            border.color: DS.Tokens.fieldRim
 
             RowLayout {
                 anchors.fill: parent
                 anchors.margins: 4
                 spacing: 2
 
-                // Hours
                 ColumnLayout {
                     Layout.fillWidth: true
                     Layout.fillHeight: true
                     spacing: 0
 
-                    Text {
-                        text: "▴"
-                        color: hourUpMouse.containsMouse ? Theme.primary : Theme.textMuted
-                        font.pixelSize: 12
-                        Layout.alignment: Qt.AlignHCenter
-                        scale: hourUpMouse.containsMouse ? 1.2 : 1.0
-                        Behavior on color {
-                            ColorAnimation { duration: Theme.hoverMs; easing.type: Easing.OutCubic }
-                        }
-                        Behavior on scale {
-                            NumberAnimation { duration: 90; easing.type: Easing.OutCubic }
-                        }
-                        MouseArea {
-                            id: hourUpMouse
-                            anchors.fill: parent
-                            anchors.margins: -10
-                            hoverEnabled: true
-                            cursorShape: Qt.PointingHandCursor
-                            onClicked: root.bumpHour(1)
-                        }
+                    Chevron {
+                        glyph: "▴"
+                        onClicked: root.bumpHour(1)
                     }
 
-                    Text {
+                    DS.QuietText {
                         text: String(root.hour).padStart(2, "0")
-                        color: Theme.text
-                        font.family: Theme.fontFamily
-                        font.pixelSize: 22
-                        font.bold: true
+                        color: DS.Tokens.textPrimary
+                        font.family: DS.Tokens.fontUi
+                        font.pixelSize: DS.Tokens.fontSize
+                        fontBold: true
                         horizontalAlignment: Text.AlignHCenter
                         verticalAlignment: Text.AlignVCenter
                         Layout.fillWidth: true
                         Layout.fillHeight: true
                     }
 
-                    Text {
-                        text: "▾"
-                        color: hourDownMouse.containsMouse ? Theme.primary : Theme.textMuted
-                        font.pixelSize: 12
-                        Layout.alignment: Qt.AlignHCenter
-                        scale: hourDownMouse.containsMouse ? 1.2 : 1.0
-                        Behavior on color {
-                            ColorAnimation { duration: Theme.hoverMs; easing.type: Easing.OutCubic }
-                        }
-                        Behavior on scale {
-                            NumberAnimation { duration: 90; easing.type: Easing.OutCubic }
-                        }
-                        MouseArea {
-                            id: hourDownMouse
-                            anchors.fill: parent
-                            anchors.margins: -10
-                            hoverEnabled: true
-                            cursorShape: Qt.PointingHandCursor
-                            onClicked: root.bumpHour(-1)
-                        }
+                    Chevron {
+                        glyph: "▾"
+                        onClicked: root.bumpHour(-1)
                     }
                 }
 
-                Text {
+                DS.QuietText {
                     text: ":"
-                    color: Theme.textMuted
-                    font.family: Theme.fontFamily
-                    font.pixelSize: 20
-                    font.bold: true
+                    color: DS.Tokens.textSecondary
+                    font.family: DS.Tokens.fontUi
+                    font.pixelSize: DS.Tokens.fontSize
+                    fontBold: true
                     Layout.alignment: Qt.AlignVCenter
                 }
 
-                // Minutes
                 ColumnLayout {
                     Layout.fillWidth: true
                     Layout.fillHeight: true
                     spacing: 0
 
-                    Text {
-                        text: "▴"
-                        color: minUpMouse.containsMouse ? Theme.primary : Theme.textMuted
-                        font.pixelSize: 12
-                        Layout.alignment: Qt.AlignHCenter
-                        scale: minUpMouse.containsMouse ? 1.2 : 1.0
-                        Behavior on color {
-                            ColorAnimation { duration: Theme.hoverMs; easing.type: Easing.OutCubic }
-                        }
-                        Behavior on scale {
-                            NumberAnimation { duration: 90; easing.type: Easing.OutCubic }
-                        }
-                        MouseArea {
-                            id: minUpMouse
-                            anchors.fill: parent
-                            anchors.margins: -10
-                            hoverEnabled: true
-                            cursorShape: Qt.PointingHandCursor
-                            onClicked: root.bumpMinute(1)
-                        }
+                    Chevron {
+                        glyph: "▴"
+                        onClicked: root.bumpMinute(1)
                     }
 
-                    Text {
+                    DS.QuietText {
                         text: String(root.minute).padStart(2, "0")
-                        color: Theme.text
-                        font.family: Theme.fontFamily
-                        font.pixelSize: 22
-                        font.bold: true
+                        color: DS.Tokens.textPrimary
+                        font.family: DS.Tokens.fontUi
+                        font.pixelSize: DS.Tokens.fontSize
+                        fontBold: true
                         horizontalAlignment: Text.AlignHCenter
                         verticalAlignment: Text.AlignVCenter
                         Layout.fillWidth: true
                         Layout.fillHeight: true
                     }
 
-                    Text {
-                        text: "▾"
-                        color: minDownMouse.containsMouse ? Theme.primary : Theme.textMuted
-                        font.pixelSize: 12
-                        Layout.alignment: Qt.AlignHCenter
-                        scale: minDownMouse.containsMouse ? 1.2 : 1.0
-                        Behavior on color {
-                            ColorAnimation { duration: Theme.hoverMs; easing.type: Easing.OutCubic }
-                        }
-                        Behavior on scale {
-                            NumberAnimation { duration: 90; easing.type: Easing.OutCubic }
-                        }
-                        MouseArea {
-                            id: minDownMouse
-                            anchors.fill: parent
-                            anchors.margins: -10
-                            hoverEnabled: true
-                            cursorShape: Qt.PointingHandCursor
-                            onClicked: root.bumpMinute(-1)
-                        }
+                    Chevron {
+                        glyph: "▾"
+                        onClicked: root.bumpMinute(-1)
                     }
                 }
             }
 
             WheelHandler {
                 onWheel: event => {
-                    // Prefer changing minutes with wheel over the whole control
                     root.bumpMinute(event.angleDelta.y > 0 ? 1 : -1)
                     event.accepted = true
                 }

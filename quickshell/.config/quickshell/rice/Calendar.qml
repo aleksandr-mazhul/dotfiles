@@ -4,6 +4,8 @@ import QtQuick.Layouts
 import Quickshell
 import Quickshell.Io
 import Quickshell.Wayland
+import Quickshell.Hyprland
+import "ds" as DS
 
 PanelWindow {
     id: root
@@ -115,7 +117,36 @@ PanelWindow {
     }
 
     function calAccent(name) {
-        return root.calColors[name] || Theme.primary
+        return root.calColors[name] || DS.Tokens.textTertiary
+    }
+
+    function sceneGeom(outsideBand) {
+        const scr = root.screen
+        const ox = scr ? Math.round(scr.x) : 0
+        const oy = scr ? Math.round(scr.y) : 0
+        const sw = scr ? Math.round(scr.width) : 0
+        const w = Math.round(root.implicitWidth)
+        let h = Math.round(root.implicitHeight)
+        if (w < 32)
+            return ""
+        if (h < 32)
+            h = 420
+        let gx = ox + sw - root.margins.right - w
+        let gy = oy + root.margins.top
+        if (gx < 0)
+            gx = 0
+        if (gy < 0)
+            gy = 0
+        if (outsideBand) {
+            const band = 28
+            const by = Math.max(0, gy - band)
+            return gx + "," + by + " " + w + "x" + band
+        }
+        return gx + "," + gy + " " + w + "x" + h
+    }
+
+    function refreshScene(outsideBand) {
+        DS.AdaptiveContrast.refresh(root.sceneGeom(!!outsideBand))
     }
 
     // True if the event is already over relative to "now".
@@ -266,8 +297,16 @@ PanelWindow {
         mutProc.running = true
     }
 
-    function toggle() { open = !open }
-    function show() { open = true }
+    function toggle() {
+        if (open)
+            close()
+        else
+            show()
+    }
+    function show() {
+        root.refreshScene(false)
+        open = true
+    }
     function close() {
         open = false
         closeForm()
@@ -321,13 +360,17 @@ PanelWindow {
         right: Theme.barMargin
     }
 
-    Rectangle {
+    Connections {
+        target: Hyprland
+        function onFocusedWorkspaceChanged() {
+            if (root.open)
+                root.refreshScene(true)
+        }
+    }
+
+    Item {
         id: panel
         anchors.fill: parent
-        color: Theme.glassBackground
-        radius: Theme.radiusLg
-        border.width: 1
-        border.color: Theme.glassBorder
         focus: root.open
         transformOrigin: Item.TopRight
         opacity: 1
@@ -342,16 +385,6 @@ PanelWindow {
             }
         }
 
-        // Soft inner highlight — Apple-like glass edge without heavy chrome
-        Rectangle {
-            anchors.fill: parent
-            anchors.margins: 1
-            radius: Theme.radiusLg - 1
-            color: "transparent"
-            border.width: 1
-            border.color: Theme.glassBorderSubtle
-        }
-
         RiceOpenAnim {
             id: openAnim
             target: panel
@@ -364,9 +397,13 @@ PanelWindow {
             toScale: 0.96
         }
 
-        ColumnLayout {
+        DS.GlassSurface {
             anchors.fill: parent
-            anchors.margins: 14
+            radius: DS.Tokens.radiusSurface
+
+            ColumnLayout {
+            anchors.fill: parent
+            anchors.margins: DS.Tokens.paddingSurface
             spacing: 10
 
             RowLayout {
@@ -381,16 +418,16 @@ PanelWindow {
                     Rectangle {
                         Layout.preferredWidth: 24
                         Layout.preferredHeight: 24
-                        radius: 8
-                        color: prevMouse.containsMouse ? Theme.glassSurfaceHover : "transparent"
+                        radius: 12
+                        color: prevMouse.containsMouse ? DS.Tokens.raised : "transparent"
                         Behavior on color {
-                            ColorAnimation { duration: Theme.hoverMs; easing.type: Easing.OutCubic }
+                            ColorAnimation { duration: DS.Tokens.stateMs; easing.type: Easing.OutCubic }
                         }
 
                         RiceIcon {
                             anchors.centerIn: parent
                             customSource: Qt.resolvedUrl("assets/chevron-left.svg")
-                            tint: prevMouse.containsMouse ? Theme.text : Theme.textMuted
+                            tint: prevMouse.containsMouse ? DS.Tokens.textPrimary : DS.Tokens.textIcon
                             implicitSize: 14
                             scale: prevMouse.containsMouse ? 1.1 : 1.0
                             Behavior on scale {
@@ -406,12 +443,12 @@ PanelWindow {
                         }
                     }
 
-                    Text {
+                    DS.QuietText {
                         text: root.monthNames[root.viewMonth] + " " + root.viewYear
-                        color: Theme.text
-                        font.family: Theme.fontFamily
-                        font.pixelSize: Theme.fontSizeLg
-                        font.bold: true
+                        color: DS.Tokens.textPrimary
+                        font.family: DS.Tokens.fontUi
+                        font.pixelSize: DS.Tokens.fontSize
+                        fontWeight: Font.Medium
                         Layout.leftMargin: 4
                         Layout.rightMargin: 4
                     }
@@ -419,16 +456,16 @@ PanelWindow {
                     Rectangle {
                         Layout.preferredWidth: 24
                         Layout.preferredHeight: 24
-                        radius: 8
-                        color: nextMouse.containsMouse ? Theme.glassSurfaceHover : "transparent"
+                        radius: 12
+                        color: nextMouse.containsMouse ? DS.Tokens.raised : "transparent"
                         Behavior on color {
-                            ColorAnimation { duration: Theme.hoverMs; easing.type: Easing.OutCubic }
+                            ColorAnimation { duration: DS.Tokens.stateMs; easing.type: Easing.OutCubic }
                         }
 
                         RiceIcon {
                             anchors.centerIn: parent
                             customSource: Qt.resolvedUrl("assets/chevron-right.svg")
-                            tint: nextMouse.containsMouse ? Theme.text : Theme.textMuted
+                            tint: nextMouse.containsMouse ? DS.Tokens.textPrimary : DS.Tokens.textIcon
                             implicitSize: 14
                             scale: nextMouse.containsMouse ? 1.1 : 1.0
                             Behavior on scale {
@@ -465,28 +502,28 @@ PanelWindow {
                             property bool hovered: hdrMouse.containsMouse
                             Layout.preferredWidth: 28
                             Layout.preferredHeight: 28
-                            radius: 8
-                            color: hdrBtn.hovered ? Theme.glassSurfaceHover : "transparent"
+                            radius: 14
+                            color: hdrBtn.hovered ? DS.Tokens.raised : "transparent"
                             opacity: hdrBtn.modelData.action === "sync" && root.busy ? 0.4 : 1
                             Behavior on color {
-                                ColorAnimation { duration: Theme.hoverMs; easing.type: Easing.OutCubic }
+                                ColorAnimation { duration: DS.Tokens.stateMs; easing.type: Easing.OutCubic }
                             }
 
-                            Text {
+                            DS.QuietText {
                                 anchors.centerIn: parent
                                 visible: hdrBtn.modelData.action !== "close"
                                 text: hdrBtn.modelData.glyph
-                                color: Theme.text
-                                font.family: Theme.fontFamily
-                                font.pixelSize: 18
-                                font.bold: true
+                                color: DS.Tokens.textPrimary
+                                font.family: DS.Tokens.fontUi
+                                font.pixelSize: DS.Tokens.fontSize
+                                fontBold: true
                             }
 
                             RiceIcon {
                                 anchors.centerIn: parent
                                 visible: hdrBtn.modelData.action === "close"
                                 customSource: Qt.resolvedUrl("assets/close.svg")
-                                tint: hdrBtn.hovered ? Theme.text : Theme.textMuted
+                                tint: hdrBtn.hovered ? DS.Tokens.textPrimary : DS.Tokens.textIcon
                                 implicitSize: 14
                                 scale: hdrBtn.hovered ? 1.1 : 1.0
                                 Behavior on scale {
@@ -523,12 +560,12 @@ PanelWindow {
 
                 Repeater {
                     model: ["M", "T", "W", "T", "F", "S", "S"]
-                    Text {
+                    DS.QuietText {
                         required property string modelData
                         text: modelData
-                        color: Theme.textMuted
-                        font.family: Theme.fontFamily
-                        font.pixelSize: Theme.fontSizeSm
+                        color: DS.Tokens.textTertiary
+                        font.family: DS.Tokens.fontUi
+                        font.pixelSize: DS.Tokens.fontSizeSection
                         horizontalAlignment: Text.AlignHCenter
                         Layout.fillWidth: true
                         Layout.preferredHeight: 18
@@ -568,26 +605,26 @@ PanelWindow {
                             visible: !cell.isPad
                             color: {
                                 if (cell.selected)
-                                    return Theme.text
-                                if (modelData.today)
-                                    return cell.hovered ? Theme.glassTileActiveHover : Theme.glassTileActive
-                                return cell.hovered ? Theme.glassSurfaceHover : "transparent"
+                                    return DS.Tokens.raisedStrong
+                                if (cell.hovered)
+                                    return DS.Tokens.raised
+                                return "transparent"
                             }
-                            border.width: modelData.today && !cell.selected ? 1 : 0
-                            border.color: Theme.glassTileBorder
+                            border.width: (cell.selected || (modelData.today && !cell.selected) || cell.hovered) ? 1 : 0
+                            border.color: cell.selected
+                                ? DS.Tokens.raisedRim
+                                : (modelData.today && !cell.selected ? DS.Tokens.fieldRim : DS.Tokens.fieldRim)
                             Behavior on color {
-                                ColorAnimation { duration: Theme.hoverMs; easing.type: Easing.OutCubic }
+                                ColorAnimation { duration: DS.Tokens.stateMs; easing.type: Easing.OutCubic }
                             }
 
-                            Text {
+                            DS.QuietText {
                                 anchors.centerIn: parent
                                 text: cell.isPad ? "" : String(cell.modelData.day)
-                                color: cell.selected
-                                    ? Theme.background
-                                    : (cell.modelData.today ? Theme.primary : Theme.text)
-                                font.family: Theme.fontFamily
-                                font.pixelSize: Theme.fontSizeSm
-                                font.bold: cell.selected || cell.modelData.today
+                                color: DS.Tokens.textPrimary
+                                font.family: DS.Tokens.fontUi
+                                font.pixelSize: DS.Tokens.fontSizeSm
+                                fontBold: cell.selected || cell.modelData.today
                             }
                         }
 
@@ -630,26 +667,25 @@ PanelWindow {
                 }
             }
 
-            Rectangle {
+            Item {
                 visible: !root.formOpen
                 Layout.fillWidth: true
-                height: 1
-                color: Theme.glassBorderSubtle
+                Layout.preferredHeight: 8
             }
 
             RowLayout {
                 Layout.fillWidth: true
 
-                Text {
+                DS.QuietText {
                     text: {
                         const d = new Date(root.viewYear, root.viewMonth, root.selectedDay)
                         const days = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"]
                         return days[d.getDay()] + " · " + root.selectedDay
                     }
-                    color: Theme.text
-                    font.family: Theme.fontFamily
-                    font.pixelSize: Theme.fontSize
-                    font.bold: true
+                    color: DS.Tokens.textPrimary
+                    font.family: DS.Tokens.fontUi
+                    font.pixelSize: DS.Tokens.fontSize
+                    fontWeight: Font.Medium
                     Layout.fillWidth: true
                 }
 
@@ -657,23 +693,23 @@ PanelWindow {
                     id: todayBtn
                     visible: !root.formOpen
                     property bool hovered: todayMouse.containsMouse
-                    radius: Theme.radiusSm
-                    color: todayBtn.hovered ? Theme.glassSurfaceHover : Theme.glassSurface
+                    radius: 12
+                    color: todayBtn.hovered ? DS.Tokens.raised : "transparent"
                     border.width: 1
-                    border.color: Theme.glassBorderSubtle
+                    border.color: DS.Tokens.fieldRim
                     implicitWidth: todayLbl.implicitWidth + 16
                     implicitHeight: 24
                     Behavior on color {
-                        ColorAnimation { duration: Theme.hoverMs; easing.type: Easing.OutCubic }
+                        ColorAnimation { duration: DS.Tokens.stateMs; easing.type: Easing.OutCubic }
                     }
 
-                    Text {
+                    DS.QuietText {
                         id: todayLbl
                         anchors.centerIn: parent
                         text: "Today"
-                        color: Theme.textMuted
-                        font.family: Theme.fontFamily
-                        font.pixelSize: Theme.fontSizeSm
+                        color: todayBtn.hovered ? DS.Tokens.textPrimary : DS.Tokens.textSecondary
+                        font.family: DS.Tokens.fontUi
+                        font.pixelSize: DS.Tokens.fontSizeSm
                     }
 
                     MouseArea {
@@ -693,11 +729,11 @@ PanelWindow {
                 Layout.fillHeight: true
                 spacing: 8
 
-                Text {
+                DS.QuietText {
                     text: root.formEditing ? "Edit event" : "New event"
-                    color: Theme.textMuted
-                    font.family: Theme.fontFamily
-                    font.pixelSize: Theme.fontSizeSm
+                    color: DS.Tokens.textTertiary
+                    font.family: DS.Tokens.fontUi
+                    font.pixelSize: DS.Tokens.fontSizeSection
                 }
 
                 Flickable {
@@ -718,12 +754,12 @@ PanelWindow {
                         Rectangle {
                             Layout.fillWidth: true
                             Layout.preferredHeight: 34
-                            radius: Theme.radiusSm
-                            color: Theme.glassSurface
+                            radius: DS.Tokens.innerRadius(DS.Tokens.radiusSurface, DS.Tokens.paddingSurface)
+                            color: DS.Tokens.fieldFill
                             border.width: 1
-                            border.color: titleInput.activeFocus ? Theme.primary : Theme.glassBorderSubtle
+                            border.color: titleInput.activeFocus ? DS.Tokens.focusRim : DS.Tokens.fieldRim
                             Behavior on border.color {
-                                ColorAnimation { duration: Theme.hoverMs; easing.type: Easing.OutCubic }
+                                ColorAnimation { duration: DS.Tokens.stateMs; easing.type: Easing.OutCubic }
                             }
 
                             TextInput {
@@ -732,19 +768,21 @@ PanelWindow {
                                 anchors.leftMargin: 10
                                 anchors.rightMargin: 10
                                 verticalAlignment: TextInput.AlignVCenter
-                                color: Theme.text
-                                font.family: Theme.fontFamily
-                                font.pixelSize: Theme.fontSize
+                                color: DS.Tokens.textPrimary
+                                font.family: DS.Tokens.fontUi
+                                font.pixelSize: DS.Tokens.fontSize
+                                selectedTextColor: DS.Tokens.textPrimary
                                 text: root.draftTitle
                                 onTextChanged: root.draftTitle = text
                                 Keys.onReturnPressed: root.submitForm()
 
-                                Text {
+                                DS.QuietText {
                                     anchors.fill: parent
                                     verticalAlignment: Text.AlignVCenter
                                     text: "Title"
-                                    color: Theme.textMuted
-                                    font: titleInput.font
+                                    color: DS.Tokens.textTertiary
+                                    font.family: DS.Tokens.fontUi
+                                    font.pixelSize: DS.Tokens.fontSize
                                     visible: titleInput.text.length === 0
                                 }
                             }
@@ -754,11 +792,11 @@ PanelWindow {
                             Layout.fillWidth: true
                             spacing: 8
 
-                            Text {
+                            DS.QuietText {
                                 text: "All-day"
-                                color: Theme.text
-                                font.family: Theme.fontFamily
-                                font.pixelSize: Theme.fontSizeSm
+                                color: DS.Tokens.textPrimary
+                                font.family: DS.Tokens.fontUi
+                                font.pixelSize: DS.Tokens.fontSizeSm
                                 Layout.fillWidth: true
                             }
 
@@ -766,14 +804,14 @@ PanelWindow {
                                 width: 42
                                 height: 24
                                 radius: 12
-                                color: root.draftAllDay ? Theme.primary : Theme.glassSurface
+                                color: root.draftAllDay ? DS.Tokens.raisedStrong : "transparent"
                                 border.width: 1
-                                border.color: root.draftAllDay ? Theme.primary : Theme.glassBorderSubtle
+                                border.color: root.draftAllDay ? DS.Tokens.raisedRim : DS.Tokens.fieldRim
                                 Behavior on color {
-                                    ColorAnimation { duration: Theme.hoverMs; easing.type: Easing.OutCubic }
+                                    ColorAnimation { duration: DS.Tokens.stateMs; easing.type: Easing.OutCubic }
                                 }
                                 Behavior on border.color {
-                                    ColorAnimation { duration: Theme.hoverMs; easing.type: Easing.OutCubic }
+                                    ColorAnimation { duration: DS.Tokens.stateMs; easing.type: Easing.OutCubic }
                                 }
 
                                 Rectangle {
@@ -782,9 +820,9 @@ PanelWindow {
                                     radius: 9
                                     anchors.verticalCenter: parent.verticalCenter
                                     x: root.draftAllDay ? parent.width - width - 3 : 3
-                                    color: Theme.text
+                                    color: DS.Tokens.textPrimary
                                     Behavior on x {
-                                        NumberAnimation { duration: Theme.hoverMs; easing.type: Easing.OutCubic }
+                                        NumberAnimation { duration: DS.Tokens.stateMs; easing.type: Easing.OutCubic }
                                     }
                                 }
 
@@ -819,12 +857,12 @@ PanelWindow {
                         Rectangle {
                             Layout.fillWidth: true
                             Layout.preferredHeight: 34
-                            radius: Theme.radiusSm
-                            color: Theme.glassSurface
+                            radius: DS.Tokens.innerRadius(DS.Tokens.radiusSurface, DS.Tokens.paddingSurface)
+                            color: DS.Tokens.fieldFill
                             border.width: 1
-                            border.color: locationInput.activeFocus ? Theme.primary : Theme.glassBorderSubtle
+                            border.color: locationInput.activeFocus ? DS.Tokens.focusRim : DS.Tokens.fieldRim
                             Behavior on border.color {
-                                ColorAnimation { duration: Theme.hoverMs; easing.type: Easing.OutCubic }
+                                ColorAnimation { duration: DS.Tokens.stateMs; easing.type: Easing.OutCubic }
                             }
 
                             TextInput {
@@ -832,19 +870,21 @@ PanelWindow {
                                 anchors.fill: parent
                                 anchors.margins: 10
                                 verticalAlignment: TextInput.AlignVCenter
-                                color: Theme.text
-                                font.family: Theme.fontFamily
-                                font.pixelSize: Theme.fontSizeSm
+                                color: DS.Tokens.textPrimary
+                                font.family: DS.Tokens.fontUi
+                                font.pixelSize: DS.Tokens.fontSizeSm
+                                selectedTextColor: DS.Tokens.textPrimary
                                 text: root.draftLocation
                                 onTextChanged: root.draftLocation = text
 
-                                Text {
+                                DS.QuietText {
                                     anchors.fill: parent
                                     verticalAlignment: Text.AlignVCenter
                                     text: "Location (optional)"
-                                    color: Theme.textMuted
-                                    font: parent.font
-                                    visible: parent.text.length === 0
+                                    color: DS.Tokens.textTertiary
+                                    font.family: DS.Tokens.fontUi
+                                    font.pixelSize: DS.Tokens.fontSizeSm
+                                    visible: locationInput.text.length === 0
                                 }
                             }
                         }
@@ -867,19 +907,21 @@ PanelWindow {
                                     readonly property bool active: root.draftCalendar === calChip.modelData.id
                                     Layout.fillWidth: true
                                     Layout.preferredHeight: 28
-                                    radius: Theme.radiusSm
+                                    radius: DS.Tokens.innerRadius(DS.Tokens.radiusSurface, DS.Tokens.paddingSurface)
                                     color: {
                                         if (calChip.active)
-                                            return calChip.hovered ? Theme.glassTileActiveHover : Theme.glassTileActive
-                                        return calChip.hovered ? Theme.glassSurfaceHover : Theme.glassSurface
+                                            return DS.Tokens.raisedStrong
+                                        if (calChip.hovered)
+                                            return DS.Tokens.raised
+                                        return "transparent"
                                     }
                                     border.width: 1
-                                    border.color: calChip.active ? Theme.glassTileBorder : Theme.glassBorderSubtle
+                                    border.color: calChip.active ? DS.Tokens.raisedRim : DS.Tokens.fieldRim
                                     Behavior on color {
-                                        ColorAnimation { duration: Theme.hoverMs; easing.type: Easing.OutCubic }
+                                        ColorAnimation { duration: DS.Tokens.stateMs; easing.type: Easing.OutCubic }
                                     }
                                     Behavior on border.color {
-                                        ColorAnimation { duration: Theme.hoverMs; easing.type: Easing.OutCubic }
+                                        ColorAnimation { duration: DS.Tokens.stateMs; easing.type: Easing.OutCubic }
                                     }
 
                                     RowLayout {
@@ -891,11 +933,11 @@ PanelWindow {
                                             radius: 4
                                             color: root.calAccent(modelData.id)
                                         }
-                                        Text {
+                                        DS.QuietText {
                                             text: modelData.label
-                                            color: Theme.text
-                                            font.family: Theme.fontFamily
-                                            font.pixelSize: Theme.fontSizeSm
+                                            color: calChip.active ? DS.Tokens.textPrimary : DS.Tokens.textSecondary
+                                            font.family: DS.Tokens.fontUi
+                                            font.pixelSize: DS.Tokens.fontSizeSm
                                         }
                                     }
 
@@ -919,13 +961,13 @@ PanelWindow {
                     property bool hovered: deleteMouse.containsMouse
                     Layout.fillWidth: true
                     Layout.preferredHeight: 34
-                    radius: Theme.radiusSm
+                    radius: DS.Tokens.innerRadius(DS.Tokens.radiusSurface, DS.Tokens.paddingSurface)
                     color: Qt.rgba(Theme.error.r, Theme.error.g, Theme.error.b, deleteBtn.hovered ? 0.22 : 0.15)
                     border.width: 1
                     border.color: Theme.error
                     opacity: root.busy ? 0.5 : 1
                     Behavior on color {
-                        ColorAnimation { duration: Theme.hoverMs; easing.type: Easing.OutCubic }
+                        ColorAnimation { duration: DS.Tokens.stateMs; easing.type: Easing.OutCubic }
                     }
 
                     RowLayout {
@@ -938,12 +980,12 @@ PanelWindow {
                             Layout.preferredWidth: 14
                             Layout.preferredHeight: 14
                         }
-                        Text {
+                        DS.QuietText {
                             text: "Delete event"
                             color: Theme.error
-                            font.family: Theme.fontFamily
-                            font.pixelSize: Theme.fontSizeSm
-                            font.bold: true
+                            font.family: DS.Tokens.fontUi
+                            font.pixelSize: DS.Tokens.fontSizeSm
+                            fontBold: true
                         }
                     }
 
@@ -966,20 +1008,20 @@ PanelWindow {
                         property bool hovered: cancelMouse.containsMouse
                         Layout.fillWidth: true
                         Layout.preferredHeight: 34
-                        radius: Theme.radiusSm
-                        color: cancelBtn.hovered ? Theme.glassSurfaceHover : Theme.glassSurface
+                        radius: DS.Tokens.innerRadius(DS.Tokens.radiusSurface, DS.Tokens.paddingSurface)
+                        color: cancelBtn.hovered ? DS.Tokens.raised : "transparent"
                         border.width: 1
-                        border.color: Theme.glassBorderSubtle
+                        border.color: DS.Tokens.fieldRim
                         Behavior on color {
-                            ColorAnimation { duration: Theme.hoverMs; easing.type: Easing.OutCubic }
+                            ColorAnimation { duration: DS.Tokens.stateMs; easing.type: Easing.OutCubic }
                         }
 
-                        Text {
+                        DS.QuietText {
                             anchors.centerIn: parent
                             text: "Cancel"
-                            color: Theme.textMuted
-                            font.family: Theme.fontFamily
-                            font.pixelSize: Theme.fontSizeSm
+                            color: DS.Tokens.textSecondary
+                            font.family: DS.Tokens.fontUi
+                            font.pixelSize: DS.Tokens.fontSizeSm
                         }
 
                         MouseArea {
@@ -996,20 +1038,19 @@ PanelWindow {
                         property bool hovered: submitMouse.containsMouse
                         Layout.fillWidth: true
                         Layout.preferredHeight: 34
-                        radius: Theme.radiusSm
-                        color: Theme.primary
-                        opacity: root.busy ? 0.5 : (submitBtn.hovered ? 0.88 : 1)
-                        Behavior on opacity {
-                            NumberAnimation { duration: Theme.hoverMs; easing.type: Easing.OutCubic }
-                        }
+                        radius: DS.Tokens.innerRadius(DS.Tokens.radiusSurface, DS.Tokens.paddingSurface)
+                        color: submitBtn.hovered ? DS.Tokens.raisedStrong : DS.Tokens.raisedStrong
+                        border.width: 1
+                        border.color: DS.Tokens.raisedRim
+                        opacity: root.busy ? 0.5 : 1
 
-                        Text {
+                        DS.QuietText {
                             anchors.centerIn: parent
                             text: root.formEditing ? "Save" : "Add"
-                            color: Theme.textOnAccent
-                            font.family: Theme.fontFamily
-                            font.pixelSize: Theme.fontSizeSm
-                            font.bold: true
+                            color: DS.Tokens.textPrimary
+                            font.family: DS.Tokens.fontUi
+                            font.pixelSize: DS.Tokens.fontSizeSm
+                            fontBold: true
                         }
 
                         MouseArea {
@@ -1041,13 +1082,13 @@ PanelWindow {
                     readonly property bool hovered: evMouse.containsMouse
                     width: ListView.view.width
                     height: Math.max(evCol.implicitHeight + 14, 44)
-                    radius: Theme.radiusMd
-                    color: ev.hovered ? Theme.glassSurfaceHover : Theme.glassSurface
-                    border.width: 1
-                    border.color: Theme.glassBorderSubtle
+                    radius: DS.Tokens.innerRadius(DS.Tokens.radiusSurface, DS.Tokens.paddingSurface)
+                    color: ev.hovered ? DS.Tokens.raised : "transparent"
+                    border.width: ev.hovered ? 1 : 0
+                    border.color: DS.Tokens.raisedRim
                     opacity: past ? 0.42 : 1.0
                     Behavior on color {
-                        ColorAnimation { duration: Theme.hoverMs; easing.type: Easing.OutCubic }
+                        ColorAnimation { duration: DS.Tokens.stateMs; easing.type: Easing.OutCubic }
                     }
 
                     Rectangle {
@@ -1074,17 +1115,17 @@ PanelWindow {
                         RowLayout {
                             Layout.fillWidth: true
 
-                            Text {
+                            DS.QuietText {
                                 text: ev.modelData.title || "Event"
-                                color: ev.past ? Theme.textMuted : Theme.text
-                                font.family: Theme.fontFamily
-                                font.pixelSize: Theme.fontSize
-                                font.bold: !ev.past
+                                color: DS.Tokens.textPrimary
+                                font.family: DS.Tokens.fontUi
+                                font.pixelSize: DS.Tokens.fontSize
+                                fontBold: !ev.past
                                 elide: Text.ElideRight
                                 Layout.fillWidth: true
                             }
 
-                            Text {
+                            DS.QuietText {
                                 text: {
                                     const s = ev.modelData["start-time"] || ""
                                     const e = ev.modelData["end-time"] || ""
@@ -1094,9 +1135,9 @@ PanelWindow {
                                         return s + "\n" + e
                                     return s || e
                                 }
-                                color: Theme.textMuted
-                                font.family: Theme.fontFamily
-                                font.pixelSize: Theme.fontSizeSm
+                                color: DS.Tokens.textSecondary
+                                font.family: DS.Tokens.fontUi
+                                font.pixelSize: DS.Tokens.fontSizeSm
                                 horizontalAlignment: Text.AlignRight
                             }
                         }
@@ -1113,13 +1154,14 @@ PanelWindow {
                                 implicitSize: 12
                                 Layout.preferredWidth: 12
                                 Layout.preferredHeight: 12
+                                tint: DS.Tokens.textIcon
                             }
 
-                            Text {
+                            DS.QuietText {
                                 text: ev.modelData.location || ""
-                                color: Theme.textMuted
-                                font.family: Theme.fontFamily
-                                font.pixelSize: Theme.fontSizeSm
+                                color: DS.Tokens.textSecondary
+                                font.family: DS.Tokens.fontUi
+                                font.pixelSize: DS.Tokens.fontSizeSm
                                 elide: Text.ElideRight
                                 Layout.fillWidth: true
                             }
@@ -1136,14 +1178,14 @@ PanelWindow {
                         anchors.right: parent.right
                         anchors.rightMargin: 10
                         anchors.verticalCenter: parent.verticalCenter
-                        tint: trashMouse.containsMouse ? Theme.error : Theme.textMuted
+                        tint: trashMouse.containsMouse ? Theme.error : DS.Tokens.textTertiary
                         opacity: trashMouse.containsMouse ? 1.0 : 0.55
                         scale: trashMouse.containsMouse ? 1.12 : 1.0
                         Behavior on scale {
                             NumberAnimation { duration: 90; easing.type: Easing.OutCubic }
                         }
                         Behavior on opacity {
-                            NumberAnimation { duration: Theme.hoverMs; easing.type: Easing.OutCubic }
+                            NumberAnimation { duration: DS.Tokens.stateMs; easing.type: Easing.OutCubic }
                         }
                         MouseArea {
                             id: trashMouse
@@ -1166,23 +1208,24 @@ PanelWindow {
                     }
                 }
 
-                Text {
+                DS.QuietText {
                     anchors.centerIn: parent
                     visible: root.events.length === 0 && !root.busy
                     text: "No events"
-                    color: Theme.textMuted
-                    font.family: Theme.fontFamily
-                    font.pixelSize: Theme.fontSize
+                    color: DS.Tokens.textSecondary
+                    font.family: DS.Tokens.fontUi
+                    font.pixelSize: DS.Tokens.fontSize
                 }
             }
 
-            Text {
+            DS.QuietText {
                 visible: root.statusText.length > 0
                 text: root.statusText
-                color: Theme.textMuted
-                font.family: Theme.fontFamily
-                font.pixelSize: Theme.fontSizeSm
+                color: DS.Tokens.textSecondary
+                font.family: DS.Tokens.fontUi
+                font.pixelSize: DS.Tokens.fontSizeSm
                 Layout.fillWidth: true
+            }
             }
         }
     }
