@@ -87,24 +87,11 @@ menu menuitem:hover,
   border-radius: 8px;
 }
 
-.nautilus-window,
-.nautilus-window .background,
-.nautilus-list-view,
-.nautilus-grid-view,
-.nautilus-canvas-view {
-  background-color: @view_bg_color;
-  color: @view_fg_color;
-}
+/* Files chrome: optical glass at EOF (.nautilus-window). */
 
-.nautilus-window .sidebar-pane,
-.nautilus-window toolbarview.sidebar-pane {
-  background-color: @sidebar_bg_color;
-  color: @sidebar_fg_color;
-}
 .sidebar,
 .navigation-sidebar,
 list.navigation-sidebar,
-.nautilus-window .sidebar,
 flap > .sidebar {
   background-color: @view_bg_color;
   color: @theme_fg_color;
@@ -157,7 +144,353 @@ headerbar, notebook > header, tab {
   color: @theme_fg_color;
 }
 
-tab:checked, .titlebar {
+tab:checked {
   background-color: @theme_selected_bg_color;
   color: @theme_selected_fg_color;
 }
+
+/* CSD chrome (Evince, Files, …) — grey, never accent. Accent is for selection only. */
+.titlebar {
+  background-color: @headerbar_bg_color;
+  color: @headerbar_fg_color;
+}
+
+/* Files glass — Nautilus 50. ADR-0010 slice. Canon №9 shell + №4 two-plane.
+   Scope beats window:not(.popup) via extra :not() + .nautilus-window.
+   Do not retarget @define-color. Popovers unfrosted (blur.popups false). */
+window.nautilus-window:not(.popup):not(.tooltip),
+.nautilus-window:not(.popup):not(.tooltip),
+.nautilus-window.background,
+.nautilus-window.view,
+.nautilus-file-chooser:not(.popup):not(.tooltip) {
+  --window-bg-color: rgba(255, 255, 255, 0.038);
+  --headerbar-bg-color: transparent;
+  --headerbar-backdrop-color: transparent;
+  --headerbar-shade-color: transparent;
+  --sidebar-bg-color: rgba(255, 255, 255, 0.038);
+  --sidebar-backdrop-color: rgba(255, 255, 255, 0.038);
+  --sidebar-shade-color: transparent;
+  --view-bg-color: rgba(0, 0, 0, 0.10);
+  --card-bg-color: rgba(255, 255, 255, 0.055);
+  --popover-bg-color: rgba(0, 0, 0, 0.92);
+  --accent-fg-color: rgba(255, 255, 255, 0.94);
+  --accent-color: rgba(255, 255, 255, 0.86);
+  --accent-bg-color: transparent;
+  background-color: rgba(255, 255, 255, 0.038);
+  background-image: none;
+  color: rgba(255, 255, 255, 0.94);
+  border: none;
+  outline: none;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.22);
+}
+
+/* Descendants redeclare Adw light :root vars that do not inherit from the window.
+   --accent-bg-color kills Nautilus #959595 and wallpaper primary on selected. */
+window.nautilus-window *,
+.nautilus-window *,
+.nautilus-file-chooser * {
+  --window-bg-color: rgba(255, 255, 255, 0.038);
+  --headerbar-bg-color: transparent;
+  --headerbar-backdrop-color: transparent;
+  --sidebar-bg-color: rgba(255, 255, 255, 0.038);
+  --sidebar-backdrop-color: rgba(255, 255, 255, 0.038);
+  --view-bg-color: rgba(0, 0, 0, 0.10);
+  --accent-bg-color: transparent;
+  --accent-color: rgba(255, 255, 255, 0.86);
+  --accent-fg-color: rgba(255, 255, 255, 0.94);
+}
+
+.nautilus-window headerbar,
+.nautilus-window headerbar:backdrop,
+.nautilus-window .titlebar,
+.nautilus-window .top-bar,
+.nautilus-file-chooser headerbar {
+  background-color: transparent;
+  background-image: none;
+  color: rgba(255, 255, 255, 0.94);
+  box-shadow: none;
+  border: none;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+/* Sidebar plate: OverlaySplitView wraps the pane in AdwBin.sidebar-pane;
+   toolbarview is not a direct child. placessidebar is Nautilus-only (css name).
+   Light Adw --sidebar-bg-color is #ebebed — paint the bin AND its children. */
+window.nautilus-window overlay-split-view,
+window.nautilus-window overlay-split-view > .sidebar-pane,
+window.nautilus-window overlay-split-view > .sidebar-pane:backdrop,
+window.nautilus-window overlay-split-view > .background,
+window.nautilus-window overlay-split-view toolbarview,
+window.nautilus-window overlay-split-view > .sidebar-pane > *,
+window.nautilus-window .sidebar-pane,
+window.nautilus-window .sidebar-pane:backdrop,
+window.nautilus-window toolbarview.sidebar-pane,
+window.nautilus-window placessidebar,
+window.nautilus-window placessidebar.sidebar,
+window.nautilus-window placessidebar > scrolledwindow,
+window.nautilus-window placessidebar scrolledwindow,
+window.nautilus-window placessidebar viewport,
+window.nautilus-window placessidebar list,
+window.nautilus-window .sidebar,
+window.nautilus-window .navigation-sidebar,
+window.nautilus-window list.navigation-sidebar,
+window.nautilus-window listview.navigation-sidebar,
+placessidebar,
+placessidebar.sidebar,
+placessidebar list,
+placessidebar list.navigation-sidebar,
+.nautilus-file-chooser overlay-split-view > .sidebar-pane,
+.nautilus-file-chooser placessidebar {
+  background-color: rgba(255, 255, 255, 0.038);
+  background-image: none;
+  color: rgba(255, 255, 255, 0.94);
+  box-shadow: none;
+  border: none;
+}
+
+window.nautilus-window overlay-split-view > .sidebar-pane,
+window.nautilus-window .sidebar-pane {
+  border-right: 1px solid rgba(255, 255, 255, 0.14);
+}
+
+.nautilus-window .content-pane,
+.nautilus-window .nautilus-list-view,
+.nautilus-window .nautilus-grid-view,
+.nautilus-window .nautilus-network-view,
+.nautilus-window .view {
+  background-color: rgba(0, 0, 0, 0.10);
+  background-image: none;
+  color: rgba(255, 255, 255, 0.94);
+}
+
+.nautilus-window .nautilus-list-view listview,
+.nautilus-window .nautilus-list-view columnview > listview,
+.nautilus-window .nautilus-grid-view gridview,
+.nautilus-window .nautilus-network-view listview {
+  background: none;
+  --accent-bg-color: transparent;
+  --accent-fg-color: rgba(255, 255, 255, 0.94);
+  --accent-color: rgba(255, 255, 255, 0.94);
+}
+
+.nautilus-window .sidebar label,
+.nautilus-window .navigation-sidebar label,
+.nautilus-window list.navigation-sidebar label,
+.nautilus-window listview.navigation-sidebar label {
+  color: rgba(255, 255, 255, 0.94);
+}
+
+.nautilus-window .dim-label,
+.nautilus-window .caption,
+.nautilus-window .subtitle {
+  color: rgba(255, 255, 255, 0.62);
+}
+
+.nautilus-window list.navigation-sidebar row,
+.nautilus-window listview.navigation-sidebar > row,
+.nautilus-window .navigation-sidebar row {
+  background: none;
+  border: none;
+  box-shadow: none;
+  border-radius: 10px;
+  color: rgba(255, 255, 255, 0.94);
+}
+
+.nautilus-window list.navigation-sidebar row:hover,
+.nautilus-window listview.navigation-sidebar > row:hover,
+.nautilus-window .navigation-sidebar row:hover {
+  background-color: rgba(255, 255, 255, 0.04);
+}
+
+.nautilus-window list.navigation-sidebar row:selected,
+.nautilus-window list.navigation-sidebar row:selected label,
+.nautilus-window listview.navigation-sidebar > row:selected,
+.nautilus-window listview.navigation-sidebar > row:selected label,
+.nautilus-window .navigation-sidebar row:selected,
+.nautilus-window .navigation-sidebar row:selected label {
+  background-color: rgba(255, 255, 255, 0.06);
+  color: rgba(255, 255, 255, 0.94);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.34);
+}
+
+.nautilus-window .nautilus-list-view columnview > listview > row,
+.nautilus-window .nautilus-network-view listview > row,
+.nautilus-window listview > row {
+  background: none;
+  border: none;
+  box-shadow: none;
+  outline: none;
+  border-radius: 10px;
+}
+
+.nautilus-window .nautilus-list-view columnview > listview > row:hover,
+.nautilus-window .nautilus-network-view listview > row:hover {
+  background-color: rgba(255, 255, 255, 0.04);
+}
+
+.nautilus-window .nautilus-list-view columnview > listview > row:selected,
+.nautilus-window .nautilus-network-view listview > row:selected,
+.nautilus-window listview > row:selected {
+  background-color: rgba(255, 255, 255, 0.06);
+  color: rgba(255, 255, 255, 0.94);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.34);
+}
+
+.nautilus-window .nautilus-list-view columnview > listview > row:selected > cell,
+.nautilus-window .nautilus-view-cell,
+.nautilus-window #NautilusViewCell {
+  background: none;
+  box-shadow: none;
+}
+
+.nautilus-window .nautilus-grid-view gridview > child {
+  background: none;
+  border: none;
+  box-shadow: none;
+  outline: none;
+  border-radius: 10px;
+}
+
+.nautilus-window .nautilus-grid-view gridview > child:hover {
+  background-color: rgba(255, 255, 255, 0.04);
+}
+
+window.nautilus-window .nautilus-grid-view gridview > child:selected,
+window.nautilus-window .nautilus-grid-view gridview > child:selected:hover,
+.nautilus-window .nautilus-grid-view gridview > child:selected {
+  background-color: rgba(255, 255, 255, 0.06);
+  color: rgba(255, 255, 255, 0.94);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.34);
+}
+
+window.nautilus-window .nautilus-grid-view gridview > child:selected .nautilus-view-cell,
+window.nautilus-window .nautilus-view-cell:selected,
+.nautilus-window .nautilus-grid-view gridview > child:selected #NautilusViewCell,
+.nautilus-window .nautilus-grid-view gridview > child:selected .nautilus-view-cell {
+  background-color: transparent;
+  box-shadow: none;
+  border: none;
+}
+
+.nautilus-window selection,
+.nautilus-window *:selected {
+  background-color: rgba(255, 255, 255, 0.06);
+  color: rgba(255, 255, 255, 0.94);
+}
+
+.nautilus-window *:selected label,
+.nautilus-window *:selected cell label {
+  color: rgba(255, 255, 255, 0.94);
+}
+
+#NautilusPathBar,
+#NautilusQueryEditor,
+.nautilus-window .nautilus-pathbar,
+.nautilus-window .nautilus-query-editor,
+.nautilus-window headerbar > entry,
+.nautilus-window headerbar entry {
+  background-color: rgba(255, 255, 255, 0.055);
+  color: rgba(255, 255, 255, 0.94);
+  caret-color: rgba(255, 255, 255, 0.94);
+  border: none;
+  border-radius: 10px;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.22);
+}
+
+#NautilusQueryEditor entry,
+.nautilus-window headerbar entry:focus {
+  background: none;
+}
+
+.nautilus-window headerbar entry:focus,
+#NautilusQueryEditor:focus-within,
+#NautilusPathBar:focus-within {
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.36);
+}
+
+#NautilusPathButton,
+#NautilusPathButton:hover,
+#NautilusPathButton.current-dir,
+.nautilus-window .nautilus-path-button,
+.nautilus-window .nautilus-path-button:hover {
+  background: none;
+  box-shadow: none;
+  border: none;
+  color: rgba(255, 255, 255, 0.94);
+}
+
+.nautilus-window button {
+  background-image: none;
+  background-color: transparent;
+  color: rgba(255, 255, 255, 0.86);
+  border-color: transparent;
+  box-shadow: none;
+}
+
+.nautilus-window button:hover,
+.nautilus-window .nautilus-path-button:hover {
+  background-color: rgba(255, 255, 255, 0.04);
+  color: rgba(255, 255, 255, 0.94);
+}
+
+.nautilus-window button.suggested-action,
+.nautilus-window button.default,
+.nautilus-window button.toggle:checked,
+.nautilus-window .linked > button:checked {
+  background-color: rgba(255, 255, 255, 0.06);
+  color: rgba(255, 255, 255, 0.94);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.34);
+}
+
+.nautilus-window rubberband,
+.nautilus-window .nautilus-list-view rubberband,
+.nautilus-window .nautilus-grid-view rubberband {
+  background-color: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.34);
+  border-radius: 10px;
+  box-shadow: none;
+}
+
+.nautilus-window check:checked,
+.nautilus-window radio:checked,
+.nautilus-window popover check:checked,
+.nautilus-window popover radio:checked {
+  background-color: rgba(255, 255, 255, 0.22);
+  color: #ffffff;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.34);
+}
+
+.nautilus-window switch:checked {
+  background-color: rgba(255, 255, 255, 0.22);
+}
+
+.nautilus-window switch:checked slider {
+  background-color: #ffffff;
+}
+
+.nautilus-window popover > contents,
+.nautilus-window popover.menu contents {
+  background-color: rgba(0, 0, 0, 0.92);
+  color: rgba(255, 255, 255, 0.94);
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  border-radius: 12px;
+  box-shadow: none;
+}
+
+.nautilus-window popover > contents modelbutton:hover,
+.nautilus-window popover > contents modelbutton:selected,
+.nautilus-window popover.menu contents modelbutton:hover,
+.nautilus-window popover.menu contents modelbutton:selected {
+  background-color: rgba(255, 255, 255, 0.04);
+  color: rgba(255, 255, 255, 0.94);
+  border-radius: 8px;
+}
+
+.nautilus-window .nautilus-image,
+.nautilus-window .thumbnail,
+.nautilus-window picture,
+.nautilus-window .nautilus-list-view row:selected image,
+.nautilus-window .nautilus-grid-view gridview > child:selected image {
+  -gtk-icon-filter: none;
+}
+
