@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
-# Rec.709 luma 0.000–1.000 = max(wallpaper, optional live region).
+# Rec.709 luma 0.000–1.000 — frost-field grade (ADR-0009).
+# Blend wallpaper + live region; do not OR with max() (that snaps to two themes).
+# Paper-white crops (region ≥ 0.84) take the region so ADR-0007 ink still hits.
 # Optional $1 is grim geometry: "x,y WxH" (pixels under the popup, not glass).
 set -euo pipefail
 
@@ -32,7 +34,7 @@ wallpaper_luma() {
   python3 - "${full}" "${upper}" <<'PY'
 import sys
 full, upper = float(sys.argv[1]), float(sys.argv[2])
-luma = max(full, 0.35 * full + 0.65 * upper)
+luma = 0.45 * full + 0.55 * upper
 print(f"{min(1.0, max(0.0, luma)):.6f}")
 PY
 }
@@ -60,6 +62,11 @@ try:
     region = float(raw) if raw else None
 except ValueError:
     region = None
-luma = wall if region is None else max(wall, region)
+if region is None:
+    luma = wall
+elif region >= 0.84:
+    luma = region
+else:
+    luma = 0.20 * wall + 0.80 * region
 print(f"{min(1.0, max(0.0, luma)):.6f}")
 PY

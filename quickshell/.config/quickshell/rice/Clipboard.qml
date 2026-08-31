@@ -840,7 +840,7 @@ Item {
                     previewFlick.contentY = 0
             }
         }
-        onExited: {
+        onExited: (exitCode, exitStatus) => {
             root.previewLoading = false
             if (root.focusPane === "preview" && previewEdit) {
                 previewEdit.forceActiveFocus()

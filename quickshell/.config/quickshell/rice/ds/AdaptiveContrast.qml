@@ -4,7 +4,8 @@ import Quickshell
 import Quickshell.Io
 
 // Scene luminance → contrast compensation (0 = dark, 1 = very bright).
-// luma = max(wallpaper, live region under the popup). Does not tint glass.
+// luma = blend(wallpaper, live region); paper-white region ≥ 0.84 wins (ADR-0009).
+// Does not tint glass. Plate stays empty.
 Item {
     id: root
 
@@ -17,8 +18,8 @@ Item {
     property string regionGeom: ""
 
     function contrastFromLuma(L) {
-        const lo = 0.30
-        const hi = 0.68
+        const lo = 0.10
+        const hi = 0.84
         const t = Math.min(1, Math.max(0, (L - lo) / (hi - lo)))
         return t * t * (3 - 2 * t)
     }
@@ -33,8 +34,8 @@ Item {
 
     Behavior on contrast {
         NumberAnimation {
-            duration: 280
-            easing.type: Easing.OutCubic
+            duration: 420
+            easing.type: Easing.InOutCubic
         }
     }
 
