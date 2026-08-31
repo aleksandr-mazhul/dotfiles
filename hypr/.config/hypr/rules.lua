@@ -45,6 +45,13 @@ hl.layer_rule({
     ignore_alpha = 0.03,
 })
 
+hl.layer_rule({
+    name = "rice-glass-blur-osd",
+    match = { namespace = "^rice-osd$" },
+    blur = true,
+    ignore_alpha = 0.03,
+})
+
 -- DS popup surface (launcher + wallpaper / VPN / clipboard pages):
 -- one glass sheet, no fullscreen dim. Pages share namespace rice-popup.
 hl.layer_rule({
