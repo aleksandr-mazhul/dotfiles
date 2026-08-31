@@ -56,6 +56,41 @@ PanelWindow {
         })
     }
 
+    // grim -g string for the pixels the plate will cover (or a strip above it).
+    function sceneGeom(outsideBand) {
+        const w = Math.round(pane.width)
+        let h = Math.round(pane.height)
+        if (w < 32)
+            return ""
+        if (h < 32)
+            h = 420
+        const lx = Math.round((root.width - w) / 2)
+        const ly = Math.round(root.height * root.anchorY)
+        let gx = lx
+        let gy = ly
+        if (typeof root.mapToGlobal === "function") {
+            const p = root.mapToGlobal(Qt.point(lx, ly))
+            if (p) {
+                gx = Math.round(p.x)
+                gy = Math.round(p.y)
+            }
+        }
+        if (gx < 0)
+            gx = 0
+        if (gy < 0)
+            gy = 0
+        if (outsideBand) {
+            const band = 28
+            const by = Math.max(0, gy - band)
+            return gx + "," + by + " " + w + "x" + band
+        }
+        return gx + "," + gy + " " + w + "x" + h
+    }
+
+    function refreshScene(outsideBand) {
+        AdaptiveContrast.refresh(root.sceneGeom(!!outsideBand))
+    }
+
     function toggle() {
         if (open)
             close()
@@ -64,7 +99,7 @@ PanelWindow {
     }
 
     function present() {
-        AdaptiveContrast.refresh()
+        root.refreshScene(false)
         parked = false
         open = true
         popupOpened()
@@ -101,7 +136,7 @@ PanelWindow {
 
     function resume() {
         parked = false
-        AdaptiveContrast.refresh()
+        root.refreshScene(false)
         open = true
         resumed()
         openAnim.play()
@@ -154,6 +189,7 @@ PanelWindow {
                 return
             // Re-arm after workspace switch (compositor may briefly drop layer focus).
             focusGrab.active = false
+            root.refreshScene(true)
             Qt.callLater(() => {
                 if (!root.open)
                     return

@@ -25,7 +25,7 @@ Item {
     Rectangle {
         anchors.fill: parent
         radius: Tokens.radiusField
-        color: Tokens.paneScrim
+        color: Tokens.fieldScrim
     }
 
     Column {

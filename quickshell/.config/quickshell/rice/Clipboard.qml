@@ -918,6 +918,11 @@ Item {
                         implicitWidth: root.listWidth
                         implicitHeight: 100
 
+                        DS.ContentScrim {
+                            anchors.fill: parent
+                            radius: DS.Tokens.innerRadius(DS.Tokens.radiusSurface, DS.Tokens.paddingSurface)
+                        }
+
                         ListView {
                             id: listView
                             anchors.fill: parent
