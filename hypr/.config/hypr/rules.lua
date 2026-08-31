@@ -16,8 +16,22 @@ hl.layer_rule({
 -- NOT on rice-panel: that layer is fullscreen + dim scrim; blur on it paints a gray
 -- fog/band under the bar. Anchored hubs (QS/calendar/notifs) stay frosted.
 hl.layer_rule({
-    name = "rice-glass-blur",
-    match = { namespace = "^rice-(quicksettings|calendar|notifications)$" },
+    name = "rice-glass-blur-quicksettings",
+    match = { namespace = "^rice-quicksettings$" },
+    blur = true,
+    ignore_alpha = 0.2,
+})
+
+hl.layer_rule({
+    name = "rice-glass-blur-calendar",
+    match = { namespace = "^rice-calendar$" },
+    blur = true,
+    ignore_alpha = 0.2,
+})
+
+hl.layer_rule({
+    name = "rice-glass-blur-notifications",
+    match = { namespace = "^rice-notifications$" },
     blur = true,
     ignore_alpha = 0.2,
 })
