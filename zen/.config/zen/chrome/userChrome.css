@@ -134,8 +134,9 @@ toolbar#TabsToolbar,
   color: var(--sand-text) !important;
 }
 
-/* Context menus / panels — not the autoscroll origin disc */
-menupopup,
+/* Context menus / panels — not the autoscroll origin disc,
+ * and not the HTML <select> popup (leave that to default Zen). */
+menupopup:not(.in-menulist),
 panel:not(.autoscroller):not(#autoscroller),
 #appMenu-popup,
 .panel-arrowcontent,

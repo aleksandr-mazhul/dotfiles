@@ -10,7 +10,7 @@ application/xhtml+xml=zen.desktop
 application/x-extension-xhtml=zen.desktop
 application/x-extension-xht=zen.desktop
 x-scheme-handler/jetbrains=jetbrainsd.desktop
-application/pdf=org.gnome.Evince.desktop
+application/pdf=folio.desktop
 application/postscript=org.gnome.Evince.desktop
 image/vnd.djvu=org.gnome.Evince.desktop
 application/x-cbr=org.gnome.Evince.desktop
@@ -24,8 +24,8 @@ application/vnd.oasis.opendocument.spreadsheet=libreoffice-calc.desktop
 application/vnd.ms-powerpoint=libreoffice-impress.desktop
 application/vnd.openxmlformats-officedocument.presentationml.presentation=libreoffice-impress.desktop
 application/vnd.oasis.opendocument.presentation=libreoffice-impress.desktop
-image/png=org.gnome.Loupe.desktop
-image/jpeg=org.gnome.Loupe.desktop
+image/png=folio.desktop
+image/jpeg=folio.desktop
 image/jpg=org.gnome.Loupe.desktop
 image/webp=org.gnome.Loupe.desktop
 image/gif=org.gnome.Loupe.desktop
@@ -56,6 +56,7 @@ x-scheme-handler/gh=github-handler.desktop
 x-scheme-handler/codex=chatgpt.desktop
 x-scheme-handler/zoommtg=Zoom.desktop
 x-scheme-handler/zoomus=Zoom.desktop
+text/markdown=folio.desktop
 
 [Added Associations]
 x-scheme-handler/http=zen.desktop;
