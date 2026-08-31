@@ -5,6 +5,7 @@ import Quickshell
 import Quickshell.Wayland
 import Quickshell.Services.Pipewire
 import Quickshell.Io
+import "ds" as DS
 
 Scope {
     id: root
@@ -136,24 +137,25 @@ Scope {
                 bottom: 48
             }
 
-            Rectangle {
+            DS.GlassSurface {
                 anchors.fill: parent
-                color: Theme.background
-                radius: Theme.radiusLg
-                border.width: 1
-                border.color: Theme.borderSubtle
-                opacity: 0.96
+                radius: DS.Tokens.radiusSurface
 
                 RowLayout {
                     anchors.fill: parent
                     anchors.margins: 12
-                    spacing: 10
+                    anchors.leftMargin: DS.Tokens.paddingFieldX
+                    anchors.rightMargin: DS.Tokens.paddingFieldX
+                    spacing: DS.Tokens.gapInline
 
                     RiceIcon {
                         name: root.osdIconName
                         fallback: "audio-volume-high"
                         customSource: root.osdCustomSource
                         struck: root.osdStruck
+                        tint: DS.Tokens.textIcon
+                        halo: true
+                        haloColor: DS.Tokens.iconHalo
                         implicitSize: 22
                         Layout.preferredWidth: 22
                         Layout.preferredHeight: 22
@@ -163,21 +165,25 @@ Scope {
                         Layout.fillWidth: true
                         Layout.preferredHeight: 8
                         radius: 4
-                        color: Theme.surfaceContainer
+                        color: DS.Tokens.fieldFill
 
                         Rectangle {
                             width: parent.width * root.osdValue
                             height: parent.height
                             radius: parent.radius
-                            color: Theme.primary
+                            color: DS.Tokens.raisedStrong
+                            border.width: 1
+                            border.color: DS.Tokens.raisedRim
                         }
                     }
 
-                    Text {
+                    DS.QuietText {
                         text: Math.round(root.osdValue * 100) + "%"
-                        color: Theme.text
-                        font.family: Theme.fontFamily
-                        font.pixelSize: Theme.fontSizeSm
+                        color: DS.Tokens.textPrimary
+                        font.family: DS.Tokens.fontUi
+                        font.pixelSize: DS.Tokens.fontSizeSm
+                        fontWeight: Font.Normal
+                        horizontalAlignment: Text.AlignRight
                         Layout.preferredWidth: 36
                     }
                 }
