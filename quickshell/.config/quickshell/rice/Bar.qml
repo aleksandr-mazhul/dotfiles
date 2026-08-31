@@ -320,14 +320,17 @@ PanelWindow {
                 Layout.alignment: Qt.AlignRight | Qt.AlignVCenter
 
                 BarQsButton {
+                    active: !!(quickSettings && (quickSettings.open || quickSettings.visible))
                     onActivated: root.openQuickSettings()
                 }
 
                 BarClockButton {
+                    active: !!(calendar && (calendar.open || calendar.visible))
                     onActivated: root.openCalendar()
                 }
 
                 BarNotifButton {
+                    active: !!(notifCenter && (notifCenter.open || notifCenter.visible))
                     muted: !!(notifCenter && notifCenter.dnd)
                     unread: notifCenter ? notifCenter.unread : 0
                     onActivated: root.openNotifications()

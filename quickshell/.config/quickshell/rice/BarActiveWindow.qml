@@ -1,6 +1,7 @@
 import QtQuick
 import QtQuick.Layouts
 import Quickshell.Hyprland
+import "ds" as DS
 
 BarIsland {
     id: root
@@ -16,18 +17,12 @@ BarIsland {
     }
 
     content: [
-        Rectangle {
-            Layout.preferredWidth: 8
-            Layout.preferredHeight: 8
-            radius: 4
-            color: Theme.primary
-        },
-        Text {
+        DS.QuietText {
             Layout.fillWidth: true
             text: root.titleText
-            color: Theme.text
-            font.family: Theme.fontFamily
-            font.pixelSize: Theme.fontSizeSm
+            color: DS.Tokens.textPrimary
+            font.family: DS.Tokens.fontUi
+            font.pixelSize: DS.Tokens.fontSizeSm
             elide: Text.ElideRight
             maximumLineCount: 1
         }

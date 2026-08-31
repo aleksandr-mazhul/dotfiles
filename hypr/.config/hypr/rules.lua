@@ -22,6 +22,15 @@ hl.layer_rule({
     ignore_alpha = 0.03,
 })
 
+-- Discrete bar islands (not a full-width fog band). Frost hugs island
+-- rects only: shellTint 0.038 clears ignore_alpha; strip pixels stay alpha 0.
+hl.layer_rule({
+    name = "rice-glass-blur-bar",
+    match = { namespace = "^rice-bar$" },
+    blur = true,
+    ignore_alpha = 0.03,
+})
+
 hl.layer_rule({
     name = "rice-glass-blur-calendar",
     match = { namespace = "^rice-calendar$" },
