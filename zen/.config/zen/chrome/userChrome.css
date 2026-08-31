@@ -1,0 +1,161 @@
+@import url("autoscroll.css");
+
+/* Zen liquid-glass chrome
+ * Sidebar / tabstrip frosted look (faux-glass + optional compositor frost).
+ * Requires: toolkit.legacyUserProfileCustomizations.stylesheets = true
+ *
+ * Active tab uses the same look as :hover so keyboard cycle (Ctrl+PgUp/Dn)
+ * always shows which tab is current.
+ */
+:root {
+  --sand-bg: #181316;
+  --sand-surface: #1d181c;
+  --sand-container: #292126;
+  --sand-high: #342931;
+  --sand-primary: #ffb688;
+  --sand-text: #ebe1d4;
+  --sand-muted: #d1c5b4;
+  --sand-outline: #c4a882;
+  --sand-glass: rgba(24, 19, 22, 0.52);
+  --sand-glass-strong: rgba(29, 24, 28, 0.62);
+  --sand-glass-edge: rgba(196, 168, 130, 0.28);
+  --sand-glass-blur: 28px;
+  --sand-tab-hover-bg: rgba(41, 33, 38, 0.45);
+}
+
+/* —— Main vertical sidebar / tab strip —— */
+#navigator-toolbox,
+#TabsToolbar,
+#zen-sidebar,
+#sidebar-box,
+#sidebar-main,
+#zen-appcontent-navbar-wrapper,
+toolbar#TabsToolbar,
+#tabbrowser-tabs,
+#vertical-tabs,
+#zen-tabs-wrapper,
+#zen-main-app-wrapper > #navigator-toolbox {
+  background: transparent !important;
+  background-color: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+}
+
+/* Zen 1.x sidebar stack */
+#browser #navigator-toolbox,
+#zen-sidebar-panels-wrapper,
+#zen-tabbox-wrapper,
+#zen-essentials,
+#zen-sidebar-foot-buttons,
+#zen-sidebar-top-buttons,
+#PanelUI-menu-button,
+#nav-bar {
+  background: transparent !important;
+  background-color: transparent !important;
+}
+
+/* Frosted sidebar panel */
+#navigator-toolbox,
+#zen-sidebar,
+#sidebar-box {
+  background: var(--sand-glass) !important;
+  backdrop-filter: blur(var(--sand-glass-blur)) saturate(140%) !important;
+  -moz-backdrop-filter: blur(var(--sand-glass-blur)) saturate(140%) !important;
+  border-inline-end: 1px solid var(--sand-glass-edge) !important;
+}
+
+/* Expanded / compact tab strip inside sidebar */
+#tabbrowser-arrowscrollbox,
+#tabbrowser-tabs,
+.toolbar-items,
+#TabsToolbar-customization-target {
+  background: transparent !important;
+}
+
+/* Tabs — idle transparent; hover/selected share one glass highlight */
+.tabbrowser-tab {
+  color: var(--sand-text) !important;
+}
+
+.tabbrowser-tab .tab-background {
+  background: transparent !important;
+  border: 1px solid transparent !important;
+  border-radius: 10px !important;
+  margin-block: 2px !important;
+  transition: background 120ms ease, border-color 120ms ease !important;
+  box-shadow: none !important;
+}
+
+/* Hover + keyboard-selected + multiselect + tablist keyboard focus */
+.tabbrowser-tab:is(:hover, [selected], [visuallyselected], [multiselected])
+  > .tab-stack
+  > .tab-background,
+.tabbrowser-tab > .tab-stack > .tab-background:is([selected], [multiselected]),
+#tabbrowser-tabs[tablist-has-focus]
+  .tabbrowser-tab.tablist-keyboard-focus
+  > .tab-stack
+  > .tab-background {
+  background: var(--sand-tab-hover-bg) !important;
+  border-color: var(--sand-glass-edge) !important;
+}
+
+.tab-label,
+.tab-icon-image {
+  color: var(--sand-text) !important;
+  fill: var(--sand-muted) !important;
+  opacity: 0.95 !important;
+}
+
+.tabbrowser-tab:is([selected], [visuallyselected]) .tab-label {
+  color: var(--sand-primary) !important;
+  font-weight: 600 !important;
+}
+
+/* Essentials / workspace buttons */
+#zen-essentials .tabbrowser-tab .tab-background,
+.zen-workspace-button,
+#zen-workspaces-button {
+  border-radius: 10px !important;
+}
+
+/* URL bar — floating glass pill when visible */
+#urlbar-background,
+#urlbar:not([breakout][breakout-extend]) > #urlbar-background {
+  background: var(--sand-glass-strong) !important;
+  backdrop-filter: blur(var(--sand-glass-blur)) saturate(140%) !important;
+  -moz-backdrop-filter: blur(var(--sand-glass-blur)) saturate(140%) !important;
+  border: 1px solid var(--sand-glass-edge) !important;
+  border-radius: 12px !important;
+  box-shadow: none !important;
+}
+
+#urlbar-input,
+#urlbar-input-container {
+  color: var(--sand-text) !important;
+}
+
+/* Context menus / panels — not the autoscroll origin disc,
+ * and not the HTML <select> popup (leave that to default Zen). */
+menupopup:not(.in-menulist),
+panel:not(.autoscroller):not(#autoscroller),
+#appMenu-popup,
+.panel-arrowcontent,
+richlistbox {
+  --panel-background: var(--sand-glass-strong) !important;
+  --arrowpanel-background: var(--sand-glass-strong) !important;
+  background: var(--sand-glass-strong) !important;
+  backdrop-filter: blur(20px) saturate(130%) !important;
+  -moz-backdrop-filter: blur(20px) saturate(130%) !important;
+  border: 1px solid var(--sand-glass-edge) !important;
+  border-radius: 12px !important;
+  color: var(--sand-text) !important;
+}
+
+/* Content area: keep page opaque; remove forced chrome wash if present */
+:root:not([inDOMFullscreen="true"])
+  #tabbrowser-tabbox
+  #tabbrowser-tabpanels
+  .browserSidebarContainer
+  browser[transparent="true"] {
+  background: none !important;
+}

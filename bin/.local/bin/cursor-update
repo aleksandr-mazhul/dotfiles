@@ -1,47 +1,450 @@
 #!/usr/bin/env bash
-# Update Cursor AppImage in-place (in-app Update button cannot replace AppImages).
+# Install/replace ~/applications/Cursor.AppImage from Cursor's download API.
+# Primary auto-update path when in-app AppImageUpdate fails (signed→unsigned).
+#
+# Layout:
+#   ~/applications/Cursor.AppImage  — real file (NOT a symlink to a versioned build)
+#   ~/.local/bin/cursor             — wrapper that execs that file (EXTRACT_AND_RUN)
+# In-app AppImageUpdate (zsync) is unreliable (signed↔unsigned, empty .upd_info).
+# Rice sets update.mode=none and uses this script + cursor-update.timer instead.
+#
+# Usage:
+#   cursor-update              # same as --apply
+#   cursor-update --check      # print remote version / signature / would-update
+#   cursor-update --apply      # download + replace
+#
+# Env:
+#   CURSOR_RELEASE_TRACK       override track (else overlay/settings, else latest)
+#   CURSOR_UPDATE_POLICY       newest (default) | signed-only
+#   CURSOR_ALLOW_UNSIGNED=1    allow unsigned even under signed-only
+#   CURSOR_UPDATE_FORCE=1     allow replace even under FUSE mount (dangerous)
 set -euo pipefail
 
 APPDIR="${CURSOR_APPDIR:-$HOME/applications}"
+APP="$APPDIR/Cursor.AppImage"
+APP_NEXT="$APPDIR/Cursor.AppImage.next"
 BIN_LINK="${CURSOR_BIN_LINK:-$HOME/.local/bin/cursor}"
-TRACK="${CURSOR_RELEASE_TRACK:-latest}"
 ARCH="$(uname -m)"
 case "$ARCH" in
-  x86_64) PLATFORM=linux-x64 ;;
-  aarch64|arm64) PLATFORM=linux-arm64 ;;
+  x86_64) PLATFORM=linux-x64; ARCH_TAG=x86_64 ;;
+  aarch64|arm64) PLATFORM=linux-arm64; ARCH_TAG=aarch64 ;;
   *) echo "Unsupported arch: $ARCH" >&2; exit 1 ;;
 esac
+VERSION_FILE="${APP}.version"
+ENGINE_FILE="${APP}.vscode-engine"
 
-API="https://cursor.com/api/download?platform=${PLATFORM}&releaseTrack=${TRACK}"
-json="$(curl -fsSL -A 'Mozilla/5.0' "$API")"
+MODE=apply
+case "${1:-}" in
+  --check) MODE=check; shift || true ;;
+  --apply) MODE=apply; shift || true ;;
+  -h|--help)
+    sed -n '2,20p' "$0" | sed 's/^# \?//'
+    exit 0
+    ;;
+  "") ;;
+  *)
+    echo "Unknown argument: $1 (use --check or --apply)" >&2
+    exit 64
+    ;;
+esac
+
+# Match Cursor Settings → update.releaseTrack (rice pins latest in cursor.overlay.json).
+TRACK="${CURSOR_RELEASE_TRACK:-}"
+if [[ -z "$TRACK" ]]; then
+  for cand in \
+    "$HOME/.config/vscode-ssot/cursor.overlay.json" \
+    "$HOME/.config/Cursor/User/settings.json"; do
+    if [[ -f "$cand" ]]; then
+      TRACK="$(python3 - "$cand" <<'PY'
+import json, re, sys
+from pathlib import Path
+raw = Path(sys.argv[1]).read_text()
+raw = re.sub(r"/\*.*?\*/", "", raw, flags=re.S)
+raw = re.sub(r"//.*?$", "", raw, flags=re.M)
+data = json.loads(raw)
+print(data.get("update.releaseTrack") or "")
+PY
+)"
+      [[ -n "$TRACK" ]] && break
+    fi
+  done
+fi
+# Default latest: matches what the in-app Update feed typically offers.
+TRACK="${TRACK:-latest}"
+
+POLICY="${CURSOR_UPDATE_POLICY:-newest}"
+case "$POLICY" in
+  newest|signed-only) ;;
+  *)
+    echo "error: CURSOR_UPDATE_POLICY must be newest|signed-only (got: $POLICY)" >&2
+    exit 64
+    ;;
+esac
+
+UA='Mozilla/5.0'
+
+cursor_fuse_mounted() {
+  # Only a live mount blocks replace. A leftover empty dir must not skip updates.
+  [[ -r /proc/mounts ]] || return 1
+  grep -qE '[[:space:]]/tmp/\.mount_Cursor[^[:space:]]*[[:space:]]' /proc/mounts
+}
+
+cursor_extract_running() {
+  pgrep -f '/home/.*/applications/Cursor\.AppImage|/tmp/appimage_extracted_[^ ]*/usr/share/cursor/cursor' >/dev/null 2>&1
+}
+
+local_sig_nonzero() {
+  local path="$1"
+  python3 - "$path" <<'PY'
+import struct, sys
+from pathlib import Path
+p = Path(sys.argv[1])
+if not p.is_file():
+    print(0)
+    raise SystemExit
+data = p.read_bytes()
+e_shoff = struct.unpack_from("<Q", data, 40)[0]
+e_shentsize = struct.unpack_from("<H", data, 58)[0]
+e_shnum = struct.unpack_from("<H", data, 60)[0]
+e_shstrndx = struct.unpack_from("<H", data, 62)[0]
+shstr = e_shoff + e_shstrndx * e_shentsize
+str_off = struct.unpack_from("<Q", data, shstr + 24)[0]
+str_size = struct.unpack_from("<Q", data, shstr + 32)[0]
+strings = data[str_off : str_off + str_size]
+for i in range(e_shnum):
+    off = e_shoff + i * e_shentsize
+    name_off = struct.unpack_from("<I", data, off)[0]
+    name = strings[name_off : strings.find(b"\0", name_off)].decode()
+    if name != ".sha256_sig":
+        continue
+    sh_offset = struct.unpack_from("<Q", data, off + 24)[0]
+    sh_size = struct.unpack_from("<Q", data, off + 32)[0]
+    blob = data[sh_offset : sh_offset + sh_size]
+    print(sum(1 for b in blob if b))
+    break
+else:
+    print(0)
+PY
+}
+
+# Probe .sha256_sig of a remote AppImage via HTTP Range (no full download).
+remote_sig_nonzero() {
+  local url="$1"
+  python3 - "$url" <<'PY'
+import struct, subprocess, sys, tempfile
+from pathlib import Path
+
+url = sys.argv[1]
+ua = "Mozilla/5.0"
+
+def curl_range(start, end, dest):
+    subprocess.check_call(
+        ["curl", "-fsSL", "-A", ua, "-r", f"{start}-{end}", "-o", str(dest), url],
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+    )
+
+def content_length():
+    out = subprocess.check_output(
+        ["curl", "-sI", "-A", ua, "-L", url], text=True, errors="replace"
+    )
+    size = None
+    for line in out.splitlines():
+        if line.lower().startswith("content-length:"):
+            size = int(line.split(":", 1)[1].strip())
+    if size is None:
+        raise SystemExit("no content-length")
+    return size
+
+try:
+    size = content_length()
+    with tempfile.TemporaryDirectory() as td:
+        td = Path(td)
+        head = td / "head"
+        curl_range(0, 65535, head)
+        data = head.read_bytes()
+        e_shoff = struct.unpack_from("<Q", data, 40)[0]
+        e_shentsize = struct.unpack_from("<H", data, 58)[0]
+        e_shnum = struct.unpack_from("<H", data, 60)[0]
+        e_shstrndx = struct.unpack_from("<H", data, 62)[0]
+        # Section headers are near the start for these AppImages.
+        sh_end = e_shoff + e_shnum * e_shentsize - 1
+        sh = td / "sh"
+        curl_range(e_shoff, sh_end, sh)
+        shdata = sh.read_bytes()
+        shstr_rel = e_shstrndx * e_shentsize
+        str_off = struct.unpack_from("<Q", shdata, shstr_rel + 24)[0]
+        str_size = struct.unpack_from("<Q", shdata, shstr_rel + 32)[0]
+        st = td / "str"
+        curl_range(str_off, str_off + str_size - 1, st)
+        strings = st.read_bytes()
+        for i in range(e_shnum):
+            off = i * e_shentsize
+            name_off = struct.unpack_from("<I", shdata, off)[0]
+            name = strings[name_off : strings.find(b"\0", name_off)].decode()
+            if name != ".sha256_sig":
+                continue
+            sh_offset = struct.unpack_from("<Q", shdata, off + 24)[0]
+            sh_size = struct.unpack_from("<Q", shdata, off + 32)[0]
+            sig = td / "sig"
+            curl_range(sh_offset, sh_offset + sh_size - 1, sig)
+            blob = sig.read_bytes()
+            print(sum(1 for b in blob if b))
+            break
+        else:
+            print(0)
+except Exception:
+    print(-1)
+PY
+}
+
+installed_version_hint() {
+  if [[ ! -f "$APP" ]]; then
+    echo ""
+    return
+  fi
+  if [[ -f "$VERSION_FILE" ]]; then
+    local hinted
+    hinted="$(tr -d '[:space:]' <"$VERSION_FILE")"
+    if [[ -n "$hinted" ]]; then
+      echo "$hinted"
+      return
+    fi
+  fi
+  local sz
+  sz="$(stat -c%s "$APP" 2>/dev/null || echo 0)"
+  local f
+  for f in "$APPDIR"/Cursor-*-"${ARCH_TAG}".AppImage; do
+    [[ -f "$f" ]] || continue
+    if [[ "$(stat -c%s "$f")" == "$sz" ]] && cmp -s "$APP" "$f" 2>/dev/null; then
+      basename "$f" | sed -n "s/^Cursor-\\(.*\\)-${ARCH_TAG}\\.AppImage$/\\1/p"
+      return
+    fi
+  done
+  echo ""
+}
+
+write_version_sidecars() {
+  local v="${1:-}"
+  [[ -n "$v" ]] && printf '%s\n' "$v" >"$VERSION_FILE" || true
+  python3 - "$APP" "$ENGINE_FILE" "$v" <<'PY' || true
+import json, re, sys
+from pathlib import Path
+app, dest = Path(sys.argv[1]), Path(sys.argv[2])
+want = (sys.argv[3] if len(sys.argv) > 3 else "").strip()
+engine = None
+roots = []
+tmp = Path("/tmp")
+if tmp.is_dir():
+    roots.extend(tmp.glob("appimage_extracted_*/usr/share/cursor/resources/app/product.json"))
+    roots.extend(tmp.glob(".mount_Cursor*/usr/share/cursor/resources/app/product.json"))
+roots = sorted(roots, key=lambda p: p.stat().st_mtime, reverse=True)
+for p in roots:
+    try:
+        meta = json.loads(p.read_text())
+    except (OSError, json.JSONDecodeError):
+        continue
+    prod = str(meta.get("version") or "").strip()
+    if want and prod and prod != want:
+        continue  # stale extract from the previous build
+    eng = str(meta.get("vscodeVersion") or "").split()[0]
+    if eng:
+        engine = eng
+        break
+if not engine and app.is_file():
+    try:
+        data = app.read_bytes()
+    except OSError:
+        data = b""
+    m = re.search(br'"vscodeVersion"\s*:\s*"(\d+\.\d+\.\d+)"', data)
+    if m:
+        engine = m.group(1).decode()
+if engine:
+    dest.write_text(engine + "\n")
+PY
+}
+
+running_product_version() {
+  python3 - <<'PY'
+from pathlib import Path
+import json
+tmp = Path("/tmp")
+cands = []
+if tmp.is_dir():
+    cands.extend(tmp.glob("appimage_extracted_*/usr/share/cursor/resources/app/product.json"))
+    cands.extend(tmp.glob(".mount_Cursor*/usr/share/cursor/resources/app/product.json"))
+cands = sorted(cands, key=lambda p: p.stat().st_mtime, reverse=True)
+for p in cands:
+    try:
+        v = json.loads(p.read_text()).get("version") or ""
+    except (OSError, json.JSONDecodeError):
+        continue
+    if v:
+        print(v)
+        break
+PY
+}
+
+API="https://www.cursor.com/api/download?platform=${PLATFORM}&releaseTrack=${TRACK}"
+json="$(curl -fsSL -A "$UA" "$API")"
 url="$(python3 -c 'import json,sys; print(json.load(sys.stdin)["downloadUrl"])' <<<"$json")"
-ver="$(python3 -c 'import json,sys; print(json.load(sys.stdin)["version"])' <<<"$json")"
+ver="$(python3 -c 'import json,sys; print(json.load(sys.stdin).get("version") or "")' <<<"$json")"
 
 if [[ -z "$url" || "$url" == "null" ]]; then
-  echo "Failed to resolve download URL" >&2
+  echo "Failed to resolve download URL (track=$TRACK)" >&2
   exit 1
 fi
 
+remote_nz="$(remote_sig_nonzero "$url")"
+case "$remote_nz" in
+  0) remote_sig_label=unsigned ;;
+  -1) remote_sig_label=unknown ;;
+  *) remote_sig_label=signed ;;
+esac
+
+local_ver="$(installed_version_hint)"
+local_nz=0
+have_local=0
+if [[ -f "$APP" ]]; then
+  have_local=1
+  local_nz="$(local_sig_nonzero "$APP")"
+fi
+
+would_update=1
+if [[ "$have_local" -eq 1 && -n "$local_ver" && "$local_ver" == "$ver" ]]; then
+  would_update=0
+elif [[ "$have_local" -eq 1 ]]; then
+  remote_len="$(curl -sI -A "$UA" -L "$url" | tr -d '\r' | awk 'tolower($1)=="content-length:"{print $2}' | tail -1)"
+  local_len="$(stat -c%s "$APP")"
+  if [[ -n "$remote_len" && "$remote_len" == "$local_len" ]]; then
+    would_update=0
+  elif [[ -z "$local_ver" && -z "$remote_len" ]]; then
+    echo "warn: cannot compare local vs remote (no version sidecar, no Content-Length) — skip download" >&2
+    would_update=0
+  fi
+fi
+
+run_ver="$(running_product_version || true)"
+relaunch_needed=0
+if [[ -n "$run_ver" && -n "$local_ver" && "$run_ver" != "$local_ver" ]]; then
+  relaunch_needed=1
+elif [[ -n "$run_ver" && -n "$ver" && "$run_ver" != "$ver" && "$would_update" -eq 0 ]]; then
+  relaunch_needed=1
+fi
+
+if [[ "$MODE" == "check" ]]; then
+  echo "track=$TRACK policy=$POLICY"
+  echo "remote_version=${ver:-?} signature=$remote_sig_label"
+  if [[ "$have_local" -eq 1 ]]; then
+    echo "local_path=$APP local_version=${local_ver:-unknown} local_sig_nonzero=$local_nz"
+  else
+    echo "local_path=$APP (missing)"
+  fi
+  if [[ "$would_update" -eq 1 ]]; then
+    echo "would_update=yes"
+  else
+    echo "would_update=no"
+  fi
+  if [[ "$relaunch_needed" -eq 1 ]]; then
+    echo "relaunch_needed=yes running=${run_ver} disk=${local_ver:-$ver}"
+  fi
+  exit 0
+fi
+
+# --apply
+if [[ "$would_update" -eq 0 ]]; then
+  echo "Already on Cursor ${ver:-?} ($APP) — nothing to do."
+  write_version_sidecars "${ver:-$local_ver}"
+  if [[ "$relaunch_needed" -eq 1 ]]; then
+    echo "Relaunch needed: running ${run_ver} vs disk ${local_ver:-$ver}."
+  fi
+  exit 0
+fi
+
+if [[ "$remote_nz" == "0" ]]; then
+  if [[ "$POLICY" == "signed-only" && "${CURSOR_ALLOW_UNSIGNED:-}" != "1" ]]; then
+    echo "error: remote AppImage is unsigned (track=$TRACK version=${ver:-?})." >&2
+    echo "AppImageUpdate refuses signed→unsigned; in-app Update will fail after install." >&2
+    echo "Use CURSOR_UPDATE_POLICY=newest or CURSOR_ALLOW_UNSIGNED=1." >&2
+    exit 3
+  fi
+  echo "warn: installing unsigned Cursor ${ver:-?} (policy=$POLICY)." >&2
+elif [[ "$remote_nz" == "-1" ]]; then
+  echo "warn: could not probe remote .sha256_sig; will verify after download." >&2
+fi
+
+# FUSE mount keeps the AppImage mapped — replacing it leaves a (deleted) binary
+# and breaks relaunch. extract-and-run holds the path open but already extracted
+# to /tmp, so atomic replace is safe for the running session; new launches get
+# the new file.
+if cursor_fuse_mounted && [[ "${CURSOR_UPDATE_FORCE:-}" != "1" ]]; then
+  echo "Cursor is FUSE-mounted (.mount_Cursor) — refusing replace." >&2
+  echo "Quit Cursor, or relaunch via the stowed wrapper (APPIMAGE_EXTRACT_AND_RUN=1)." >&2
+  if command -v notify-send >/dev/null 2>&1; then
+    notify-send -u normal "Cursor update pending" \
+      "Quit Cursor to apply ${ver:-update} (FUSE mount blocks replace)." || true
+  fi
+  # Soft success for systemd timer — user must quit; do not mark the unit failed.
+  exit 0
+fi
+
 mkdir -p "$APPDIR"
-tmp="$(mktemp "$APPDIR/.Cursor-${ver}.XXXXXX.AppImage")"
+tmp="$(mktemp "$APPDIR/.Cursor-download.XXXXXX.AppImage")"
 cleanup() { rm -f "$tmp"; }
 trap cleanup EXIT
 
-echo "Downloading Cursor ${ver}..."
-curl -fL -A 'Mozilla/5.0' --progress-bar -o "$tmp" "$url"
+echo "Downloading Cursor ${ver:-?} (track=$TRACK)..."
+curl -fL -A "$UA" --progress-bar -o "$tmp" "$url"
 chmod +x "$tmp"
 
-dest="$APPDIR/Cursor-${ver}-x86_64.AppImage"
-if [[ "$PLATFORM" == "linux-arm64" ]]; then
-  dest="$APPDIR/Cursor-${ver}-aarch64.AppImage"
+sig_nonzero="$(local_sig_nonzero "$tmp")"
+if [[ "${sig_nonzero:-0}" -eq 0 ]]; then
+  if [[ "$POLICY" == "signed-only" && "${CURSOR_ALLOW_UNSIGNED:-}" != "1" ]]; then
+    echo "error: downloaded AppImage has empty .sha256_sig (unsigned)." >&2
+    echo "Use CURSOR_UPDATE_POLICY=newest or CURSOR_ALLOW_UNSIGNED=1." >&2
+    exit 3
+  fi
+  echo "warn: downloaded AppImage is unsigned." >&2
 fi
-mv -f "$tmp" "$dest"
+
+# Stage then atomic publish (running extract-and-run session keeps old inode).
+rm -f "$APP_NEXT"
+mv -f "$tmp" "$APP_NEXT"
+chmod +x "$APP_NEXT"
 trap - EXIT
 
-# Point stable names at the new build
-ln -sfn "$dest" "$APPDIR/Cursor.AppImage"
-mkdir -p "$(dirname "$BIN_LINK")"
-ln -sfn "$APPDIR/Cursor.AppImage" "$BIN_LINK"
+if [[ -e "$APP" || -L "$APP" ]]; then
+  rm -f "$APP.bak"
+  mv -f "$APP" "$APP.bak"
+fi
+mv -f "$APP_NEXT" "$APP"
+chmod +x "$APP"
 
-echo "Installed Cursor ${ver} → $dest"
-echo "Restart Cursor to finish (Help → Reload Window is not enough)."
+# Keep a versioned sibling for local version detection / rollback convenience.
+if [[ -n "$ver" ]]; then
+  versioned="$APPDIR/Cursor-${ver}-${ARCH_TAG}.AppImage"
+  if [[ ! -e "$versioned" ]]; then
+    cp -a "$APP" "$versioned" || true
+  fi
+fi
+
+if [[ -L "$BIN_LINK" ]]; then
+  target="$(readlink -f "$BIN_LINK" 2>/dev/null || true)"
+  if [[ "$target" == *.AppImage ]]; then
+    echo "warn: $BIN_LINK pointed at an AppImage; restow bin package so the wrapper wins" >&2
+  fi
+fi
+
+echo "Installed Cursor ${ver:-?} → $APP"
+write_version_sidecars "${ver:-}"
+if [[ -e "$APP.bak" ]]; then
+  echo "Previous kept as $APP.bak"
+fi
+if cursor_extract_running; then
+  echo "Cursor is still running on the previous extract — fully quit and relaunch to load ${ver:-?}."
+  if command -v notify-send >/dev/null 2>&1; then
+    notify-send -u normal "Cursor ${ver:-update} on disk" \
+      "Fully quit Cursor and relaunch via 'cursor' to load the new build." || true
+  fi
+fi
+echo "Start Cursor via: cursor   (wrapper uses APPIMAGE_EXTRACT_AND_RUN). In-app Update is disabled (update.mode=none); this timer is the installer."

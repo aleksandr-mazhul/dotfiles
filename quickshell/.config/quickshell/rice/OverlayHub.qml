@@ -121,7 +121,34 @@ QtObject {
             panels = panels.concat([panel])
     }
 
+    // Parked popups under the current one (Raycast-style Esc back).
+    property var overlayStack: []
+
+    function mapOverlay(id) {
+        return {
+            clipboard: clipboard,
+            launcher: launcher,
+            wallpaper: wallpaper,
+            vpn: vpn
+        }[id] || null
+    }
+
+    function dropStack(except) {
+        const parked = overlayStack.slice()
+        overlayStack = []
+        for (let i = 0; i < parked.length; i++) {
+            const p = parked[i]
+            if (!p || p === except)
+                continue
+            if (typeof p.hide === "function")
+                p.hide()
+            else if (typeof p.close === "function")
+                p.close()
+        }
+    }
+
     function closeOthers(except) {
+        dropStack(except)
         for (let i = 0; i < panels.length; i++) {
             const p = panels[i]
             if (p && p !== except && p.open)
@@ -130,6 +157,7 @@ QtObject {
     }
 
     function closeAll() {
+        dropStack(null)
         for (let i = 0; i < panels.length; i++) {
             const p = panels[i]
             if (p && p.open)
@@ -137,24 +165,66 @@ QtObject {
         }
     }
 
-    function open(id) {
-        const map = {
-            clipboard: clipboard,
-            launcher: launcher,
-            wallpaper: wallpaper,
-            vpn: vpn
+    // Open a page on top of `from` without destroying it. Esc pops back.
+    function pushFrom(from, id) {
+        if (from === launcher && launcher && typeof launcher.openPage === "function") {
+            launcher.openPage(id)
+            return
         }
-        const p = map[id]
+        if (launcher && typeof launcher.openPage === "function"
+                && (id === "clipboard" || id === "wallpaper" || id === "vpn")) {
+            launcher.openPage(id)
+            return
+        }
+        const target = mapOverlay(id)
+        if (!target)
+            return
+        if (from && from.open) {
+            if (typeof from.park === "function") {
+                from.park()
+                overlayStack = overlayStack.concat([from])
+            } else {
+                from.close()
+            }
+        }
+        if (typeof target.present === "function")
+            target.present()
+        else if (typeof target.show === "function")
+            target.show()
+    }
+
+    // One step back: in-surface view stack, then parked overlay, else hide.
+    function pop(panel) {
+        if (panel && typeof panel.popView === "function" && panel.popView())
+            return
+        if (panel && typeof panel.close === "function")
+            panel.close()
+        else if (panel && typeof panel.hide === "function")
+            panel.hide()
+    }
+
+    function open(id) {
+        if (id === "launcher" && launcher && typeof launcher.show === "function") {
+            launcher.show()
+            return
+        }
+        if (launcher && typeof launcher.openPage === "function"
+                && (id === "clipboard" || id === "wallpaper" || id === "vpn")) {
+            launcher.openPage(id)
+            return
+        }
+        const p = mapOverlay(id)
         if (p && typeof p.show === "function")
             p.show()
     }
 
-    // Contextual filter: toggle burger on the open overlay; else open clipboard + filter.
+    // Contextual filter: toggle only on an already-open overlay / launcher page.
     function toggleFilter() {
         for (let i = 0; i < panels.length; i++) {
             const p = panels[i]
             if (!p || !p.open)
                 continue
+            // Prefer page-aware routing (Launcher → clipboard/wallpaper/vpn).
             if (typeof p.toggleFilter === "function") {
                 p.toggleFilter()
                 return
@@ -169,15 +239,27 @@ QtObject {
             }
             return
         }
-        // Nothing open — default to clipboard with filter menu
+        if (launcher && launcher.open && typeof launcher.toggleFilter === "function") {
+            launcher.toggleFilter()
+        }
+    }
+
+    function refocusOpen() {
         for (let i = 0; i < panels.length; i++) {
             const p = panels[i]
-            if (!p || typeof p.showFilter !== "function")
+            if (!p || !p.open)
                 continue
-            if (p.hasFilter === false)
-                continue
-            p.showFilter()
+            if (typeof p.grabFocus === "function") {
+                p.grabFocus()
+                return
+            }
+            if (typeof p.refocusInput === "function") {
+                p.refocusInput()
+                return
+            }
             return
         }
+        if (launcher && launcher.open && typeof launcher.grabFocus === "function")
+            launcher.grabFocus()
     }
 }

@@ -3,8 +3,9 @@ import QtQuick
 import Quickshell
 import Quickshell.Io
 
-// Wallpaper luminance → contrast compensation (0 = dark, 1 = very bright).
-// Does not tint the glass; Tokens map this into localized black scrims.
+// Scene luminance → contrast compensation (0 = dark, 1 = very bright).
+// luma = blend(wallpaper, live region); paper-white region ≥ 0.84 wins (ADR-0009).
+// Does not tint glass. Plate stays empty.
 Item {
     id: root
 
@@ -14,15 +15,18 @@ Item {
 
     property real luma: 0.22
     property real contrast: 0
+    property string regionGeom: ""
 
     function contrastFromLuma(L) {
-        const lo = 0.30
-        const hi = 0.68
+        const lo = 0.10
+        const hi = 0.84
         const t = Math.min(1, Math.max(0, (L - lo) / (hi - lo)))
         return t * t * (3 - 2 * t)
     }
 
-    function refresh() {
+    function refresh(geom) {
+        if (typeof geom === "string")
+            root.regionGeom = geom
         if (probe.running)
             probe.running = false
         probe.running = true
@@ -30,15 +34,17 @@ Item {
 
     Behavior on contrast {
         NumberAnimation {
-            duration: 280
-            easing.type: Easing.OutCubic
+            duration: 420
+            easing.type: Easing.InOutCubic
         }
     }
 
     Process {
         id: probe
         running: false
-        command: ["bash", Quickshell.env("HOME") + "/.config/hypr/scripts/wallpaper-luma.sh"]
+        command: root.regionGeom.length > 0
+            ? ["bash", Quickshell.env("HOME") + "/.config/hypr/scripts/wallpaper-luma.sh", root.regionGeom]
+            : ["bash", Quickshell.env("HOME") + "/.config/hypr/scripts/wallpaper-luma.sh"]
         stdout: StdioCollector {
             onStreamFinished: {
                 const v = parseFloat(String(text).trim())

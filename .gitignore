@@ -12,6 +12,7 @@ hypr/.config/hypr/hyprland.conf
 hypr/.config/hypr/vendor/
 
 # Scratch / logs / secrets
+.cursor/
 .tmp-*
 nvim.log
 obs/.config/obs-studio/logs/

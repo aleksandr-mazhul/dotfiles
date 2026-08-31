@@ -1,0 +1,20 @@
+[Desktop Entry]
+Name=Cursor
+Comment=The AI Code Editor.
+GenericName=Text Editor
+Exec=/home/stranger/.local/bin/cursor %F
+Icon=co.anysphere.cursor
+Type=Application
+StartupNotify=false
+StartupWMClass=Cursor
+Categories=TextEditor;Development;IDE;
+MimeType=application/x-cursor-workspace;
+Actions=new-empty-window;
+Keywords=cursor;code;editor;ide;
+Terminal=false
+
+[Desktop Action new-empty-window]
+Name=New Empty Window
+Name[ru]=Новое пустое окно
+Exec=/home/stranger/.local/bin/cursor --classic --new-window %F
+Icon=co.anysphere.cursor

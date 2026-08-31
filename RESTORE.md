@@ -24,6 +24,8 @@ BOOTSTRAP_WALLPAPER=~/pictures/wallpapers/nature/foo.jpg ./bootstrap.sh
 | Kitty, Fish, Tmux, Starship | `kitty/`, `fish/`, `tmux/`, `starship/` |
 | Kanata + systemd unit | `kanata/` |
 | Theme SSOT templates + pipeline | `theme/`, `bin/.local/bin/theme-*` |
+| VS Code + Cursor (shared settings, keybindings, extension lists) | `vscode/` → `vscode-cursor-sync` + `vscode-cursor-sync.path` + idle timer |
+| Cursor AppImage updater | `bin/` → `cursor` wrapper, `cursor-update` + user timer `cursor-update.timer` |
 | Quickshell rice | `quickshell/` |
 | nvim LazyVim rice | `nvim/` |
 | Zen shortcuts + user.js + Vimium mirror | `zen/` (+ `zen-browser` launcher) |
@@ -46,6 +48,7 @@ SSOT-generated files (`~/.config/cava/themes/ssot`, `btop` theme, `glow/ssot.jso
 | Discord, Spotify, JetBrains, VS Code caches | huge + machine-local |
 | OBS websocket password | secret (gitignored) |
 | Wallpaper image library | large binaries — copy separately |
+| `~/applications/Cursor.AppImage` | binary not in git — `cursor-update --apply` after restore |
 | `chromium-ffmpeg/` nested git | ignored; rebuild if needed |
 
 After bootstrap, copy secrets/media yourself, then `exec fish`.

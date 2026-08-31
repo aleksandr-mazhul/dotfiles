@@ -2,42 +2,45 @@ import QtQuick
 import QtQuick.Layouts
 import Quickshell
 import Quickshell.Io
+import "ds" as DS
 
-RicePanel {
+DS.SearchListChrome {
     id: root
 
     property var walls: []
     property var filtered: []
     property var markedPaths: []
     property string wallDir: Quickshell.env("HOME") + "/pictures/wallpapers"
-    property string categoryFilter: "all"
+    filterValue: "all"
+    filterOptions: [{ value: "all", label: "All" }]
 
-    title: "Wallpapers"
-    searchPlaceholder: "Search wallpapers…"
-    footerText: "↑↓ move  ·  ⇧↵ mark  ·  ↵ apply  ·  ⌃P filter  ·  esc close"
+    pageId: "wallpaper"
+    placeholder: "Search wallpapers…"
+    hintKeys: ["super", "W"]
     model: filtered
-    countText: countLabel()
-    itemHeight: 76
-    maxVisible: 7
-    panelHeight: 560
-    filterValue: categoryFilter
-    filterPlaceholder: "All"
+    maxRows: 8
+    rowSize: DS.Tokens.rowHeight
+    closeHint: (host && host.canPop)
+        ? ({ keys: ["esc"], label: "Back" })
+        : ({ keys: ["esc"], label: "Close" })
+    readonly property string applyHintLabel: markedPaths.length > 0
+        ? ("Apply " + markedPaths.length)
+        : "Apply"
 
-    onPanelOpened: {
+    footerHints: [
+        { keys: ["↑", "↓"], label: "Navigate" },
+        { keys: ["⇧", "⏎"], label: "Mark" },
+        { keys: ["⏎"], label: applyHintLabel }
+    ]
+
+    onPageEntered: {
         markedPaths = []
-        categoryFilter = "all"
         filterValue = "all"
         refresh.running = true
     }
-    onPanelClosed: {
-        markedPaths = []
-        filterMenuOpen = false
-    }
-    onQueryChanged: applyFilter()
-    onFilterChanged: value => {
-        categoryFilter = value
-        applyFilter()
-    }
+    onPageLeft: markedPaths = []
+    onSearchTextChanged: applyFilter()
+    onFilterChanged: applyFilter()
     onActivated: (item, index) => activatePrimary(item)
 
     customKeyHandler: event => {
@@ -47,14 +50,6 @@ RicePanel {
             return true
         }
         return false
-    }
-
-    function countLabel() {
-        const n = filtered.length
-        const base = n + (n === 1 ? " image" : " images")
-        if (markedPaths.length > 0)
-            return base + "  ·  " + markedPaths.length + " marked"
-        return base
     }
 
     function rebuildFilterOptions() {
@@ -70,16 +65,16 @@ RicePanel {
         for (let i = 0; i < keys.length; i++)
             opts.push({ value: keys[i], label: keys[i] })
         filterOptions = opts
-        if (categoryFilter !== "all" && !cats[categoryFilter]) {
-            categoryFilter = "all"
+        if (filterValue !== "all" && !cats[filterValue]) {
             filterValue = "all"
+            applyFilter()
         }
     }
 
     function applyFilter() {
         let base = walls.slice()
-        if (categoryFilter && categoryFilter !== "all") {
-            const prefix = categoryFilter + "/"
+        if (filterValue && filterValue !== "all") {
+            const prefix = filterValue + "/"
             base = base.filter(w => (w.name || "").startsWith(prefix))
         }
         const q = searchText.trim().toLowerCase()
@@ -168,26 +163,32 @@ RicePanel {
 
     Process { id: applyProc }
 
-    rowDelegate: Rectangle {
+    rowDelegate: Item {
         required property var modelData
         required property int index
-        width: ListView.view ? ListView.view.width : root.panelWidth - 28
-        height: 72
-        radius: Theme.radiusSm
-        color: index === root.selectedIndex ? Theme.rowSelected : Theme.row
-        border.width: root.isMarked(modelData.path) ? 2 : 0
-        border.color: Theme.secondary
+        width: ListView.view ? ListView.view.width : 0
+        height: root.rowSize
+
+        readonly property bool selected: index === root.selectedIndex
+        readonly property bool marked: root.isMarked(modelData.path)
+
+        DS.SelectionPill {
+            anchors.fill: parent
+            hovered: rowMouse.containsMouse && !root.keyboardNav
+            selected: parent.selected
+        }
 
         RowLayout {
             anchors.fill: parent
-            anchors.margins: 8
-            spacing: 12
+            anchors.leftMargin: DS.Tokens.rowPaddingX
+            anchors.rightMargin: DS.Tokens.rowPaddingX
+            spacing: DS.Tokens.gapInline
 
             Rectangle {
-                Layout.preferredWidth: 96
-                Layout.preferredHeight: 56
-                radius: Theme.radiusSm
-                color: Qt.rgba(0, 0, 0, 0.35)
+                Layout.preferredWidth: 56
+                Layout.preferredHeight: 36
+                radius: 6
+                color: Qt.rgba(0, 0, 0, 0.28)
                 clip: true
 
                 Image {
@@ -199,39 +200,43 @@ RicePanel {
                 }
 
                 Rectangle {
-                    visible: root.isMarked(modelData.path)
+                    visible: marked
                     anchors.right: parent.right
                     anchors.top: parent.top
                     anchors.margins: 4
-                    width: 18
-                    height: 18
-                    radius: 9
-                    color: Theme.secondary
+                    width: 16
+                    height: 16
+                    radius: 8
+                    color: Qt.rgba(1, 1, 1, 0.18)
 
-                    Text {
+                    DS.QuietText {
                         anchors.centerIn: parent
                         text: "✓"
-                        color: Theme.textOnAccent
-                        font.pixelSize: 11
-                        font.bold: true
+                        color: DS.Tokens.textPrimary
+                        font.pixelSize: 10
+                        fontBold: true
                     }
                 }
             }
 
-            Text {
+            DS.QuietText {
                 Layout.fillWidth: true
+                Layout.fillHeight: true
                 text: modelData.name
-                color: index === root.selectedIndex ? Theme.textOnAccent : Theme.text
-                font.family: Theme.fontFamily
-                font.pixelSize: Theme.fontSize
+                color: DS.Tokens.textPrimary
+                font.family: DS.Tokens.fontUi
+                font.pixelSize: DS.Tokens.fontSize
+                fontWeight: Font.Medium
                 elide: Text.ElideMiddle
             }
         }
 
         MouseArea {
+            id: rowMouse
             anchors.fill: parent
-            hoverEnabled: true
+            hoverEnabled: !root.keyboardNav
             acceptedButtons: Qt.LeftButton | Qt.RightButton
+            cursorShape: root.keyboardNav ? Qt.BlankCursor : Qt.PointingHandCursor
             onEntered: {
                 if (root.keyboardNav)
                     return

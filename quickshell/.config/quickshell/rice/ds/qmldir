@@ -11,6 +11,9 @@ SearchField SearchField.qml
 ListRow ListRow.qml
 ScrollIndicator ScrollIndicator.qml
 PopupSurface PopupSurface.qml
+SearchListChrome SearchListChrome.qml
 SearchListPopup SearchListPopup.qml
 ContentScrim ContentScrim.qml
 QuietText QuietText.qml
+FilterDropdown FilterDropdown.qml
+FilterChip FilterChip.qml

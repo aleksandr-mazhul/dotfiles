@@ -41,6 +41,38 @@ Do all of the following in one session (or explain what you blocked on):
    - Run `theme-render` and verify.
    - Optional fish wrapper → `theme-rice.fish.tmpl` for toys that only take ANSI indices.
 
+VS Code / Cursor: hub is `vscode/.config/vscode-ssot/` (stowed to
+`~/.config/vscode-ssot`). systemd `--user` unit `vscode-cursor-sync.path`
+watches both editors: a plugin or settings/theme change is harvested into
+SSOT and applied to the other app (`vscode-cursor-sync --auto`). Do not copy
+`cursor.*` keys into VS Code. Do not copy `anysphere.*` into VS Code (all
+Anysphere extensions are Cursor-only, including remotes and
+`anysphere.cursorpyright`). Do not copy Microsoft remotes
+(`ms-vscode-remote.*`, `ms-vscode.remote-explorer`) into Cursor. Pylance
+(`ms-python.vscode-pylance`) is VS Code-only; Cursor uses bundled
+`anysphere.cursorpyright`. Remotes / Pylance / cursorpyright go in
+`extensions-code.txt` / `extensions-cursor.txt`. Cursor-only prefs stay in
+`cursor.overlay.json`. Cursor Agents / Tab Stats / Glass chrome are product
+UI and are not mirrored. Color palette for the SSOT theme is still
+`theme-render`.
+
+Cursor AppImage (Linux): install as a **real file**
+`~/applications/Cursor.AppImage` (not a symlink to `Cursor-X.Y.Z.AppImage`).
+Launch via stowed `~/.local/bin/cursor` (sets `APPIMAGE_EXTRACT_AND_RUN=1` so
+the on-disk AppImage is not FUSE-mounted; `cursor-update` can replace it).
+
+Auto-update: user timer `cursor-update.timer` runs `cursor-update --apply`
+hourly (`CURSOR_UPDATE_POLICY=newest`). That does a **full download** replace,
+which works when in-app AppImageUpdate cannot (signed→unsigned rollback —
+“couldn't finish installing”). Track comes from `cursor.overlay.json`
+(`update.releaseTrack`, rice default `latest`) or `CURSOR_RELEASE_TRACK`.
+In-app AppImageUpdate (zsync) is unreliable (signed↔unsigned, empty `.upd_info`);
+rice sets `update.mode` to `none` in `cursor.overlay.json` and uses the timer
+instead. `cursor-update --check` prints remote version/signature/would-update.
+Do **not** set `update.releaseTrack` to `dev` casually. Under FUSE
+(`.mount_Cursor`) refuse replace; under extract-and-run atomic replace is
+OK — fully quit and relaunch to load the new build.
+
 5. **Binds / rules**
    - Hyprland: `hypr/.config/hypr/binds.lua` / `rules.lua` only when needed.
    - Kanata: `kanata/.config/kanata/kanata.kbd` for OS-level remaps.

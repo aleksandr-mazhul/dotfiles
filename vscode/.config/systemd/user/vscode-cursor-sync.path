@@ -1,0 +1,17 @@
+[Unit]
+Description=Watch VS Code and Cursor settings/extensions for SSOT sync
+
+[Path]
+PathModified=%h/.config/Code/User/settings.json
+PathModified=%h/.config/Code/User/keybindings.json
+PathModified=%h/.config/Cursor/User/settings.json
+PathModified=%h/.config/Cursor/User/keybindings.json
+PathModified=%h/.vscode/extensions/extensions.json
+PathModified=%h/.cursor/extensions/extensions.json
+Unit=vscode-cursor-sync.service
+# Coalesce bursts; service StartLimit is the real safety net.
+TriggerLimitIntervalSec=30
+TriggerLimitBurst=20
+
+[Install]
+WantedBy=default.target

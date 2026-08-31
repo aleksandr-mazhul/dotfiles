@@ -12,6 +12,7 @@ local terminal = "kitty"
 local fileManager = home .. "/.local/bin/nautilus-dark --new-window"
 local menu = "qs -c rice ipc call launcher toggle"
 local browser = "zen-browser"
+local chatgpt = "chatgpt"
 
 -- Expose for binds.lua
 programs = {
@@ -19,6 +20,7 @@ programs = {
     fileManager = fileManager,
     menu = menu,
     browser = browser,
+    chatgpt = chatgpt,
 }
 
 hl.env("XCURSOR_THEME", "macOS")
@@ -119,9 +121,10 @@ hl.config({
         kb_options = "grp:win_space_toggle,grp:ctrl_space_toggle",
         kb_rules = "",
         follow_mouse = 1,
-        -- Mac-like key repeat: brightness hold ramps ~16 steps without feeling frantic
+        -- Mac-like key repeat: delay must be > a firm second tap (~300ms).
+        -- 250ms made "qq" type "qqq" — compositor repeat fired on the second press.
         repeat_rate = 25,
-        repeat_delay = 250,
+        repeat_delay = 550,
         -- Mac-like pointer feel; slower base + adaptive accel
         sensitivity = -0.72,
         accel_profile = "adaptive",
@@ -210,7 +213,38 @@ hl.device({
     accel_profile = "adaptive",
 })
 
+-- Kanata already grabs the real keyboards and emits a virtual "kanata" device.
+-- If Hyprland also listens to the physical HID interfaces (Ergohaven has TWO
+-- Keyboard endpoints: event5 + event9), one tap becomes 2–4 characters.
+-- Consumer Control is NOT grabbed by kanata — volume/brightness XF86 keys live
+-- there, so those nodes must stay enabled.
+for _, name in ipairs({
+    "fifine-microphone",
+    "compx-vgn-dragonfly-4k-receiver",
+    "compx-vgn-dragonfly-4k-receiver-system-control",
+    "ergohaven-k:03-v3/v4",
+    "ergohaven-k:03-v3/v4-system-control",
+    "ergohaven-k:03-v3/v4-keyboard",
+}) do
+    hl.device({
+        name = name,
+        enabled = false,
+    })
+end
+for _, name in ipairs({
+    "ergohaven-k:03-v3/v4-consumer-control",
+    "compx-vgn-dragonfly-4k-receiver-consumer-control",
+}) do
+    hl.device({
+        name = name,
+        enabled = true,
+    })
+end
+
+local session_apps = require("session-apps")
+
 hl.on("hyprland.start", function()
+    session_apps.begin_restore()
     -- VPN first — no delay; script retries until helper is ready.
     hl.exec_cmd("~/.config/hypr/scripts/vpn-autostart.sh")
     -- Rice owns notifications; stop swaync if it grabbed the bus.

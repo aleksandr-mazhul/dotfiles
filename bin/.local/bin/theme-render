@@ -119,6 +119,12 @@ def main() -> int:
     if _update_vimium(tdir, flat):
         rendered += 1
 
+    if _ensure_vscode_ssot(tdir, flat):
+        rendered += 1
+
+    if _ensure_obsidian_ssot(tdir, flat):
+        rendered += 1
+
     print(f"theme-render: wrote {rendered} targets from palette.toml")
     return 0
 
@@ -352,6 +358,140 @@ def _update_vimium(tdir: Path, flat: dict[str, str], *, force: bool = False) -> 
 
     if changed:
         print("theme-render: updated Vimium CSS (storage.sync)", file=sys.stderr)
+    return changed
+
+
+def _vscode_ext_dirs() -> list[Path]:
+    home = Path.home()
+    return [
+        home / ".vscode" / "extensions" / "dotfiles-ssot",
+        home / ".cursor" / "extensions" / "dotfiles-ssot",
+        home / ".vscode-oss" / "extensions" / "dotfiles-ssot",
+    ]
+
+
+def _vscode_settings_paths() -> list[Path]:
+    return [
+        CFG / "Code" / "User" / "settings.json",
+        CFG / "Cursor" / "User" / "settings.json",
+        CFG / "Code - OSS" / "User" / "settings.json",
+        CFG / "VSCodium" / "User" / "settings.json",
+    ]
+
+
+def _patch_json_file(path: Path, updates: dict) -> bool:
+    if not path.is_file():
+        return False
+    try:
+        data = json.loads(path.read_text())
+    except (OSError, json.JSONDecodeError) as e:
+        print(f"theme-render: skip json {path}: {e}", file=sys.stderr)
+        return False
+    if not isinstance(data, dict):
+        return False
+    changed = False
+    for key, value in updates.items():
+        if data.get(key) != value:
+            data[key] = value
+            changed = True
+    if not changed:
+        return False
+    try:
+        path.write_text(json.dumps(data, ensure_ascii=False, indent=4) + "\n")
+    except PermissionError as e:
+        print(f"theme-render: permission denied writing {path}: {e}", file=sys.stderr)
+        return False
+    return True
+
+
+def _ensure_vscode_ssot(tdir: Path, flat: dict[str, str]) -> bool:
+    pkg = tdir / "vscode-ssot-package.json"
+    tmpl = tdir / "vscode-ssot-theme.json.tmpl"
+    if not pkg.is_file() or not tmpl.is_file():
+        print("theme-render: skip missing vscode SSOT templates", file=sys.stderr)
+        return False
+    theme = render_template(tmpl.read_text(), flat)
+    if not theme.endswith("\n"):
+        theme += "\n"
+    pkg_body = pkg.read_text()
+    wrote = False
+    for dest in _vscode_ext_dirs():
+        if not dest.parent.is_dir():
+            continue
+        write(dest / "package.json", pkg_body)
+        write(dest / "themes" / "ssot-color-theme.json", theme)
+        wrote = True
+    patched = False
+    for settings in _vscode_settings_paths():
+        if _patch_json_file(
+            settings,
+            {
+                "workbench.colorTheme": "SSOT",
+                "workbench.preferredDarkColorTheme": "SSOT",
+                "window.autoDetectColorScheme": False,
+            },
+        ):
+            patched = True
+    if wrote:
+        print("theme-render: wrote VS Code/Cursor SSOT theme", file=sys.stderr)
+    return wrote or patched
+
+
+def _obsidian_vaults() -> list[Path]:
+    cfg = CFG / "obsidian" / "obsidian.json"
+    if not cfg.is_file():
+        return []
+    try:
+        data = json.loads(cfg.read_text())
+    except (OSError, json.JSONDecodeError):
+        return []
+    vaults = data.get("vaults") or {}
+    out: list[Path] = []
+    for meta in vaults.values():
+        if not isinstance(meta, dict):
+            continue
+        p = Path(str(meta.get("path") or "")).expanduser()
+        if p.is_dir():
+            out.append(p)
+    return out
+
+
+def _ensure_obsidian_ssot(tdir: Path, flat: dict[str, str]) -> bool:
+    tmpl = tdir / "obsidian-ssot.css.tmpl"
+    if not tmpl.is_file():
+        return False
+    css = render_template(tmpl.read_text(), flat)
+    if not css.endswith("\n"):
+        css += "\n"
+    changed = False
+    for vault in _obsidian_vaults():
+        ob = vault / ".obsidian"
+        if not ob.is_dir():
+            continue
+        write(ob / "snippets" / "ssot.css", css)
+        changed = True
+        appearance = ob / "appearance.json"
+        if appearance.is_file():
+            try:
+                data = json.loads(appearance.read_text())
+            except (OSError, json.JSONDecodeError):
+                continue
+            snippets = list(data.get("enabledCssSnippets") or [])
+            dirty = False
+            if "ssot" not in snippets:
+                snippets.append("ssot")
+                data["enabledCssSnippets"] = snippets
+                dirty = True
+            if data.get("accentColor") != flat.get("primary"):
+                data["accentColor"] = flat.get("primary")
+                dirty = True
+            if dirty:
+                try:
+                    appearance.write_text(json.dumps(data, ensure_ascii=False, indent=2) + "\n")
+                except PermissionError as e:
+                    print(f"theme-render: permission denied writing {appearance}: {e}", file=sys.stderr)
+    if changed:
+        print("theme-render: wrote Obsidian SSOT snippet", file=sys.stderr)
     return changed
 
 

@@ -2,14 +2,15 @@ import QtQuick
 import QtQuick.Layouts
 import Quickshell
 import Quickshell.Io
-import Quickshell.Wayland
 import "vim"
+import "ds" as DS
 
-// Raycast-inspired clipboard history: fixed size, list + preview/info, type filter.
-PanelWindow {
+// Clipboard history as a launcher page (same window as SearchListPopup).
+Item {
     id: root
 
-    property bool open: false
+    property var host: null
+    readonly property bool open: !!(host && host.open && visible)
     property var items: []
     property var filtered: []
     property var listModel: []
@@ -19,9 +20,10 @@ PanelWindow {
     property int selectedIndex: 0
     property bool filterMenuOpen: false
     property int filterHighlight: 0
-    property bool pendingOpenFilter: false
     property bool keyboardNav: false
     property point navPointer: Qt.point(-1, -1)
+    // While true, list rebuilds (index/cache) always land on the newest item.
+    property bool pinNewest: false
     // list = history; preview = text pane (Super+L / Super+H)
     property string focusPane: "list"
     property string previewFullText: ""
@@ -33,10 +35,39 @@ PanelWindow {
     property bool liveIndexReady: false
 
     readonly property var filterOptions: [
-        { value: "all", label: "All Types" },
+        { value: "all", label: "All" },
         { value: "image", label: "Images" },
         { value: "text", label: "Text" }
     ]
+    readonly property string typeFilterLabel: typeFilter === "image"
+        ? "Images"
+        : (typeFilter === "text" ? "Text" : "All")
+    readonly property string pasteHintLabel: markedLines.length > 0
+        ? ("Paste " + markedLines.length)
+        : "Paste"
+    readonly property string previewMeta: {
+        const it = selectedItem
+        if (!it)
+            return ""
+        const bits = []
+        if (it.contentType)
+            bits.push(it.contentType)
+        if (it.isImage && it.dimsLabel)
+            bits.push(it.dimsLabel)
+        if (it.sizeLabel)
+            bits.push(it.sizeLabel)
+        if (it.mtimeLabel)
+            bits.push(it.mtimeLabel)
+        return bits.join(" · ")
+    }
+    readonly property bool selectedIsCode: root.looksLikeCode(selectedItem)
+    // Same plate as launcher home: 960 × search + 8 rows + footer.
+    readonly property int paneHeight: {
+        const t = DS.Tokens
+        return t.paddingSurface * 2 + t.searchFieldHeight + 8
+            + 8 * t.rowHeight + 8 + t.footerHeight
+    }
+    readonly property int listWidth: Math.max(280, Math.round((width > 1 ? width : 960) * 0.38))
 
     readonly property var selectedItem: {
         if (!listModel || selectedIndex < 0 || selectedIndex >= listModel.length)
@@ -45,36 +76,27 @@ PanelWindow {
         return row && row.kind === "item" ? row.item : null
     }
 
-    visible: open
-    color: "transparent"
-    exclusiveZone: -1
-    exclusionMode: ExclusionMode.Ignore
-    focusable: true
-    WlrLayershell.layer: WlrLayer.Overlay
-    WlrLayershell.namespace: "rice-clipboard"
-    WlrLayershell.keyboardFocus: open ? WlrKeyboardFocus.OnDemand : WlrKeyboardFocus.None
-    anchors {
-        left: true
-        right: true
-        top: true
-        bottom: true
+    width: parent ? parent.width : 960
+    implicitWidth: width
+    implicitHeight: paneHeight
+    visible: false
+
+    Keys.onPressed: event => {
+        if (searchField && searchField.activeFocus)
+            return
+        if (previewEdit && previewEdit.activeFocus)
+            return
+        if (root.handleKey(event))
+            event.accepted = true
     }
 
-    Component.onCompleted: {
-        OverlayHub.register(root)
-        cacheProc.running = true
-    }
+    Component.onCompleted: cacheProc.running = true
 
-    function toggle() {
-        if (open)
-            close()
-        else
-            show()
-    }
+    property alias searchField: searchFieldBox.input
+    property string pageId: "clipboard"
 
-    function show() {
-        OverlayHub.closeOthers(root)
-        open = true
+    function enter() {
+        DS.AdaptiveContrast.refresh()
         searchField.text = ""
         typeFilter = "all"
         filterMenuOpen = false
@@ -82,51 +104,47 @@ PanelWindow {
         selectedIndex = 0
         focusPane = "list"
         previewFullText = ""
-        keyboardNav = false
+        keyboardNav = true
         navPointer = Qt.point(-1, -1)
+        pinNewest = true
         if (items && items.length)
             applyFilter()
         refreshList()
-        openAnim.play()
         Qt.callLater(() => {
-            if (pendingOpenFilter) {
-                pendingOpenFilter = false
-                openFilterMenu()
-            } else {
+            if (root.pinNewest)
+                root.selectNewest()
+            if (searchField)
                 searchField.forceActiveFocus()
-            }
         })
     }
 
-    function close() {
-        if (!open)
-            return
-        open = false
+    function leave() {
         searchField.text = ""
         filterMenuOpen = false
-        pendingOpenFilter = false
         markedLines = []
         focusPane = "list"
         previewFullText = ""
         keyboardNav = false
         navPointer = Qt.point(-1, -1)
+        pinNewest = false
     }
 
-    function showFilter() {
-        if (open) {
-            toggleFilterMenu()
-            return
-        }
-        pendingOpenFilter = true
-        show()
+    function close() {
+        if (host && typeof host.close === "function")
+            host.close()
     }
 
     function toggleFilter() {
-        showFilter()
+        if (visible && host && host.open)
+            toggleFilterMenu()
+    }
+
+    function showFilter() {
+        toggleFilter()
     }
 
     function openFilter() {
-        showFilter()
+        toggleFilter()
     }
 
     function syncFilterHighlight() {
@@ -159,6 +177,7 @@ PanelWindow {
     }
 
     function beginKeyboardNav() {
+        pinNewest = false
         keyboardNav = true
         navPointer = Qt.point(-1, -1)
     }
@@ -206,6 +225,10 @@ PanelWindow {
 
         filtered = base
         rebuildListModel()
+        if (pinNewest) {
+            selectNewest()
+            return
+        }
         if (preferId) {
             for (let i = 0; i < listModel.length; i++) {
                 const row = listModel[i]
@@ -247,8 +270,10 @@ PanelWindow {
         onTriggered: {
             if (!listView)
                 return
+            listView.forceLayout()
             listView.positionViewAtBeginning()
-            listView.contentY = 0
+            const origin = Number(listView.originY) || 0
+            listView.contentY = origin
         }
     }
 
@@ -306,6 +331,19 @@ PanelWindow {
 
     function focusListPane() {
         focusPane = "list"
+        searchField.forceActiveFocus()
+    }
+
+    function refocusInput() {
+        if (filterMenuOpen) {
+            searchField.forceActiveFocus()
+            return
+        }
+        if (focusPane === "preview" && previewEdit) {
+            previewEdit.forceActiveFocus()
+            previewEdit.cursorVisible = true
+            return
+        }
         searchField.forceActiveFocus()
     }
 
@@ -471,6 +509,11 @@ PanelWindow {
         const meta = !!(event.modifiers & Qt.MetaModifier)
         const cmd = VimKeys.resolve(event)
 
+        if (root.isCtrlP(event)) {
+            root.toggleFilterMenu()
+            return true
+        }
+
         // Super+H / Super+L — physical keys (works on RU layout)
         if (meta && cmd === "l") {
             if (root.filterMenuOpen)
@@ -505,8 +548,25 @@ PanelWindow {
             return true
         }
 
+        if ((event.key === Qt.Key_Backspace || event.key === Qt.Key_Back)
+                && searchField.text.length === 0
+                && host && typeof host.popView === "function" && host.popView())
+            return true
+
         if (event.key === Qt.Key_Escape || cmd === "escape") {
-            root.close()
+            if (root.focusPane === "preview") {
+                root.focusListPane()
+                return true
+            }
+            if (searchField.text.length > 0) {
+                searchField.text = ""
+                return true
+            }
+            if (host && host.canPop === false && typeof host.close === "function") {
+                host.close()
+                return true
+            }
+            OverlayHub.pop(host || root)
             return true
         }
 
@@ -551,6 +611,16 @@ PanelWindow {
         if (!item || !item.line)
             return false
         return markedLines.indexOf(item.line) >= 0
+    }
+
+    function isCtrlP(event) {
+        const ctrl = !!(event.modifiers & Qt.ControlModifier)
+        const meta = !!(event.modifiers & Qt.MetaModifier)
+        const alt = !!(event.modifiers & Qt.AltModifier)
+        const shift = !!(event.modifiers & Qt.ShiftModifier)
+        if (!ctrl || meta || alt || shift)
+            return false
+        return VimKeys.resolve(event) === "p"
     }
 
     function toggleMarkAt(index) {
@@ -648,12 +718,28 @@ PanelWindow {
         searchField.forceActiveFocus()
     }
 
-    function filterLabel() {
-        if (typeFilter === "image")
-            return "Images"
-        if (typeFilter === "text")
-            return "Text"
-        return "All Types"
+    function itemClock(item) {
+        const s = item && item.mtimeLabel ? String(item.mtimeLabel) : ""
+        const i = s.lastIndexOf(" ")
+        return i >= 0 ? s.slice(i + 1) : s
+    }
+
+    function looksLikeCode(item) {
+        if (!item || item.isImage)
+            return false
+        const t = String(item.preview || item.label || "")
+        if (t.indexOf("```") >= 0)
+            return true
+        if (/^(package |import |from |def |class |function |const |let |var |#!\/)/m.test(t))
+            return true
+        if (/<(html|meta|div|span|script|style|svg|!DOCTYPE)\b/i.test(t))
+            return true
+        if (/^\s*[{\[]/.test(t) && /[}\]]/.test(t) && /[:,"]/.test(t))
+            return true
+        const lines = (t.match(/\n/g) || []).length
+        if (lines >= 3 && /[{};=]/.test(t))
+            return true
+        return false
     }
 
     function thumbUrl(item) {
@@ -754,7 +840,7 @@ PanelWindow {
                     previewFlick.contentY = 0
             }
         }
-        onExited: {
+        onExited: (exitCode, exitStatus) => {
             root.previewLoading = false
             if (root.focusPane === "preview" && previewEdit) {
                 previewEdit.forceActiveFocus()
@@ -763,418 +849,248 @@ PanelWindow {
         }
     }
 
-    Rectangle {
-        id: dim
-        anchors.fill: parent
-        color: Theme.backdrop
-        z: -1
-        opacity: 0
-        MouseArea {
-            anchors.fill: parent
-            onClicked: root.close()
+    HoverHandler {
+        enabled: root.keyboardNav
+        acceptedDevices: PointerDevice.Mouse | PointerDevice.TouchPad
+        cursorShape: Qt.BlankCursor
+        onPointChanged: {
+            const p = point.position
+            if (root.navPointer.x < 0) {
+                root.navPointer = Qt.point(p.x, p.y)
+                return
+            }
+            if (Math.abs(p.x - root.navPointer.x) > 3 || Math.abs(p.y - root.navPointer.y) > 3) {
+                root.keyboardNav = false
+                root.pinNewest = false
+            }
         }
     }
 
-    Rectangle {
-        id: panel
-        width: Theme.clipboardWidth
-        height: Theme.clipboardHeight
-        anchors.centerIn: parent
-        radius: Theme.radiusLg
-        color: Theme.surface
-        border.color: Theme.border
-        border.width: 1
-        clip: true
-        transformOrigin: Item.Center
-        opacity: 1
-        scale: 1
+    ColumnLayout {
+        anchors.fill: parent
+        anchors.margins: DS.Tokens.paddingSurface
+        spacing: 8
 
-        HoverHandler {
-            enabled: root.keyboardNav
-            acceptedDevices: PointerDevice.Mouse | PointerDevice.TouchPad
-            cursorShape: Qt.BlankCursor
-            onPointChanged: {
-                const p = point.position
-                if (root.navPointer.x < 0) {
-                    root.navPointer = Qt.point(p.x, p.y)
-                    return
-                }
-                if (Math.abs(p.x - root.navPointer.x) > 3 || Math.abs(p.y - root.navPointer.y) > 3)
-                    root.keyboardNav = false
+        Item {
+            id: searchRow
+            Layout.fillWidth: true
+            Layout.fillHeight: false
+            Layout.preferredHeight: DS.Tokens.searchFieldHeight
+            Layout.minimumHeight: DS.Tokens.searchFieldHeight
+            Layout.maximumHeight: DS.Tokens.searchFieldHeight
+
+            DS.SearchField {
+                id: searchFieldBox
+                anchors.left: parent.left
+                anchors.right: filterChip.left
+                anchors.rightMargin: DS.Tokens.gapInline
+                height: parent.height
+                placeholder: "Search clipboard…"
+                hintKeys: ["super", "Q"]
+                keyHandler: event => root.handleKey(event)
+                pointerHidden: root.keyboardNav
+                onTextChanged: root.applyFilter()
+            }
+
+            DS.FilterChip {
+                id: filterChip
+                anchors.right: parent.right
+                anchors.verticalCenter: parent.verticalCenter
+                label: root.typeFilterLabel
+                menuOpen: root.filterMenuOpen
+                onClicked: root.toggleFilterMenu()
             }
         }
 
-        RiceOpenAnim {
-            id: openAnim
-            target: panel
-            dimTarget: dim
-            fromScale: 0.98
-        }
-
-        Rectangle {
-            anchors.fill: parent
-            anchors.margins: 1
-            radius: Theme.radiusLg - 1
-            color: "transparent"
-            border.width: 1
-            border.color: Theme.borderSubtle
-        }
-
-        ColumnLayout {
-            anchors.fill: parent
+        RowLayout {
+            Layout.fillWidth: true
+            Layout.fillHeight: true
+            Layout.topMargin: 16
             spacing: 0
 
-            // Header: search + type filter
-            Item {
-                Layout.fillWidth: true
-                Layout.preferredHeight: 56
-
-                RowLayout {
-                    anchors.fill: parent
-                    anchors.leftMargin: 14
-                    anchors.rightMargin: 14
-                    anchors.topMargin: 10
-                    anchors.bottomMargin: 10
-                    spacing: 10
-
-                    Rectangle {
-                        Layout.fillWidth: true
+                    Item {
+                        id: listPane
+                        Layout.preferredWidth: root.listWidth
+                        Layout.minimumWidth: root.listWidth
+                        Layout.maximumWidth: root.listWidth
+                        Layout.fillWidth: false
                         Layout.fillHeight: true
-                        radius: Theme.radiusMd
-                        color: Theme.surfaceContainer
-                        border.color: searchField.activeFocus && !root.filterMenuOpen ? Theme.primary : Theme.borderSubtle
-                        border.width: 1
+                        implicitWidth: root.listWidth
+                        implicitHeight: 100
 
-                        TextInput {
-                            id: searchField
+                        DS.ContentScrim {
                             anchors.fill: parent
-                            anchors.leftMargin: 14
-                            anchors.rightMargin: 14
-                            verticalAlignment: TextInput.AlignVCenter
-                            color: Theme.text
-                            font.family: Theme.fontFamily
-                            font.pixelSize: Theme.fontSize
+                            radius: DS.Tokens.innerRadius(DS.Tokens.radiusSurface, DS.Tokens.paddingSurface)
+                        }
+
+                        ListView {
+                            id: listView
+                            anchors.fill: parent
+                            anchors.topMargin: 4
+                            anchors.bottomMargin: 4
+                            anchors.leftMargin: 4
+                            anchors.rightMargin: 8
                             clip: true
-                            selectionColor: Theme.primary
-                            selectedTextColor: Theme.textOnAccent
+                            spacing: 2
+                            model: root.listModel
+                            currentIndex: root.selectedIndex
+                            highlightFollowsCurrentItem: false
+                            keyNavigationWraps: false
+                            boundsBehavior: Flickable.StopAtBounds
 
-                            Text {
-                                anchors.fill: parent
-                                verticalAlignment: Text.AlignVCenter
-                                text: "Type to filter entries…"
-                                color: Theme.textMuted
-                                font: searchField.font
-                                visible: searchField.text.length === 0
-                            }
+                            delegate: Item {
+                                required property var modelData
+                                required property int index
+                                width: ListView.view ? ListView.view.width : listPane.width
+                                height: modelData.kind === "header" ? DS.Tokens.sectionHeight : DS.Tokens.rowHeight
 
-                            onTextChanged: root.applyFilter()
+                                readonly property bool rowImage: !!(modelData.item && modelData.item.isImage)
+                                readonly property bool rowCode: !rowImage && root.looksLikeCode(modelData.item)
+                                readonly property bool marked: !!(modelData.item && root.isMarked(modelData.item))
 
-                            Keys.onPressed: event => {
-                                if (root.handleKey(event))
-                                    event.accepted = true
-                            }
-                        }
-                    }
-
-                    Rectangle {
-                        id: filterPill
-                        Layout.preferredWidth: filterLabel.implicitWidth + filterHint.implicitWidth + 44
-                        Layout.fillHeight: true
-                        radius: height / 2
-                        color: Theme.surfaceContainer
-                        border.color: root.filterMenuOpen ? Theme.primary : Theme.borderSubtle
-                        border.width: 1
-
-                        RowLayout {
-                            anchors.centerIn: parent
-                            spacing: 6
-                            Text {
-                                id: filterLabel
-                                text: root.filterLabel()
-                                color: Theme.text
-                                font.family: Theme.fontFamily
-                                font.pixelSize: Theme.fontSizeSm
-                            }
-                            Text {
-                                id: filterHint
-                                text: "⌃P"
-                                color: Theme.textMuted
-                                font.family: Theme.fontFamily
-                                font.pixelSize: Theme.fontSizeSm
-                                opacity: 0.85
-                            }
-                            Text {
-                                text: "▾"
-                                color: Theme.textMuted
-                                font.pixelSize: Theme.fontSizeSm
-                            }
-                        }
-
-                        MouseArea {
-                            anchors.fill: parent
-                            onClicked: root.toggleFilterMenu()
-                        }
-                    }
-                }
-
-                Rectangle {
-                    anchors.left: parent.left
-                    anchors.right: parent.right
-                    anchors.bottom: parent.bottom
-                    height: 1
-                    color: Theme.borderSubtle
-                }
-            }
-
-            // Body: list + preview
-            RowLayout {
-                Layout.fillWidth: true
-                Layout.fillHeight: true
-                spacing: 0
-
-                // Left list + history depth scrollbar
-                Item {
-                    Layout.preferredWidth: 340
-                    Layout.fillHeight: true
-
-                    ListView {
-                        id: listView
-                        anchors.fill: parent
-                        anchors.rightMargin: listScrollBar.visible ? 10 : 0
-                        clip: true
-                        spacing: 2
-                        model: root.listModel
-                        currentIndex: root.selectedIndex
-                        // Don't auto-scroll to current item — that hides the Today header above it.
-                        highlightFollowsCurrentItem: false
-                        keyNavigationWraps: false
-                        boundsBehavior: Flickable.StopAtBounds
-
-                        delegate: Item {
-                            required property var modelData
-                            required property int index
-                            width: ListView.view.width
-                            height: modelData.kind === "header" ? 28 : 48
-
-                            Text {
-                                visible: modelData.kind === "header"
-                                anchors.left: parent.left
-                                anchors.leftMargin: 14
-                                anchors.right: parent.right
-                                anchors.rightMargin: 14
-                                anchors.verticalCenter: parent.verticalCenter
-                                text: modelData.title || ""
-                                color: Theme.textMuted
-                                font.family: Theme.fontFamily
-                                font.pixelSize: Theme.fontSizeSm
-                                font.bold: true
-                                elide: Text.ElideRight
-                            }
-
-                            Rectangle {
-                                visible: modelData.kind === "item"
-                                anchors.fill: parent
-                                anchors.leftMargin: 8
-                                anchors.rightMargin: 8
-                                radius: Theme.radiusSm
-                                color: {
-                                    if (index === root.selectedIndex)
-                                        return Theme.rowSelected
-                                    if (rowMouse.containsMouse && !root.keyboardNav)
-                                        return Theme.rowHover
-                                    return "transparent"
+                                DS.SectionLabel {
+                                    visible: modelData.kind === "header"
+                                    anchors.left: parent.left
+                                    anchors.leftMargin: DS.Tokens.rowPaddingX
+                                    anchors.right: parent.right
+                                    anchors.rightMargin: DS.Tokens.rowPaddingX
+                                    anchors.bottom: parent.bottom
+                                    anchors.bottomMargin: 6
+                                    label: modelData.title || ""
                                 }
-                                border.width: modelData.item && root.isMarked(modelData.item) ? 2 : 0
-                                border.color: Theme.secondary
-                                opacity: root.focusPane === "preview" ? 0.72 : 1
 
-                                RowLayout {
+                                Item {
+                                    visible: modelData.kind === "item"
                                     anchors.fill: parent
-                                    anchors.leftMargin: 10
-                                    anchors.rightMargin: 10
-                                    spacing: 10
+                                    opacity: root.focusPane === "preview" ? 0.72 : 1
 
-                                    Rectangle {
-                                        Layout.preferredWidth: 28
-                                        Layout.preferredHeight: 28
-                                        radius: 6
-                                        color: Qt.rgba(0, 0, 0, 0.35)
-                                        clip: true
+                                    DS.SelectionPill {
+                                        anchors.fill: parent
+                                        hovered: rowMouse.containsMouse && !root.keyboardNav
+                                        selected: index === root.selectedIndex
+                                        muted: marked
+                                    }
 
-                                        Image {
-                                            anchors.fill: parent
-                                            anchors.margins: 2
-                                            visible: !!(modelData.item && modelData.item.isImage)
-                                            source: modelData.item ? root.thumbUrl(modelData.item) : ""
-                                            fillMode: Image.PreserveAspectCrop
-                                            asynchronous: true
-                                            cache: true
-                                        }
+                                    RowLayout {
+                                        anchors.fill: parent
+                                        anchors.leftMargin: DS.Tokens.rowPaddingX
+                                        anchors.rightMargin: DS.Tokens.rowPaddingX
+                                        spacing: DS.Tokens.gapInline
 
-                                        Text {
-                                            anchors.centerIn: parent
-                                            visible: !(modelData.item && modelData.item.isImage)
-                                            text: "Aa"
-                                            color: index === root.selectedIndex ? Theme.textOnAccent : Theme.textMuted
-                                            font.family: Theme.fontFamily
-                                            font.pixelSize: 10
-                                            font.bold: true
-                                        }
+                                        Item {
+                                            Layout.preferredWidth: rowImage ? 40 : DS.Tokens.leadingSize
+                                            Layout.preferredHeight: DS.Tokens.leadingSize
 
-                                        Rectangle {
-                                            visible: !!(modelData.item && root.isMarked(modelData.item))
-                                            anchors.right: parent.right
-                                            anchors.top: parent.top
-                                            anchors.margins: 1
-                                            width: 12
-                                            height: 12
-                                            radius: 6
-                                            color: Theme.secondary
+                                            Image {
+                                                anchors.fill: parent
+                                                visible: rowImage
+                                                source: modelData.item ? root.thumbUrl(modelData.item) : ""
+                                                fillMode: Image.PreserveAspectCrop
+                                                asynchronous: true
+                                                cache: true
+                                            }
 
-                                            Text {
+                                            DS.QuietText {
                                                 anchors.centerIn: parent
-                                                text: "✓"
-                                                color: Theme.textOnAccent
-                                                font.pixelSize: 8
-                                                font.bold: true
+                                                visible: !rowImage
+                                                text: rowCode ? "{ }" : "Aa"
+                                                color: DS.Tokens.textTertiary
+                                                font.family: DS.Tokens.fontUi
+                                                font.pixelSize: DS.Tokens.fontSizeSm
+                                                fontWeight: Font.Medium
                                             }
                                         }
+
+                                        DS.QuietText {
+                                            Layout.fillWidth: true
+                                            Layout.fillHeight: true
+                                            text: modelData.item ? (modelData.item.label || "") : ""
+                                            color: DS.Tokens.textPrimary
+                                            font.family: DS.Tokens.fontUi
+                                            font.pixelSize: DS.Tokens.fontSize
+                                            fontWeight: Font.Medium
+                                            elide: Text.ElideRight
+                                            verticalAlignment: Text.AlignVCenter
+                                        }
+
+                                        DS.QuietText {
+                                            visible: !!(modelData.item && root.itemClock(modelData.item))
+                                            Layout.fillHeight: true
+                                            text: modelData.item ? root.itemClock(modelData.item) : ""
+                                            color: DS.Tokens.textTertiary
+                                            font.family: DS.Tokens.fontUi
+                                            font.pixelSize: DS.Tokens.fontSizeSm
+                                            verticalAlignment: Text.AlignVCenter
+                                        }
                                     }
 
-                                    Text {
-                                        Layout.fillWidth: true
-                                        text: modelData.item ? (modelData.item.label || "") : ""
-                                        color: index === root.selectedIndex ? Theme.textOnAccent : Theme.text
-                                        font.family: Theme.fontFamily
-                                        font.pixelSize: Theme.fontSize
-                                        elide: Text.ElideRight
-                                    }
-                                }
-
-                                MouseArea {
-                                    id: rowMouse
-                                    anchors.fill: parent
-                                    hoverEnabled: true
-                                    acceptedButtons: Qt.LeftButton | Qt.RightButton
-                                    cursorShape: root.keyboardNav ? Qt.BlankCursor : Qt.ArrowCursor
-                                    onEntered: {
-                                        if (root.keyboardNav)
-                                            return
-                                        root.selectedIndex = index
-                                    }
-                                    onClicked: mouse => {
-                                        root.selectedIndex = index
-                                        root.focusListPane()
-                                        if (mouse.modifiers & Qt.ShiftModifier || mouse.button === Qt.RightButton)
-                                            root.toggleMarkAt(index)
-                                    }
-                                    onDoubleClicked: {
-                                        root.selectedIndex = index
-                                        root.activateSelected()
+                                    MouseArea {
+                                        id: rowMouse
+                                        anchors.fill: parent
+                                        hoverEnabled: !root.keyboardNav
+                                        acceptedButtons: Qt.LeftButton | Qt.RightButton
+                                        cursorShape: root.keyboardNav ? Qt.BlankCursor : Qt.ArrowCursor
+                                        onEntered: {
+                                            if (root.keyboardNav)
+                                                return
+                                            root.pinNewest = false
+                                            root.selectedIndex = index
+                                        }
+                                        onClicked: mouse => {
+                                            root.pinNewest = false
+                                            root.selectedIndex = index
+                                            root.focusListPane()
+                                            if (mouse.modifiers & Qt.ShiftModifier || mouse.button === Qt.RightButton)
+                                                root.toggleMarkAt(index)
+                                        }
+                                        onDoubleClicked: {
+                                            root.selectedIndex = index
+                                            root.activateSelected()
+                                        }
                                     }
                                 }
                             }
+
+                            DS.QuietText {
+                                anchors.centerIn: parent
+                                visible: !root.filtered || root.filtered.length === 0
+                                text: (indexProc.running || cacheProc.running) && (!root.items || root.items.length === 0)
+                                      ? "Loading…"
+                                      : "Nothing found"
+                                color: DS.Tokens.textTertiary
+                                font.family: DS.Tokens.fontUi
+                                font.pixelSize: DS.Tokens.fontSize
+                            }
                         }
 
-                        Text {
-                            anchors.centerIn: parent
-                            visible: !root.filtered || root.filtered.length === 0
-                            text: (indexProc.running || cacheProc.running) && (!root.items || root.items.length === 0)
-                                  ? "Loading…"
-                                  : "Nothing found"
-                            color: Theme.textMuted
-                            font.family: Theme.fontFamily
-                            font.pixelSize: Theme.fontSize
+                        DS.ScrollIndicator {
+                            view: listView
+                            anchors.right: parent.right
+                            anchors.rightMargin: 2
+                            anchors.top: parent.top
+                            anchors.bottom: parent.bottom
+                            anchors.topMargin: 4
                         }
+                    }
+
+                    Rectangle {
+                        Layout.preferredWidth: 1
+                        Layout.fillHeight: true
+                        Layout.topMargin: 10
+                        Layout.bottomMargin: 10
+                        color: DS.Tokens.hairline
                     }
 
                     Item {
-                        id: listScrollBar
-                        readonly property bool needed: listView.contentHeight > listView.height + 2
-                        readonly property real ratio: listView.height / Math.max(1, listView.contentHeight)
-                        readonly property real thumbH: Math.max(28, height * ratio)
-                        readonly property real maxThumbY: Math.max(0, height - thumbH)
-                        readonly property real maxContentY: Math.max(1, listView.contentHeight - listView.height)
-                        readonly property real thumbY: maxThumbY * (listView.contentY / maxContentY)
-
-                        visible: needed
-                        anchors.right: parent.right
-                        anchors.top: parent.top
-                        anchors.bottom: parent.bottom
-                        width: 6
-
-                        Rectangle {
-                            anchors.fill: parent
-                            radius: 3
-                            color: Theme.borderSubtle
-                            opacity: 0.35
-                        }
-
-                        Rectangle {
-                            id: listScrollThumb
-                            width: parent.width
-                            height: listScrollBar.thumbH
-                            y: listScrollBar.thumbY
-                            radius: 3
-                            color: Theme.primary
-                            opacity: listScrollDrag.active ? 0.95 : 0.65
-
-                            MouseArea {
-                                id: listScrollDrag
-                                anchors.fill: parent
-                                anchors.margins: -4
-                                cursorShape: Qt.PointingHandCursor
-                                preventStealing: true
-                                property real grabOffset: 0
-                                onPressed: mouse => { grabOffset = mouse.y }
-                                onPositionChanged: mouse => {
-                                    if (!pressed)
-                                        return
-                                    const localY = listScrollThumb.y + mouse.y - grabOffset
-                                    const clamped = Math.max(0, Math.min(listScrollBar.maxThumbY, localY))
-                                    listView.contentY = (clamped / Math.max(1, listScrollBar.maxThumbY)) * listScrollBar.maxContentY
-                                }
-                            }
-                        }
-
-                        MouseArea {
-                            anchors.fill: parent
-                            z: -1
-                            cursorShape: Qt.PointingHandCursor
-                            onClicked: mouse => {
-                                const target = mouse.y - listScrollBar.thumbH / 2
-                                const clamped = Math.max(0, Math.min(listScrollBar.maxThumbY, target))
-                                listView.contentY = (clamped / Math.max(1, listScrollBar.maxThumbY)) * listScrollBar.maxContentY
-                            }
-                        }
-                    }
-                }
-
-                Rectangle {
-                    Layout.preferredWidth: 1
-                    Layout.fillHeight: true
-                    color: Theme.borderSubtle
-                }
-
-                // Right preview + info
-                ColumnLayout {
-                    Layout.fillWidth: true
-                    Layout.fillHeight: true
-                    spacing: 0
-
-                    Rectangle {
                         Layout.fillWidth: true
                         Layout.fillHeight: true
-                        color: Theme.surfaceContainer
-                        clip: true
-                        border.width: root.focusPane === "preview" ? 1 : 0
-                        border.color: Theme.primary
+                        Layout.minimumWidth: 280
 
-                        // Image preview
                         Image {
                             id: previewImage
                             anchors.fill: parent
-                            anchors.margins: 18
+                            anchors.margins: 20
+                            anchors.bottomMargin: root.previewMeta.length ? 48 : 20
                             visible: root.selectedItem && root.selectedItem.isImage
                             source: root.selectedItem ? root.previewUrl(root.selectedItem) : ""
                             fillMode: Image.PreserveAspectFit
@@ -1182,356 +1098,169 @@ PanelWindow {
                             cache: true
                         }
 
-                        // Full text preview — scrollable + selectable
                         Item {
                             anchors.fill: parent
                             visible: root.selectedItem && !root.selectedItem.isImage
 
-                            Flickable {
-                                id: previewFlick
-                                anchors.fill: parent
-                                anchors.margins: 14
-                                anchors.rightMargin: previewScrollBar.visible ? 18 : 14
-                                contentWidth: width
-                                contentHeight: previewEdit.implicitHeight
-                                clip: true
-                                boundsBehavior: Flickable.StopAtBounds
-                                interactive: true
-                                flickableDirection: Flickable.VerticalFlick
-                                // TextEdit owns arrows / shift-select; don't scroll the pane instead.
-                                Keys.enabled: false
+                                Flickable {
+                                    id: previewFlick
+                                    anchors.fill: parent
+                                    anchors.leftMargin: 20
+                                    anchors.rightMargin: 12
+                                    anchors.topMargin: 8
+                                    anchors.bottomMargin: root.previewMeta.length ? 40 : 8
+                                    contentWidth: width
+                                    contentHeight: previewEdit.implicitHeight
+                                    clip: true
+                                    boundsBehavior: Flickable.StopAtBounds
+                                    interactive: true
+                                    flickableDirection: Flickable.VerticalFlick
+                                    Keys.enabled: false
 
-                                TextEdit {
-                                    id: previewEdit
-                                    width: previewFlick.width
-                                    color: Theme.text
-                                    font.family: Theme.fontFamily
-                                    font.pixelSize: Theme.fontSize
-                                    wrapMode: TextEdit.Wrap
-                                    readOnly: true
-                                    selectByMouse: true
-                                    selectByKeyboard: true
-                                    persistentSelection: true
-                                    activeFocusOnPress: true
-                                    cursorVisible: activeFocus
-                                    selectionColor: Theme.primary
-                                    selectedTextColor: Theme.textOnAccent
+                                    TextEdit {
+                                        id: previewEdit
+                                        width: previewFlick.width
+                                        color: DS.Tokens.textPrimary
+                                        font.family: root.selectedIsCode ? Colors.font_mono : DS.Tokens.fontUi
+                                        font.pixelSize: DS.Tokens.fontSize
+                                        font.weight: Font.Medium
+                                        wrapMode: TextEdit.WrapAtWordBoundaryOrAnywhere
+                                        readOnly: true
+                                        selectByMouse: true
+                                        selectByKeyboard: true
+                                        persistentSelection: true
+                                        activeFocusOnPress: true
+                                        cursorVisible: activeFocus
+                                        selectionColor: DS.Tokens.raisedStrong
+                                        selectedTextColor: DS.Tokens.textPrimary
 
-                                    cursorDelegate: Rectangle {
-                                        width: 2
-                                        color: Theme.primary
-                                        visible: previewEdit.activeFocus
-                                        SequentialAnimation on opacity {
-                                            running: previewEdit.activeFocus
-                                            loops: Animation.Infinite
-                                            NumberAnimation { from: 1; to: 0; duration: 530 }
-                                            NumberAnimation { from: 0; to: 1; duration: 530 }
+                                        cursorDelegate: Rectangle {
+                                            width: 2
+                                            color: DS.Tokens.textPrimary
+                                            visible: previewEdit.activeFocus
+                                            SequentialAnimation on opacity {
+                                                running: previewEdit.activeFocus
+                                                loops: Animation.Infinite
+                                                NumberAnimation { from: 1; to: 0; duration: 530 }
+                                                NumberAnimation { from: 0; to: 1; duration: 530 }
+                                            }
+                                        }
+
+                                        onActiveFocusChanged: {
+                                            if (activeFocus) {
+                                                root.focusPane = "preview"
+                                                cursorVisible = true
+                                            }
+                                        }
+
+                                        onCursorRectangleChanged: root.ensurePreviewCursorVisible()
+
+                                        Keys.onPressed: event => {
+                                            if (root.handleKey(event))
+                                                event.accepted = true
                                         }
                                     }
+                                }
 
-                                    onActiveFocusChanged: {
-                                        if (activeFocus) {
-                                            root.focusPane = "preview"
-                                            cursorVisible = true
-                                        }
-                                    }
+                                DS.ScrollIndicator {
+                                    view: previewFlick
+                                    anchors.right: parent.right
+                                    anchors.rightMargin: 6
+                                    anchors.top: parent.top
+                                    anchors.bottom: parent.bottom
+                                    anchors.topMargin: 16
+                                    anchors.bottomMargin: 16
+                                }
 
-                                    onCursorRectangleChanged: root.ensurePreviewCursorVisible()
-
-                                    Keys.onPressed: event => {
-                                        if (root.handleKey(event))
-                                            event.accepted = true
-                                    }
+                                DS.QuietText {
+                                    anchors.right: parent.right
+                                    anchors.bottom: parent.bottom
+                                    anchors.margins: 16
+                                    visible: root.previewLoading
+                                    text: "loading…"
+                                    color: DS.Tokens.textTertiary
+                                    font.family: DS.Tokens.fontUi
+                                    font.pixelSize: DS.Tokens.fontSizeSm
                                 }
                             }
 
-                            Item {
-                                id: previewScrollBar
-                                readonly property bool needed: previewFlick.contentHeight > previewFlick.height + 2
-                                readonly property real ratio: previewFlick.height / Math.max(1, previewFlick.contentHeight)
-                                readonly property real thumbH: Math.max(24, height * ratio)
-                                readonly property real maxThumbY: Math.max(0, height - thumbH)
-                                readonly property real maxContentY: Math.max(1, previewFlick.contentHeight - previewFlick.height)
-                                readonly property real thumbY: maxThumbY * (previewFlick.contentY / maxContentY)
-
-                                visible: needed
-                                anchors.right: parent.right
-                                anchors.top: parent.top
-                                anchors.bottom: parent.bottom
-                                anchors.margins: 6
-                                width: 6
-
-                                Rectangle {
-                                    anchors.fill: parent
-                                    radius: 3
-                                    color: Theme.borderSubtle
-                                    opacity: 0.35
-                                }
-
-                                Rectangle {
-                                    id: previewScrollThumb
-                                    width: parent.width
-                                    height: previewScrollBar.thumbH
-                                    y: previewScrollBar.thumbY
-                                    radius: 3
-                                    color: Theme.primary
-                                    opacity: previewScrollDrag.active ? 0.95 : 0.65
-
-                                    MouseArea {
-                                        id: previewScrollDrag
-                                        anchors.fill: parent
-                                        anchors.margins: -4
-                                        cursorShape: Qt.PointingHandCursor
-                                        preventStealing: true
-                                        property real grabOffset: 0
-                                        onPressed: mouse => { grabOffset = mouse.y }
-                                        onPositionChanged: mouse => {
-                                            if (!pressed)
-                                                return
-                                            const localY = previewScrollThumb.y + mouse.y - grabOffset
-                                            const clamped = Math.max(0, Math.min(previewScrollBar.maxThumbY, localY))
-                                            previewFlick.contentY = (clamped / Math.max(1, previewScrollBar.maxThumbY)) * previewScrollBar.maxContentY
-                                        }
-                                    }
-                                }
-
-                                MouseArea {
-                                    anchors.fill: parent
-                                    z: -1
-                                    cursorShape: Qt.PointingHandCursor
-                                    onClicked: mouse => {
-                                        const target = mouse.y - previewScrollBar.thumbH / 2
-                                        const clamped = Math.max(0, Math.min(previewScrollBar.maxThumbY, target))
-                                        previewFlick.contentY = (clamped / Math.max(1, previewScrollBar.maxThumbY)) * previewScrollBar.maxContentY
-                                    }
-                                }
-                            }
-
-                            Text {
+                            DS.QuietText {
+                                anchors.left: parent.left
                                 anchors.right: parent.right
                                 anchors.bottom: parent.bottom
-                                anchors.margins: 10
-                                visible: root.previewLoading
-                                text: "loading…"
-                                color: Theme.textMuted
-                                font.family: Theme.fontFamily
-                                font.pixelSize: Theme.fontSizeSm
+                                anchors.leftMargin: 20
+                                anchors.rightMargin: 20
+                                anchors.bottomMargin: 12
+                                visible: !!root.selectedItem && !root.previewLoading && root.previewMeta.length > 0
+                                text: root.previewMeta
+                                color: DS.Tokens.textTertiary
+                                font.family: DS.Tokens.fontUi
+                                font.pixelSize: DS.Tokens.fontSizeSm
+                                elide: Text.ElideRight
                             }
-                        }
 
-                        Text {
-                            anchors.centerIn: parent
-                            visible: !root.selectedItem
-                            text: "Select an entry"
-                            color: Theme.textMuted
-                            font.family: Theme.fontFamily
-                            font.pixelSize: Theme.fontSize
-                        }
+                            DS.QuietText {
+                                anchors.centerIn: parent
+                                visible: !root.selectedItem
+                                text: "Select an entry"
+                                color: DS.Tokens.textTertiary
+                                font.family: DS.Tokens.fontUi
+                                font.pixelSize: DS.Tokens.fontSize
+                            }
                     }
+                }
 
-                    Rectangle {
-                        Layout.fillWidth: true
-                        Layout.preferredHeight: infoCol.implicitHeight + 28
-                        color: Theme.surface
-
-                        Rectangle {
-                            anchors.left: parent.left
-                            anchors.right: parent.right
-                            anchors.top: parent.top
-                            height: 1
-                            color: Theme.borderSubtle
-                        }
-
-                        ColumnLayout {
-                            id: infoCol
-                            anchors.left: parent.left
-                            anchors.right: parent.right
-                            anchors.top: parent.top
-                            anchors.margins: 16
-                            spacing: 10
-
-                            Text {
-                                text: "Information"
-                                color: Theme.textMuted
-                                font.family: Theme.fontFamily
-                                font.pixelSize: Theme.fontSizeSm
-                                font.bold: true
-                            }
-
-                            RowLayout {
-                                Layout.fillWidth: true
-                                Text {
-                                    text: "Content type"
-                                    color: Theme.textMuted
-                                    font.family: Theme.fontFamily
-                                    font.pixelSize: Theme.fontSizeSm
-                                    Layout.preferredWidth: 110
-                                }
-                                Text {
-                                    text: root.selectedItem ? (root.selectedItem.contentType || "") : "—"
-                                    color: Theme.text
-                                    font.family: Theme.fontFamily
-                                    font.pixelSize: Theme.fontSizeSm
-                                    Layout.fillWidth: true
-                                }
-                            }
-
-                            RowLayout {
-                                Layout.fillWidth: true
-                                visible: !!(root.selectedItem && root.selectedItem.isImage && root.selectedItem.dimsLabel)
-                                Text {
-                                    text: "Dimensions"
-                                    color: Theme.textMuted
-                                    font.family: Theme.fontFamily
-                                    font.pixelSize: Theme.fontSizeSm
-                                    Layout.preferredWidth: 110
-                                }
-                                Text {
-                                    text: root.selectedItem ? (root.selectedItem.dimsLabel || "") : ""
-                                    color: Theme.text
-                                    font.family: Theme.fontFamily
-                                    font.pixelSize: Theme.fontSizeSm
-                                    Layout.fillWidth: true
-                                }
-                            }
-
-                            RowLayout {
-                                Layout.fillWidth: true
-                                visible: !!(root.selectedItem && root.selectedItem.isImage && root.selectedItem.mtimeLabel)
-                                Text {
-                                    text: "Created"
-                                    color: Theme.textMuted
-                                    font.family: Theme.fontFamily
-                                    font.pixelSize: Theme.fontSizeSm
-                                    Layout.preferredWidth: 110
-                                }
-                                Text {
-                                    text: root.selectedItem ? (root.selectedItem.mtimeLabel || "") : ""
-                                    color: Theme.text
-                                    font.family: Theme.fontFamily
-                                    font.pixelSize: Theme.fontSizeSm
-                                    Layout.fillWidth: true
-                                }
-                            }
-                        }
+                DS.FooterHints {
+                    Layout.fillWidth: true
+                    Layout.fillHeight: false
+                    Layout.preferredHeight: DS.Tokens.footerHeight
+                    Layout.maximumHeight: DS.Tokens.footerHeight
+                    closeHint: (host && host.canPop)
+                        ? ({ keys: ["esc"], label: "Back" })
+                        : ({ keys: ["esc"], label: "Close" })
+                    hints: {
+                        if (root.filterMenuOpen)
+                            return [
+                                { keys: ["↑", "↓"], label: "Filter" },
+                                { keys: ["⏎"], label: "Choose" }
+                            ]
+                        if (root.focusPane === "preview")
+                            return [
+                                { keys: ["⇧", "←", "→"], label: "Select" },
+                                { keys: ["ctrl", "C"], label: "Copy" },
+                                { keys: ["super", "H"], label: "List" }
+                            ]
+                        return [
+                            { keys: ["↑", "↓"], label: "Navigate" },
+                            { keys: ["super", "L"], label: "Preview" },
+                            { keys: ["⇧", "⏎"], label: "Mark" },
+                            { keys: ["ctrl", "C"], label: "Copy" },
+                            { keys: ["⏎"], label: root.pasteHintLabel }
+                        ]
                     }
                 }
             }
 
-            // Footer
-            Item {
-                Layout.fillWidth: true
-                Layout.preferredHeight: 40
-
-                Rectangle {
-                    anchors.left: parent.left
-                    anchors.right: parent.right
-                    anchors.top: parent.top
-                    height: 1
-                    color: Theme.borderSubtle
-                }
-
-                RowLayout {
-                    anchors.fill: parent
-                    anchors.leftMargin: 16
-                    anchors.rightMargin: 16
-                    spacing: 8
-
-                    Text {
-                        text: root.markedLines.length > 0
-                            ? ("Clipboard · " + root.markedLines.length + " marked")
-                            : "Clipboard History"
-                        color: Theme.textMuted
-                        font.family: Theme.fontFamily
-                        font.pixelSize: Theme.fontSizeSm
-                        Layout.fillWidth: true
-                    }
-
-                    Text {
-                        text: {
-                            if (root.filterMenuOpen)
-                                return "↑↓ filter  ·  ↵ choose  ·  esc close menu"
-                            if (root.focusPane === "preview")
-                                return "⇧←→ select  ·  ⌃C copy  ·  Super+H list"
-                            return "↑↓ list  ·  Super+L preview  ·  ⇧↵ mark  ·  ⌃C copy  ·  ↵ paste"
-                        }
-                        color: Theme.textMuted
-                        font.family: Theme.fontFamily
-                        font.pixelSize: Theme.fontSizeSm
-                    }
-                }
+            MouseArea {
+                anchors.fill: parent
+                enabled: root.filterMenuOpen
+                z: 20
+                onClicked: root.closeFilterMenu()
             }
-        }
 
-        // Type filter dropdown
-        Rectangle {
-            visible: root.filterMenuOpen
-            width: 160
-            height: filterCol.implicitHeight + 12
-            anchors.top: parent.top
-            anchors.right: parent.right
-            anchors.topMargin: 54
-            anchors.rightMargin: 14
-            radius: Theme.radiusMd
-            color: Theme.surfaceContainer
-            border.color: Theme.border
-            border.width: 1
-            z: 30
-
-            ColumnLayout {
-                id: filterCol
-                anchors.left: parent.left
-                anchors.right: parent.right
+            DS.FilterDropdown {
+                visible: root.filterMenuOpen
+                options: root.filterOptions
+                highlight: root.filterHighlight
+                currentValue: root.typeFilter
                 anchors.top: parent.top
-                anchors.margins: 6
-                spacing: 2
-
-                Repeater {
-                    model: root.filterOptions
-
-                    delegate: Rectangle {
-                        required property var modelData
-                        required property int index
-                        Layout.fillWidth: true
-                        height: 34
-                        radius: Theme.radiusSm
-                        color: {
-                            if (index === root.filterHighlight)
-                                return Theme.rowSelected
-                            if (modelData.value === root.typeFilter)
-                                return Theme.rowHover
-                            return "transparent"
-                        }
-
-                        Text {
-                            anchors.left: parent.left
-                            anchors.leftMargin: 12
-                            anchors.verticalCenter: parent.verticalCenter
-                            text: modelData.label
-                            color: index === root.filterHighlight ? Theme.textOnAccent : Theme.text
-                            font.family: Theme.fontFamily
-                            font.pixelSize: Theme.fontSizeSm
-                        }
-
-                        MouseArea {
-                            anchors.fill: parent
-                            hoverEnabled: true
-                            onEntered: root.filterHighlight = index
-                            onClicked: {
-                                root.filterHighlight = index
-                                root.applyFilterHighlight()
-                            }
-                        }
-                    }
+                anchors.right: parent.right
+                anchors.topMargin: DS.Tokens.paddingSurface + DS.Tokens.searchFieldHeight + 4
+                anchors.rightMargin: DS.Tokens.paddingSurface
+                z: 30
+                onPicked: index => {
+                    root.filterHighlight = index
+                    root.applyFilterHighlight()
                 }
             }
-        }
-
-        MouseArea {
-            anchors.fill: parent
-            enabled: root.filterMenuOpen
-            z: 20
-            onClicked: root.closeFilterMenu()
-        }
-    }
 }

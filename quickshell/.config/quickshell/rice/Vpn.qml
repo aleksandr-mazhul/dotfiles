@@ -2,8 +2,9 @@ import QtQuick
 import QtQuick.Layouts
 import Quickshell
 import Quickshell.Io
+import "ds" as DS
 
-RicePanel {
+DS.SearchListChrome {
     id: root
 
     property var entries: []
@@ -26,6 +27,7 @@ RicePanel {
     property int busyPolls: 0
     property bool locationsCached: false
     property int pingRefreshTicks: 0
+    property bool pinFirst: true
     readonly property string helper: Quickshell.env("HOME") + "/.config/hypr/scripts/qs-vpn.sh"
     readonly property string spinGlyph: {
         const frames = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"]
@@ -45,15 +47,16 @@ RicePanel {
         return hay.indexOf(bestNode.toLowerCase()) >= 0
     }
 
-    title: "VPN"
-    searchPlaceholder: "Search locations…"
-    footerText: busy
-        ? (spinGlyph + " " + (busyAction === "disconnect" ? "disconnecting…" : ("connecting" + (busyLabel ? (" " + busyLabel) : "") + "…")) + "  ·  ↵ cancel  ·  esc cancel")
-        : (connected
-            ? "↑↓ move  ·  ↵ active = OFF  ·  ⇧↵ fav"
-            : "↑↓ move  ·  ↵ connect  ·  ⇧↵ fav  ·  esc close")
+    pageId: "vpn"
+    placeholder: "Search locations…"
     model: filtered
-    countText: {
+    maxRows: 8
+    closeHint: (host && host.canPop)
+        ? ({ keys: ["esc"], label: "Back" })
+        : ({ keys: ["esc"], label: "Close" })
+    selectable: function (item) { return root.isActionable(item) }
+
+    readonly property string vpnStatusLabel: {
         if (loading || busy)
             return spinGlyph + " " + statusText
         if (connected && currentLabel)
@@ -62,13 +65,22 @@ RicePanel {
             return "ON"
         return "OFF"
     }
-    itemHeight: Theme.rowHeight
-    maxVisible: 10
-    panelHeight: 560
+    footerHints: busy ? [
+        { keys: [], label: vpnStatusLabel },
+        { keys: ["⏎"], label: "Cancel" }
+    ] : [
+        { keys: [], label: vpnStatusLabel },
+        { keys: ["↑", "↓"], label: "Navigate" },
+        { keys: ["⏎"], label: connected ? "Toggle" : "Connect" },
+        { keys: ["⇧", "⏎"], label: "Favorite" }
+    ]
 
-    onPanelOpened: {
+    onPageEntered: {
         wantLocations = true
         pingRefreshTicks = 0
+        pinFirst = true
+        keyboardNav = true
+        navPointer = Qt.point(-1, -1)
         if (!locationsCached) {
             locationRows = []
             loading = true
@@ -87,14 +99,14 @@ RicePanel {
         pendingProc.running = true
         pingPollTimer.restart()
     }
-    onPanelClosed: {
+    onPageLeft: {
         if (!busy) {
             pollTimer.stop()
             busyWatchdog.stop()
         }
         pingPollTimer.stop()
     }
-    onQueryChanged: applyFilter()
+    onSearchTextChanged: applyFilter()
     onActivated: (item, index) => runAction(item)
 
     Timer {
@@ -194,11 +206,13 @@ RicePanel {
             return true
         }
         if (event.key === Qt.Key_Down) {
-            moveActionable(1)
+            pinFirst = false
+            moveSelection(1)
             return true
         }
         if (event.key === Qt.Key_Up) {
-            moveActionable(-1)
+            pinFirst = false
+            moveSelection(-1)
             return true
         }
         return false
@@ -222,9 +236,20 @@ RicePanel {
         return 0
     }
 
+    function selectFirstActionable() {
+        selectedIndex = firstActionableIndex()
+        clampSelection()
+        if (!isActionable(filtered[selectedIndex]))
+            selectedIndex = firstActionableIndex()
+        Qt.callLater(() => root.scrollToStart())
+    }
+
     function moveActionable(delta) {
         if (!filtered || filtered.length === 0)
             return
+        pinFirst = false
+        keyboardNav = true
+        navPointer = Qt.point(-1, -1)
         let i = selectedIndex
         for (let n = 0; n < filtered.length; n++) {
             i += delta
@@ -604,6 +629,10 @@ RicePanel {
             }
             filtered = out
         }
+        if (pinFirst) {
+            selectFirstActionable()
+            return
+        }
         const first = firstActionableIndex()
         if (!isActionable(filtered[selectedIndex]))
             selectedIndex = first
@@ -766,142 +795,120 @@ RicePanel {
         readonly property bool isBusyRow: !!(modelData.busy)
         readonly property bool isCancel: modelData.action === "cancel"
         readonly property bool isFav: root.isFavorite(modelData.key || (isCurrent ? root.currentKey : ""))
-        readonly property bool selectable: root.isActionable(modelData)
-        readonly property bool selected: selectable && index === root.selectedIndex
+        readonly property bool rowSelectable: root.isActionable(modelData)
+        readonly property bool selected: rowSelectable && index === root.selectedIndex
 
-        width: ListView.view ? ListView.view.width : root.panelWidth - 28
-        height: isHeader ? 28 : Theme.rowHeight
+        width: ListView.view ? ListView.view.width : 0
+        height: isHeader ? DS.Tokens.sectionHeight : DS.Tokens.rowHeight
+        opacity: root.busy && !isBusyRow && !isCancel && !isEmpty && !isHeader ? 0.55 : 1
 
-        // Section header
-        Text {
+        DS.SectionLabel {
             visible: isHeader
             anchors.left: parent.left
             anchors.right: parent.right
             anchors.verticalCenter: parent.verticalCenter
-            anchors.leftMargin: 6
-            text: modelData.label || ""
-            color: Theme.textMuted
-            font.family: Theme.fontFamily
-            font.pixelSize: Theme.fontSizeSm
-            font.bold: true
-            font.capitalization: Font.AllUppercase
-            opacity: 0.85
+            anchors.leftMargin: DS.Tokens.rowPaddingX
+            label: modelData.label || ""
         }
 
-        Rectangle {
+        DS.SelectionPill {
             visible: !isHeader
             anchors.fill: parent
-            radius: Theme.radiusSm
-            color: {
-                if (isEmpty)
-                    return "transparent"
-                if (selected)
-                    return Theme.rowSelected
-                if (isCancel)
-                    return Theme.surfaceVariant
-                if (isBusyRow)
-                    return Theme.surfaceVariant
-                if (isCurrent)
-                    return Theme.glassTileActive
-                return Theme.row
-            }
-            border.width: isCurrent && !selected ? 1 : 0
-            border.color: Theme.glassTileBorder
-            opacity: root.busy && !isBusyRow && !isCancel && !isEmpty ? 0.55 : 1
+            hovered: rowMouse.containsMouse && !root.keyboardNav
+            selected: rowRoot.selected || (isCurrent && !rowRoot.selected)
+        }
 
-            RowLayout {
-                anchors.fill: parent
-                anchors.margins: 10
-                spacing: 8
+        RowLayout {
+            visible: !isHeader
+            anchors.fill: parent
+            anchors.leftMargin: DS.Tokens.rowPaddingX
+            anchors.rightMargin: DS.Tokens.rowPaddingX
+            spacing: DS.Tokens.gapInline
 
-                Text {
-                    text: {
-                        if (isEmpty)
-                            return root.loading ? root.spinGlyph : "…"
-                        if (isCancel)
-                            return "✕"
-                        if (isBusyRow)
-                            return root.spinGlyph
-                        if (isCurrent)
-                            return "✓"
-                        return "•"
-                    }
-                    color: selected
-                        ? Theme.textOnAccent
-                        : (isCurrent ? Theme.primary : Theme.secondary)
-                    font.family: Theme.fontFamily
-                    font.pixelSize: Theme.fontSizeSm
-                    font.bold: true
-                    Layout.preferredWidth: 22
+            DS.QuietText {
+                text: {
+                    if (isEmpty)
+                        return root.loading ? root.spinGlyph : "…"
+                    if (isCancel)
+                        return "✕"
+                    if (isBusyRow)
+                        return root.spinGlyph
+                    if (isCurrent)
+                        return "✓"
+                    return ""
                 }
-
-                Text {
-                    Layout.fillWidth: true
-                    text: modelData.label || ""
-                    color: {
-                        if (isEmpty)
-                            return Theme.textMuted
-                        if (selected)
-                            return Theme.textOnAccent
-                        if (isCurrent)
-                            return Theme.primary
-                        return Theme.text
-                    }
-                    font.family: Theme.fontFamily
-                    font.pixelSize: Theme.fontSize
-                    font.bold: isCurrent || isBusyRow
-                    elide: Text.ElideRight
-                }
-
-                // Favorite mark — only on favourited rows (⇧↵ to add/remove)
-                Text {
-                    visible: isFav && !isBusyRow && !isEmpty && !isCancel
-                    text: "★"
-                    color: selected ? Theme.textOnAccent : Theme.primary
-                    font.family: Theme.fontFamily
-                    font.pixelSize: Theme.fontSize
-                    Layout.preferredWidth: visible ? 22 : 0
-                    horizontalAlignment: Text.AlignHCenter
-
-                    MouseArea {
-                        anchors.fill: parent
-                        anchors.margins: -6
-                        enabled: !root.busy
-                        cursorShape: Qt.PointingHandCursor
-                        onClicked: {
-                            root.selectedIndex = rowRoot.index
-                            root.toggleFavorite(modelData.key || root.currentKey)
-                        }
-                    }
-                }
-
-                // Latency
-                Text {
-                    visible: !isEmpty && !isBusyRow && !!(modelData.detail)
-                    text: modelData.detail || ""
-                    color: selected ? Theme.textOnAccent : Theme.textMuted
-                    font.family: Theme.fontFamily
-                    font.pixelSize: Theme.fontSizeSm
-                    opacity: 0.9
-                    Layout.preferredWidth: 58
-                    horizontalAlignment: Text.AlignRight
-                }
+                visible: text.length > 0
+                color: DS.Tokens.textIcon
+                font.family: DS.Tokens.fontUi
+                font.pixelSize: DS.Tokens.fontSizeSm
+                fontBold: true
+                Layout.preferredWidth: visible ? 18 : 0
             }
 
-            MouseArea {
-                anchors.fill: parent
-                z: -1
-                enabled: selectable
-                hoverEnabled: true
-                cursorShape: selectable ? Qt.PointingHandCursor : Qt.ArrowCursor
-                onEntered: {
-                    if (selectable)
+            DS.QuietText {
+                Layout.fillWidth: true
+                Layout.fillHeight: true
+                text: modelData.label || ""
+                color: isEmpty ? DS.Tokens.textTertiary : DS.Tokens.textPrimary
+                font.family: DS.Tokens.fontUi
+                font.pixelSize: DS.Tokens.fontSize
+                fontWeight: (isCurrent || isBusyRow) ? Font.Medium : Font.Normal
+                elide: Text.ElideRight
+            }
+
+            DS.QuietText {
+                visible: isFav && !isBusyRow && !isEmpty && !isCancel
+                text: "★"
+                color: DS.Tokens.textSecondary
+                font.family: DS.Tokens.fontUi
+                font.pixelSize: DS.Tokens.fontSize
+                Layout.preferredWidth: visible ? 18 : 0
+
+                MouseArea {
+                    anchors.fill: parent
+                    anchors.margins: -6
+                    enabled: !root.busy
+                    cursorShape: Qt.PointingHandCursor
+                    onClicked: {
+                        root.pinFirst = false
                         root.selectedIndex = rowRoot.index
+                        root.toggleFavorite(modelData.key || root.currentKey)
+                    }
                 }
-                onClicked: {
-                    root.selectedIndex = rowRoot.index
-                    root.activateSelected()
-                }
+            }
+
+            DS.QuietText {
+                visible: !isEmpty && !isBusyRow && !!(modelData.detail)
+                text: modelData.detail || ""
+                color: DS.Tokens.textTertiary
+                font.family: DS.Tokens.fontUi
+                font.pixelSize: DS.Tokens.fontSizeSm
+                Layout.preferredWidth: visible ? 58 : 0
+                horizontalAlignment: Text.AlignRight
+            }
+        }
+
+        MouseArea {
+            id: rowMouse
+            z: -1
+            anchors.fill: parent
+            enabled: rowSelectable
+            hoverEnabled: !root.keyboardNav
+            cursorShape: {
+                if (root.keyboardNav)
+                    return Qt.BlankCursor
+                return rowSelectable ? Qt.PointingHandCursor : Qt.ArrowCursor
+            }
+            onEntered: {
+                if (!rowSelectable || root.keyboardNav)
+                    return
+                root.pinFirst = false
+                root.selectedIndex = rowRoot.index
+            }
+            onClicked: {
+                root.pinFirst = false
+                root.selectedIndex = rowRoot.index
+                root.activateSelected()
             }
         }
     }

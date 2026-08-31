@@ -75,6 +75,7 @@ inetutils
 intel-media-driver
 intel-ucode
 inxi
+ipcalc
 iwd
 k9s
 keychain

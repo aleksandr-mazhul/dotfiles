@@ -42,12 +42,7 @@ Item {
         radius: root.radius
         color: Tokens.shellTint
         // Never clip this fill: Qt clip frosts square ears outside the radius.
-
-        Rectangle {
-            anchors.fill: parent
-            radius: root.radius
-            color: Tokens.paneScrim
-        }
+        // No plate scrim — wells carry ink (ADR-0007).
 
         Item {
             anchors.fill: parent

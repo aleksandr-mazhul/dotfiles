@@ -5,7 +5,7 @@ Pipeline (via `apply-wallpaper-theme`):
 1. `theme-extract` — weighted colors from wallpaper → `extract.json`
 2. `theme-match` — pick curated harmony (sand-biased hybrid) → `match.json`
 3. `theme-build` — full role map → **`palette.toml`** (canonical)
-4. `theme-render` — templates → Kitty, Hypr, QS, GTK, starship, tmux, yazi, nvim, Vimium (Zen), btop, cava, peaclock, glow, bottom, rice fish wrappers, …
+4. `theme-render` — templates → Kitty, Hypr, QS, GTK/Files, VS Code/Cursor, Obsidian, starship, tmux, yazi, nvim, Vimium (Zen), btop, cava, peaclock, glow, bottom, rice fish wrappers, …
 
     Edit accents families in `harmonies.toml`. Do not hardcode hex in apps.
 
@@ -21,6 +21,35 @@ Pipeline (via `apply-wallpaper-theme`):
 | `gum` | `GUM_*_FOREGROUND` env from `theme-rice.fish` |
 
 Reload fish (`exec fish`) after a wallpaper change so wrappers pick up new indices.
+
+### VS Code / Cursor
+
+`theme-render` writes extension `dotfiles-ssot` into `~/.vscode/extensions` and
+`~/.cursor/extensions`, then sets `workbench.colorTheme` to **SSOT**. Reload the
+window once after the first install (`Ctrl+Shift+P` → Developer: Reload Window).
+
+Shared editor settings / keybindings / marketplace extensions live in
+`~/.config/vscode-ssot` (stow package `vscode/`). systemd user unit
+`vscode-cursor-sync.path` mirrors theme, settings, and new plugins both ways
+(`vscode-cursor-sync --auto`). Cursor-only keys stay in `cursor.overlay.json`.
+Do not copy `anysphere.*` into VS Code, or Microsoft remotes into Cursor.
+Pylance is VS Code-only (`extensions-code.txt`); Cursor uses bundled
+`anysphere.cursorpyright` (`extensions-cursor.txt`). Activity Bar pin order
+is `activity-bar.json`. Wallpaper `theme-render` still writes the **SSOT**
+color theme into both editors; picking another theme in either app is then
+mirrored.
+
+### GNOME Files (Nautilus)
+
+GTK 3/4 `gtk.css` maps libadwaita named colors (`window_bg_color`, `accent_bg_color`,
+sidebar, …) from `palette.toml`. `nautilus-dark` unsets Graphite so Files reads
+`~/.config/gtk-4.0/gtk.css`. Restart Nautilus after a wallpaper change.
+
+### Obsidian
+
+A `ssot.css` snippet is written into each vault from `obsidian.json` and enabled.
+Accent color is patched in `.obsidian/appearance.json`. Reopen or switch theme
+once if the snippet does not pick up immediately.
 
 ### Vimium (Zen)
 

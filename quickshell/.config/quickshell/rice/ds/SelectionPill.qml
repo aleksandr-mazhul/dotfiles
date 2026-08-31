@@ -7,8 +7,11 @@ Item {
 
     property bool hovered: false
     property bool selected: false
+    // Quieter than selected: current device / marked rows. Focus still wins.
+    property bool muted: false
 
     readonly property int pillRadius: Tokens.innerRadius(Tokens.radiusSurface, Tokens.paddingSurface)
+    readonly property bool showMuted: root.muted && !root.selected
 
     RectangularShadow {
         anchors.fill: fill
@@ -41,9 +44,13 @@ Item {
         id: fill
         anchors.fill: parent
         radius: root.pillRadius
-        color: root.selected ? Tokens.raisedStrong : (root.hovered ? Tokens.raised : "transparent")
-        border.width: root.selected ? 1 : (root.hovered ? 1 : 0)
-        border.color: root.selected ? Tokens.raisedRim : Qt.rgba(1, 1, 1, 0.08)
+        color: root.selected
+            ? Tokens.raisedStrong
+            : (root.showMuted || root.hovered ? Tokens.raised : "transparent")
+        border.width: (root.selected || root.showMuted || root.hovered) ? 1 : 0
+        border.color: root.selected
+            ? Tokens.raisedRim
+            : (root.showMuted ? Tokens.hairline : Qt.rgba(1, 1, 1, 0.08))
 
         Behavior on color {
             ColorAnimation {

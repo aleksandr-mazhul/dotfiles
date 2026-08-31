@@ -76,6 +76,21 @@ if [[ -f "$HOME/.config/systemd/user/kanata.service" ]]; then
     echo "warn: kanata.service failed to start (user must be in 'input' group; re-login)" >&2
   }
 fi
+if [[ -f "$HOME/.config/systemd/user/vscode-cursor-sync.path" ]]; then
+  systemctl --user enable --now vscode-cursor-sync.path || {
+    echo "warn: vscode-cursor-sync.path failed to enable" >&2
+  }
+fi
+if [[ -f "$HOME/.config/systemd/user/vscode-cursor-sync-idle.timer" ]]; then
+  systemctl --user enable --now vscode-cursor-sync-idle.timer || {
+    echo "warn: vscode-cursor-sync-idle.timer failed to enable" >&2
+  }
+fi
+if [[ -f "$HOME/.config/systemd/user/cursor-update.timer" ]]; then
+  systemctl --user enable --now cursor-update.timer || {
+    echo "warn: cursor-update.timer failed to enable" >&2
+  }
+fi
 
 if [[ "$(getent passwd "$USER" | cut -d: -f7)" != "$(command -v fish)" ]] \
   && command -v fish >/dev/null 2>&1; then
@@ -100,6 +115,11 @@ if [[ -x "$HOME/.local/bin/apply-wallpaper-theme" ]]; then
   fi
 fi
 
+if [[ -x "$HOME/.local/bin/vscode-cursor-sync" ]] && command -v code >/dev/null 2>&1; then
+  log "VS Code / Cursor settings + extensions"
+  "$HOME/.local/bin/vscode-cursor-sync" || echo "warn: vscode-cursor-sync failed" >&2
+fi
+
 if [[ -x "$ROOT/sddm/install.sh" ]]; then
   log "SDDM adaptive theme (optional; needs sudo)"
   "$ROOT/sddm/install.sh" || echo "warn: SDDM install skipped/failed" >&2
@@ -115,6 +135,8 @@ Restored automatically:
   • all stowed configs (Hypr, Kitty, Fish, Kanata, Tmux, nvim, QS, theme, Zen shortcuts, …)
   • kanata user service (if permitted)
   • SSOT colors (if a wallpaper was available)
+  • VS Code/Cursor shared settings + extensions (`vscode-cursor-sync.path`, idle timer)
+  • Cursor AppImage hourly updater (`cursor-update.timer`; binary via `cursor-update --apply`)
 
 NOT restored (by design — secrets / machine-local):
   • Browser profiles (Zen cookies/logins) — only shortcuts + user.js

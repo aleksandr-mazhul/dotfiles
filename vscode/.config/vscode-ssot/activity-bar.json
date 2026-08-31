@@ -1,0 +1,178 @@
+{
+    "pinnedViewlets": [
+        {
+            "id": "workbench.view.explorer",
+            "pinned": true,
+            "visible": true,
+            "order": 0
+        },
+        {
+            "id": "workbench.view.search",
+            "pinned": true,
+            "visible": false,
+            "order": 1
+        },
+        {
+            "id": "workbench.view.scm",
+            "pinned": true,
+            "visible": false,
+            "order": 2
+        },
+        {
+            "id": "workbench.view.debug",
+            "pinned": true,
+            "visible": false,
+            "order": 3
+        },
+        {
+            "id": "workbench.view.extensions",
+            "pinned": true,
+            "visible": false,
+            "order": 4
+        },
+        {
+            "id": "workbench.view.extension.python",
+            "pinned": true,
+            "visible": false,
+            "order": 5
+        },
+        {
+            "id": "workbench.view.extension.test",
+            "pinned": true,
+            "visible": false,
+            "order": 6
+        },
+        {
+            "id": "workbench.view.extension.ansible-explorer",
+            "pinned": true,
+            "visible": false,
+            "order": 7
+        },
+        {
+            "id": "workbench.view.extension.terraform",
+            "pinned": true,
+            "visible": false,
+            "order": 8
+        },
+        {
+            "id": "workbench.view.extension.terraform-cloud",
+            "pinned": true,
+            "visible": false,
+            "order": 9
+        },
+        {
+            "id": "workbench.view.extension.containersView",
+            "pinned": true,
+            "visible": false,
+            "order": 10
+        },
+        {
+            "id": "workbench.view.extension.jupyter",
+            "pinned": false,
+            "visible": false,
+            "order": 11
+        },
+        {
+            "id": "workbench.view.remote",
+            "pinned": false,
+            "visible": false,
+            "order": 12
+        },
+        {
+            "id": "workbench.view.extension.references-view",
+            "pinned": false,
+            "visible": false,
+            "order": 13
+        },
+        {
+            "id": "workbench.view.extension.copilot-chat",
+            "pinned": false,
+            "visible": false,
+            "order": 14
+        },
+        {
+            "id": "workbench.view.extension.context-inspector",
+            "pinned": false,
+            "visible": false,
+            "order": 15
+        },
+        {
+            "id": "workbench.view.extension.gitlens",
+            "pinned": false,
+            "visible": false,
+            "order": 16
+        },
+        {
+            "id": "workbench.view.voiceTranscriptsContainer",
+            "pinned": false,
+            "visible": false,
+            "order": 17
+        },
+        {
+            "id": "workbench.view.extension.gitlensInspect",
+            "pinned": false,
+            "visible": false,
+            "order": 18
+        },
+        {
+            "id": "workbench.view.extension.gitlensPatch",
+            "pinned": false,
+            "visible": false,
+            "order": 19
+        },
+        {
+            "id": "workbench.view.extension.github-pull-requests",
+            "pinned": false,
+            "visible": false,
+            "order": 20
+        },
+        {
+            "id": "workbench.view.extension.github-pull-request",
+            "pinned": false,
+            "visible": false,
+            "order": 21
+        },
+        {
+            "id": "workbench.view.extension.github-actions",
+            "pinned": false,
+            "visible": false,
+            "order": 22
+        },
+        {
+            "id": "workbench.view.extension.kubernetesView",
+            "pinned": false,
+            "visible": false,
+            "order": 23
+        },
+        {
+            "id": "workbench.view.extension.makefile__viewContainer",
+            "pinned": false,
+            "visible": false,
+            "order": 24
+        },
+        {
+            "id": "workbench.view.extension.todo-tree-container",
+            "pinned": false,
+            "visible": false,
+            "order": 25
+        },
+        {
+            "id": "workbench.view.extension.sqltoolsActivityBarContainer",
+            "pinned": false,
+            "visible": false,
+            "order": 26
+        },
+        {
+            "id": "workbench.view.sync",
+            "pinned": false,
+            "visible": false,
+            "order": 27
+        },
+        {
+            "id": "workbench.view.editSessions",
+            "pinned": false,
+            "visible": false,
+            "order": 28
+        }
+    ]
+}

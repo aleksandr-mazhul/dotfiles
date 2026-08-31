@@ -24,11 +24,16 @@ case "${class,,}" in
     exec kitty
     ;;
   cursor)
-    # VS Code / Cursor: -n = new window
-    if command -v cursor >/dev/null; then
-      exec cursor -n
+    # Wrapper sets APPIMAGE_EXTRACT_AND_RUN so in-app Update can replace the file.
+    # --classic: editor chrome (Activity Bar), not Agents/Glass
+    if [[ -x "$HOME/.local/bin/cursor" ]]; then
+      exec "$HOME/.local/bin/cursor" --classic -n
     fi
-    exec "$HOME/applications/Cursor.AppImage" -n
+    if command -v cursor >/dev/null; then
+      exec cursor --classic -n
+    fi
+    export APPIMAGE_EXTRACT_AND_RUN="${APPIMAGE_EXTRACT_AND_RUN:-1}"
+    exec "$HOME/applications/Cursor.AppImage" --classic -n
     ;;
   firefox)
     exec firefox --new-window

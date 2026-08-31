@@ -1,0 +1,12 @@
+[Unit]
+Description=Periodically update Cursor AppImage
+
+[Timer]
+OnBootSec=5min
+OnUnitActiveSec=1h
+AccuracySec=5min
+Persistent=true
+Unit=cursor-update.service
+
+[Install]
+WantedBy=timers.target

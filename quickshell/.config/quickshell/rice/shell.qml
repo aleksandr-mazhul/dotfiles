@@ -4,10 +4,7 @@ import Quickshell
 import Quickshell.Io
 
 ShellRoot {
-    Clipboard { id: clipboard }
     Launcher { id: launcher }
-    Wallpaper { id: wallpaper }
-    Vpn { id: vpn }
 
     // Ids must differ from Bar property names — `calendar: calendar` self-binds to null.
     QuickSettings { id: qsPanel }
@@ -30,10 +27,10 @@ ShellRoot {
     }
 
     Component.onCompleted: {
-        OverlayHub.clipboard = clipboard
         OverlayHub.launcher = launcher
-        OverlayHub.wallpaper = wallpaper
-        OverlayHub.vpn = vpn
+        OverlayHub.clipboard = launcher.clipboard
+        OverlayHub.wallpaper = launcher.wallpaper
+        OverlayHub.vpn = launcher.vpn
         OverlayHub.quickSettings = qsPanel
         OverlayHub.calendar = calendarPanel
         OverlayHub.notifications = notifications
@@ -43,18 +40,19 @@ ShellRoot {
         target: "overlay"
         function filter(): void { OverlayHub.toggleFilter() }
         function toggleFilter(): void { OverlayHub.toggleFilter() }
+        function refocus(): void { OverlayHub.refocusOpen() }
         function open(id: string): void { OverlayHub.open(id) }
     }
 
     IpcHandler {
         target: "clipboard"
-        function toggle(): void { clipboard.toggle() }
-        function open(): void { clipboard.show() }
-        function close(): void { clipboard.close() }
-        function openFilter(): void { clipboard.showFilter() }
-        function toggleFilter(): void { clipboard.showFilter() }
-        function focusPreview(): void { clipboard.focusPreviewPane() }
-        function focusList(): void { clipboard.focusListPane() }
+        function toggle(): void { launcher.togglePage("clipboard") }
+        function open(): void { launcher.openPage("clipboard") }
+        function close(): void { launcher.close() }
+        function openFilter(): void { launcher.clipboard.showFilter() }
+        function toggleFilter(): void { launcher.clipboard.showFilter() }
+        function focusPreview(): void { launcher.clipboardFocusPreview() }
+        function focusList(): void { launcher.clipboardFocusList() }
     }
 
     IpcHandler {
@@ -62,22 +60,26 @@ ShellRoot {
         function toggle(): void { launcher.toggle() }
         function open(): void { launcher.show() }
         function close(): void { launcher.close() }
+        function refocus(): void {
+            if (launcher.open)
+                launcher.grabFocus()
+        }
     }
 
     IpcHandler {
         target: "wallpaper"
-        function toggle(): void { wallpaper.toggle() }
-        function open(): void { wallpaper.show() }
-        function close(): void { wallpaper.close() }
-        function filter(): void { wallpaper.toggleFilter() }
-        function toggleFilter(): void { wallpaper.toggleFilter() }
+        function toggle(): void { launcher.togglePage("wallpaper") }
+        function open(): void { launcher.openPage("wallpaper") }
+        function close(): void { launcher.close() }
+        function filter(): void { launcher.wallpaper.toggleFilter() }
+        function toggleFilter(): void { launcher.wallpaper.toggleFilter() }
     }
 
     IpcHandler {
         target: "vpn"
-        function toggle(): void { vpn.toggle() }
-        function open(): void { vpn.show() }
-        function close(): void { vpn.close() }
+        function toggle(): void { launcher.togglePage("vpn") }
+        function open(): void { launcher.openPage("vpn") }
+        function close(): void { launcher.close() }
     }
 
     IpcHandler {

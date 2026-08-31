@@ -37,13 +37,20 @@ void main() {
     float cy = smoothstep(halfSize.y - r - 22.0, halfSize.y - r + 4.0, ap.y);
     float corner = cx * cy;
 
-    float ny = p.y / max(halfSize.y, 1.0);
-    float topBottom = smoothstep(0.50, 1.0, abs(ny));
+    // Dark scene (g→1): louder catch-light in the SDF band only.
+    // Bright scene (g→0): ADR-0006 amplitudes unchanged. Plate fill stays empty.
+    // g^0.70 (ADR-0009): midtones keep catch-light instead of snapping.
+    float g = pow(clamp(1.0 - contrast, 0.0, 1.0), 0.70);
 
-    float a = rim * 0.30;
-    a += inner * 0.11;
-    a += rim * corner * 0.24;
-    a += rim * topBottom * 0.12;
+    float ny = p.y / max(halfSize.y, 1.0);
+    float top    = smoothstep(0.50, 1.0, -ny);
+    float bottom = smoothstep(0.50, 1.0,  ny);
+
+    float a  = rim * (0.30 + g * 0.04);
+    a += inner        * (0.11 + g * 0.03);
+    a += rim * corner * (0.24 + g * 0.08);
+    a += rim * top    * (0.12 + g * 0.08);
+    a += rim * bottom * (0.12 - g * 0.02);
     a *= inside * qt_Opacity;
 
     // Bright wallpaper: a dark inner lip under the white catch-light.

@@ -1,0 +1,22 @@
+#!/usr/bin/env bash
+# Stable launcher for Cursor AppImage.
+#
+# In-app updates use appimageupdatetool -O "$APPIMAGE". That fails when:
+#   1) we launch a versioned file via symlink (realpath → Cursor-X.Y.Z.AppImage)
+#   2) the AppImage is FUSE-mounted while the updater tries to overwrite it
+#
+# So we always exec a real file at ~/applications/Cursor.AppImage, and force
+# extract-and-run so the on-disk AppImage is not held open via FUSE.
+set -euo pipefail
+
+APP="${CURSOR_APPIMAGE:-$HOME/applications/Cursor.AppImage}"
+if [[ ! -x "$APP" ]]; then
+  echo "Cursor AppImage not found: $APP" >&2
+  echo "Run: cursor-update" >&2
+  exit 127
+fi
+
+# Avoid FUSE mount of the AppImage so quitAndInstall/zsync can replace the file.
+export APPIMAGE_EXTRACT_AND_RUN="${APPIMAGE_EXTRACT_AND_RUN:-1}"
+
+exec "$APP" "$@"

@@ -1,0 +1,7 @@
+[Unit]
+Description=Retry vscode-ssot Cursor state apply when Cursor is idle
+After=graphical-session.target
+
+[Service]
+Type=oneshot
+ExecStart=%h/.local/bin/vscode-cursor-sync --apply-cursor-state
