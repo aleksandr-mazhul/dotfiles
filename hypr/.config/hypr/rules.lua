@@ -19,7 +19,7 @@ hl.layer_rule({
     name = "rice-glass-blur-quicksettings",
     match = { namespace = "^rice-quicksettings$" },
     blur = true,
-    ignore_alpha = 0.2,
+    ignore_alpha = 0.03,
 })
 
 hl.layer_rule({

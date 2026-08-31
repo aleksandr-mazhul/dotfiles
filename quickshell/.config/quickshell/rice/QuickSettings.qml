@@ -5,7 +5,9 @@ import QtQuick.Layouts
 import Quickshell
 import Quickshell.Io
 import Quickshell.Wayland
+import Quickshell.Hyprland
 import Quickshell.Services.Pipewire
+import "ds" as DS
 
 PanelWindow {
     id: root
@@ -37,8 +39,45 @@ PanelWindow {
     // Bumped while Apps is open so corked/playing streams refresh.
     property int streamRev: 0
 
-    function toggle() { open = !open }
-    function show() { open = true }
+    function sceneGeom(outsideBand) {
+        const scr = root.screen
+        const ox = scr ? Math.round(scr.x) : 0
+        const oy = scr ? Math.round(scr.y) : 0
+        const sw = scr ? Math.round(scr.width) : 0
+        const w = Math.round(root.implicitWidth)
+        let h = Math.round(root.implicitHeight)
+        if (w < 32)
+            return ""
+        if (h < 32)
+            h = 420
+        let gx = ox + sw - root.margins.right - w
+        let gy = oy + root.margins.top
+        if (gx < 0)
+            gx = 0
+        if (gy < 0)
+            gy = 0
+        if (outsideBand) {
+            const band = 28
+            const by = Math.max(0, gy - band)
+            return gx + "," + by + " " + w + "x" + band
+        }
+        return gx + "," + gy + " " + w + "x" + h
+    }
+
+    function refreshScene(outsideBand) {
+        DS.AdaptiveContrast.refresh(root.sceneGeom(!!outsideBand))
+    }
+
+    function toggle() {
+        if (open)
+            close()
+        else
+            show()
+    }
+    function show() {
+        root.refreshScene(false)
+        open = true
+    }
     function close() { open = false }
 
     onOpenChanged: {
@@ -313,13 +352,17 @@ PanelWindow {
         onTriggered: root.streamRev++
     }
 
-    Rectangle {
+    Connections {
+        target: Hyprland
+        function onFocusedWorkspaceChanged() {
+            if (root.open)
+                root.refreshScene(true)
+        }
+    }
+
+    Item {
         id: panel
         anchors.fill: parent
-        color: Theme.glassBackground
-        radius: Theme.radiusLg
-        border.width: 1
-        border.color: Theme.glassBorder
         focus: root.open
         transformOrigin: Item.TopRight
         opacity: 1
@@ -335,16 +378,6 @@ PanelWindow {
             }
         }
 
-        // Soft inner highlight — Apple-like glass edge without heavy chrome
-        Rectangle {
-            anchors.fill: parent
-            anchors.margins: 1
-            radius: Theme.radiusLg - 1
-            color: "transparent"
-            border.width: 1
-            border.color: Theme.glassBorderSubtle
-        }
-
         RiceOpenAnim {
             id: openAnim
             target: panel
@@ -357,10 +390,14 @@ PanelWindow {
             toScale: 0.96
         }
 
-        Flickable {
+        DS.GlassSurface {
+            anchors.fill: parent
+            radius: DS.Tokens.radiusSurface
+
+            Flickable {
             id: flick
             anchors.fill: parent
-            anchors.margins: 10
+            anchors.margins: DS.Tokens.paddingSurface
             clip: true
             z: 1
             contentWidth: width
@@ -382,18 +419,11 @@ PanelWindow {
                 RowLayout {
                     Layout.columnSpan: 2
                     Layout.fillWidth: true
-                    Text {
-                        text: "Quick Settings"
-                        color: Theme.text
-                        font.family: Theme.fontFamily
-                        font.pixelSize: Theme.fontSize
-                        font.weight: Font.DemiBold
-                        Layout.fillWidth: true
-                    }
+                    Item { Layout.fillWidth: true }
                     RiceIcon {
                         id: closeIcon
                         customSource: Qt.resolvedUrl("assets/close.svg")
-                        tint: closeMouse.containsMouse ? Theme.text : Theme.textMuted
+                        tint: closeMouse.containsMouse ? DS.Tokens.textPrimary : DS.Tokens.textSecondary
                         implicitSize: 14
                         Layout.preferredWidth: 14
                         Layout.preferredHeight: 14
@@ -500,11 +530,11 @@ PanelWindow {
                 visible: root.expanded === "bluetooth" && root.btList.length === 0
                 Layout.fillWidth: true
                 spacing: 6
-                Text {
+                DS.QuietText {
                     text: root.btScanning ? "Scanning for devices…" : "No devices found nearby"
-                    color: Theme.textMuted
-                    font.family: Theme.fontFamily
-                    font.pixelSize: Theme.fontSizeSm
+                    color: DS.Tokens.textSecondary
+                    font.family: DS.Tokens.fontUi
+                    font.pixelSize: DS.Tokens.fontSizeSm
                 }
                 PowerRow {
                     label: root.btScanning ? "Scanning…" : "Scan again"
@@ -531,13 +561,14 @@ PanelWindow {
                 visible: root.expanded === "vpn"
                 Layout.fillWidth: true
                 spacing: 6
-                Text {
+                DS.QuietText {
                     text: "Icon toggles Best / Disconnect · arrow opens list"
-                    color: Theme.textMuted
-                    font.family: Theme.fontFamily
+                    color: DS.Tokens.textSecondary
+                    font.family: DS.Tokens.fontUi
                     font.pixelSize: 10
                     Layout.fillWidth: true
                     wrapMode: Text.Wrap
+                    maximumLineCount: 3
                 }
                 PowerRow {
                     label: "Search regions…"
@@ -549,18 +580,18 @@ PanelWindow {
                         Qt.callLater(() => OverlayHub.open("vpn"))
                     }
                 }
-                Text {
+                DS.QuietText {
                     text: root.vpnLoading ? "Loading regions…" : "Regions"
-                    color: Theme.text
-                    font.family: Theme.fontFamily
-                    font.pixelSize: Theme.fontSizeSm
+                    color: DS.Tokens.textPrimary
+                    font.family: DS.Tokens.fontUi
+                    font.pixelSize: DS.Tokens.fontSizeSm
                 }
-                Text {
+                DS.QuietText {
                     visible: !root.vpnLoading && root.vpnList.length === 0
                     text: "No regions available"
-                    color: Theme.textMuted
-                    font.family: Theme.fontFamily
-                    font.pixelSize: Theme.fontSizeSm
+                    color: DS.Tokens.textSecondary
+                    font.family: DS.Tokens.fontUi
+                    font.pixelSize: DS.Tokens.fontSizeSm
                 }
                 ListView {
                     visible: root.vpnList.length > 0
@@ -574,21 +605,21 @@ PanelWindow {
                         width: ListView.view.width
                         height: 36
                         radius: Theme.radiusSm
-                        color: vpnRow.containsMouse ? Theme.glassSurfaceHover : Theme.glassSurface
+                        color: vpnRow.containsMouse ? DS.Tokens.raised : "transparent"
                         border.width: 1
-                        border.color: Theme.glassBorderSubtle
+                        border.color: DS.Tokens.fieldRim
                         Behavior on color {
                             ColorAnimation { duration: Theme.hoverMs; easing.type: Easing.OutCubic }
                         }
-                        Text {
+                        DS.QuietText {
                             anchors.left: parent.left
                             anchors.right: parent.right
                             anchors.verticalCenter: parent.verticalCenter
                             anchors.margins: 10
                             text: modelData.label || modelData.key || ""
-                            color: Theme.text
-                            font.family: Theme.fontFamily
-                            font.pixelSize: Theme.fontSizeSm
+                            color: DS.Tokens.textPrimary
+                            font.family: DS.Tokens.fontUi
+                            font.pixelSize: DS.Tokens.fontSizeSm
                             elide: Text.ElideRight
                         }
                         MouseArea {
@@ -606,11 +637,11 @@ PanelWindow {
                 visible: root.expanded === "updates"
                 Layout.fillWidth: true
                 spacing: 6
-                Text {
+                DS.QuietText {
                     text: root.updatePacCount + " system · " + root.updateAurCount + " AUR"
-                    color: Theme.textMuted
-                    font.family: Theme.fontFamily
-                    font.pixelSize: Theme.fontSizeSm
+                    color: DS.Tokens.textSecondary
+                    font.family: DS.Tokens.fontUi
+                    font.pixelSize: DS.Tokens.fontSizeSm
                 }
                 PowerRow {
                     label: "Update all"
@@ -624,19 +655,19 @@ PanelWindow {
                     iconName: "view-refresh"
                     onActivated: root.runUpdate("check")
                 }
-                Text {
+                DS.QuietText {
                     visible: root.updateList.length > 0
                     text: "Pending packages"
-                    color: Theme.text
-                    font.family: Theme.fontFamily
-                    font.pixelSize: Theme.fontSizeSm
+                    color: DS.Tokens.textPrimary
+                    font.family: DS.Tokens.fontUi
+                    font.pixelSize: DS.Tokens.fontSizeSm
                 }
-                Text {
+                DS.QuietText {
                     visible: !root.updatesLoading && root.updateList.length === 0
                     text: "Nothing to update"
-                    color: Theme.textMuted
-                    font.family: Theme.fontFamily
-                    font.pixelSize: Theme.fontSizeSm
+                    color: DS.Tokens.textSecondary
+                    font.family: DS.Tokens.fontUi
+                    font.pixelSize: DS.Tokens.fontSizeSm
                 }
                 ListView {
                     visible: root.updateList.length > 0
@@ -650,33 +681,33 @@ PanelWindow {
                         width: ListView.view.width
                         height: 34
                         radius: Theme.radiusSm
-                        color: Theme.glassSurface
+                        color: "transparent"
                         border.width: 1
-                        border.color: Theme.glassBorderSubtle
+                        border.color: DS.Tokens.fieldRim
                         RowLayout {
                             anchors.fill: parent
                             anchors.margins: 8
                             spacing: 8
-                            Text {
+                            DS.QuietText {
                                 text: modelData.kind === "aur" ? "AUR" : "SYS"
-                                color: Theme.primary
-                                font.family: Theme.fontFamily
+                                color: DS.Tokens.textSecondary
+                                font.family: DS.Tokens.fontUi
                                 font.pixelSize: 10
                                 font.bold: true
                                 Layout.preferredWidth: 28
                             }
-                            Text {
+                            DS.QuietText {
                                 text: modelData.label || ""
-                                color: Theme.text
-                                font.family: Theme.fontFamily
-                                font.pixelSize: Theme.fontSizeSm
+                                color: DS.Tokens.textPrimary
+                                font.family: DS.Tokens.fontUi
+                                font.pixelSize: DS.Tokens.fontSizeSm
                                 elide: Text.ElideRight
                                 Layout.fillWidth: true
                             }
-                            Text {
+                            DS.QuietText {
                                 text: modelData.detail || ""
-                                color: Theme.textMuted
-                                font.family: Theme.fontFamily
+                                color: DS.Tokens.textSecondary
+                                font.family: DS.Tokens.fontUi
                                 font.pixelSize: 10
                                 elide: Text.ElideLeft
                                 Layout.preferredWidth: 110
@@ -745,18 +776,18 @@ PanelWindow {
                 visible: root.expanded === "brightness"
                 Layout.fillWidth: true
                 spacing: 4
-                Text {
+                DS.QuietText {
                     text: "Monitor"
-                    color: Theme.text
-                    font.family: Theme.fontFamily
-                    font.pixelSize: Theme.fontSizeSm
+                    color: DS.Tokens.textPrimary
+                    font.family: DS.Tokens.fontUi
+                    font.pixelSize: DS.Tokens.fontSizeSm
                 }
-                Text {
+                DS.QuietText {
                     visible: root.brightMonitors.length < 2
                     text: "No extra monitors detected"
-                    color: Theme.textMuted
-                    font.family: Theme.fontFamily
-                    font.pixelSize: Theme.fontSizeSm
+                    color: DS.Tokens.textSecondary
+                    font.family: DS.Tokens.fontUi
+                    font.pixelSize: DS.Tokens.fontSizeSm
                 }
                 Repeater {
                     model: root.brightMonitors
@@ -793,18 +824,18 @@ PanelWindow {
                 visible: root.expanded === "soundOut"
                 Layout.fillWidth: true
                 spacing: 4
-                Text {
+                DS.QuietText {
                     text: "Output"
-                    color: Theme.text
-                    font.family: Theme.fontFamily
-                    font.pixelSize: Theme.fontSizeSm
+                    color: DS.Tokens.textPrimary
+                    font.family: DS.Tokens.fontUi
+                    font.pixelSize: DS.Tokens.fontSizeSm
                 }
-                Text {
+                DS.QuietText {
                     visible: root.sinkList.length === 0
                     text: "No output devices"
-                    color: Theme.textMuted
-                    font.family: Theme.fontFamily
-                    font.pixelSize: Theme.fontSizeSm
+                    color: DS.Tokens.textSecondary
+                    font.family: DS.Tokens.fontUi
+                    font.pixelSize: DS.Tokens.fontSizeSm
                 }
                 Repeater {
                     model: root.sinkList
@@ -844,18 +875,18 @@ PanelWindow {
                 visible: root.expanded === "soundIn"
                 Layout.fillWidth: true
                 spacing: 4
-                Text {
+                DS.QuietText {
                     text: "Input"
-                    color: Theme.text
-                    font.family: Theme.fontFamily
-                    font.pixelSize: Theme.fontSizeSm
+                    color: DS.Tokens.textPrimary
+                    font.family: DS.Tokens.fontUi
+                    font.pixelSize: DS.Tokens.fontSizeSm
                 }
-                Text {
+                DS.QuietText {
                     visible: root.sourceList.length === 0
                     text: "No input devices"
-                    color: Theme.textMuted
-                    font.family: Theme.fontFamily
-                    font.pixelSize: Theme.fontSizeSm
+                    color: DS.Tokens.textSecondary
+                    font.family: DS.Tokens.fontUi
+                    font.pixelSize: DS.Tokens.fontSizeSm
                 }
                 Repeater {
                     model: root.sourceList
@@ -886,14 +917,15 @@ PanelWindow {
                 visible: root.expanded === "apps"
                 Layout.fillWidth: true
                 spacing: 6
-                Text {
+                DS.QuietText {
                     visible: root.playbackStreams.length === 0
                     text: "Play something to see per-app volume here"
-                    color: Theme.textMuted
-                    font.family: Theme.fontFamily
-                    font.pixelSize: Theme.fontSizeSm
+                    color: DS.Tokens.textSecondary
+                    font.family: DS.Tokens.fontUi
+                    font.pixelSize: DS.Tokens.fontSizeSm
                     Layout.fillWidth: true
                     wrapMode: Text.Wrap
+                    maximumLineCount: 3
                 }
                 Repeater {
                     model: root.playbackStreams
@@ -903,6 +935,7 @@ PanelWindow {
                     }
                 }
             }
+        }
         }
         }
     }
@@ -1219,13 +1252,13 @@ PanelWindow {
         radius: Theme.radiusMd
         color: {
             if (tile.active)
-                return tile.hovered ? Theme.glassTileActiveHover : Theme.glassTileActive
-            return tile.hovered ? Theme.glassSurfaceHover : Theme.glassSurface
+                return tile.hovered ? DS.Tokens.raisedStrong : DS.Tokens.raisedStrong
+            return tile.hovered ? DS.Tokens.raised : "transparent"
         }
         border.width: 1
         border.color: tile.active
-            ? Theme.glassTileBorder
-            : Theme.glassBorderSubtle
+            ? DS.Tokens.raisedRim
+            : (tile.hovered ? DS.Tokens.fieldRim : "transparent")
         Behavior on color {
             ColorAnimation { duration: Theme.hoverMs; easing.type: Easing.OutCubic }
         }
@@ -1248,6 +1281,7 @@ PanelWindow {
                     RiceIcon {
                         name: tile.iconName
                         fallback: tile.fallbackIcon
+                        tint: DS.Tokens.textIcon
                         implicitSize: 18
                         Layout.preferredWidth: 18
                         Layout.preferredHeight: 18
@@ -1255,16 +1289,16 @@ PanelWindow {
                     ColumnLayout {
                         Layout.fillWidth: true
                         spacing: 2
-                        Text {
+                        DS.QuietText {
                             text: tile.title
-                            color: Theme.text
-                            font.family: Theme.fontFamily
-                            font.pixelSize: Theme.fontSizeSm
+                            color: DS.Tokens.textPrimary
+                            font.family: DS.Tokens.fontUi
+                            font.pixelSize: DS.Tokens.fontSizeSm
                         }
-                        Text {
+                        DS.QuietText {
                             text: tile.subtitle
-                            color: tile.active ? Theme.primary : Theme.textMuted
-                            font.family: Theme.fontFamily
+                            color: tile.active ? DS.Tokens.textSecondary : DS.Tokens.textSecondary
+                            font.family: DS.Tokens.fontUi
                             font.pixelSize: 11
                             elide: Text.ElideRight
                             Layout.fillWidth: true
@@ -1291,13 +1325,14 @@ PanelWindow {
                 Layout.preferredWidth: 28
                 Layout.preferredHeight: 28
                 radius: 8
-                color: chevMouse.containsMouse ? Theme.rowHover : "transparent"
+                color: chevMouse.containsMouse ? DS.Tokens.raised : "transparent"
                 Behavior on color {
                     ColorAnimation { duration: Theme.hoverMs; easing.type: Easing.OutCubic }
                 }
                 RiceIcon {
                     anchors.centerIn: parent
                     name: tile.expanded ? "go-up" : "go-down"
+                    tint: DS.Tokens.textIcon
                     implicitSize: 14
                     rotation: tile.expanded ? 180 : 0
                     Behavior on rotation {
@@ -1327,9 +1362,9 @@ PanelWindow {
         Layout.fillWidth: true
         Layout.preferredHeight: prow.detail.length ? 46 : 40
         radius: Theme.radiusSm
-        color: prow.hovered ? Theme.glassSurfaceHover : Theme.glassSurface
+        color: prow.hovered ? DS.Tokens.raised : "transparent"
         border.width: 1
-        border.color: Theme.glassBorderSubtle
+        border.color: prow.hovered ? DS.Tokens.fieldRim : "transparent"
         Behavior on color {
             ColorAnimation { duration: Theme.hoverMs; easing.type: Easing.OutCubic }
         }
@@ -1340,6 +1375,7 @@ PanelWindow {
             RiceIcon {
                 name: iconName
                 fallback: fallbackIcon
+                tint: DS.Tokens.textIcon
                 implicitSize: 16
                 Layout.preferredWidth: 16
                 Layout.preferredHeight: 16
@@ -1347,18 +1383,18 @@ PanelWindow {
             ColumnLayout {
                 Layout.fillWidth: true
                 spacing: 1
-                Text {
+                DS.QuietText {
                     text: label
-                    color: Theme.text
-                    font.family: Theme.fontFamily
-                    font.pixelSize: Theme.fontSizeSm
+                    color: DS.Tokens.textPrimary
+                    font.family: DS.Tokens.fontUi
+                    font.pixelSize: DS.Tokens.fontSizeSm
                     Layout.fillWidth: true
                 }
-                Text {
+                DS.QuietText {
                     visible: prow.detail.length > 0
                     text: prow.detail
-                    color: Theme.textMuted
-                    font.family: Theme.fontFamily
+                    color: DS.Tokens.textSecondary
+                    font.family: DS.Tokens.fontUi
                     font.pixelSize: 10
                     Layout.fillWidth: true
                     elide: Text.ElideRight
@@ -1384,11 +1420,11 @@ PanelWindow {
         Layout.fillWidth: true
         spacing: 2
 
-        Text {
+                        DS.QuietText {
             text: root.streamLabel(arow.node)
-            color: Theme.text
-            font.family: Theme.fontFamily
-            font.pixelSize: Theme.fontSizeSm
+            color: DS.Tokens.textPrimary
+            font.family: DS.Tokens.fontUi
+            font.pixelSize: DS.Tokens.fontSizeSm
             elide: Text.ElideRight
             Layout.fillWidth: true
         }
@@ -1432,13 +1468,14 @@ PanelWindow {
             Layout.preferredWidth: 28
             Layout.preferredHeight: 28
             radius: 8
-            color: iconMouse.containsMouse ? Theme.rowHover : "transparent"
+            color: iconMouse.containsMouse ? DS.Tokens.raised : "transparent"
             RiceIcon {
                 anchors.centerIn: parent
                 name: srow.iconName
                 fallback: srow.fallbackIcon
                 customSource: srow.customIconSource
                 struck: srow.struck
+                tint: DS.Tokens.textIcon
                 implicitSize: 18
             }
             MouseArea {
@@ -1491,11 +1528,11 @@ PanelWindow {
                 width: slider.availableWidth
                 height: implicitHeight
                 radius: 4
-                color: Theme.glassTrack
+                color: DS.Tokens.fieldFill
                 Rectangle {
                     width: slider.visualPosition * parent.width
                     height: parent.height
-                    color: Theme.glassFill
+                    color: DS.Tokens.raisedStrong
                     radius: 4
                 }
             }
@@ -1505,9 +1542,9 @@ PanelWindow {
                 width: 18
                 height: 18
                 radius: 9
-                color: Theme.primary
+                color: DS.Tokens.textIcon
                 border.width: 1
-                border.color: Theme.glassBorder
+                border.color: DS.Tokens.rimOuter
                 scale: slider.hovered || slider.pressed ? 1.10 : 1
                 Behavior on scale {
                     NumberAnimation { duration: 80 }
@@ -1519,13 +1556,14 @@ PanelWindow {
             Layout.preferredWidth: 28
             Layout.preferredHeight: 28
             radius: 8
-            color: chevMouse.containsMouse ? Theme.rowHover : "transparent"
+            color: chevMouse.containsMouse ? DS.Tokens.raised : "transparent"
             Behavior on color {
                 ColorAnimation { duration: Theme.hoverMs; easing.type: Easing.OutCubic }
             }
             RiceIcon {
                 anchors.centerIn: parent
                 name: "go-down"
+                tint: DS.Tokens.textIcon
                 implicitSize: 14
                 rotation: srow.expanded ? 180 : 0
                 Behavior on rotation {
@@ -1553,10 +1591,12 @@ PanelWindow {
         Layout.preferredHeight: 36
         radius: Theme.radiusSm
         color: drow.checked
-            ? (drow.hovered ? Theme.glassTileActiveHover : Theme.glassTileActive)
-            : (drow.hovered ? Theme.glassSurfaceHover : Theme.glassSurface)
+            ? (drow.hovered ? DS.Tokens.raisedStrong : DS.Tokens.raisedStrong)
+            : (drow.hovered ? DS.Tokens.raised : "transparent")
         border.width: 1
-        border.color: drow.checked ? Theme.glassTileBorder : Theme.glassBorderSubtle
+        border.color: drow.checked
+            ? DS.Tokens.raisedRim
+            : (drow.hovered ? DS.Tokens.fieldRim : "transparent")
         Behavior on color {
             ColorAnimation { duration: Theme.hoverMs; easing.type: Easing.OutCubic }
         }
@@ -1566,10 +1606,10 @@ PanelWindow {
         RowLayout {
             anchors.fill: parent
             anchors.margins: 8
-            Text {
+                        DS.QuietText {
                 text: label
-                color: Theme.text
-                font.family: Theme.fontFamily
+                color: DS.Tokens.textPrimary
+                font.family: DS.Tokens.fontUi
                 font.pixelSize: 11
                 elide: Text.ElideRight
                 Layout.fillWidth: true
@@ -1578,14 +1618,14 @@ PanelWindow {
                 width: 16
                 height: 16
                 radius: 4
-                border.color: Theme.primary
+                border.color: DS.Tokens.textSecondary
                 border.width: 1
                 color: "transparent"
-                Text {
+                DS.QuietText {
                     anchors.centerIn: parent
                     visible: checked
                     text: "✓"
-                    color: Theme.primary
+                    color: DS.Tokens.textSecondary
                     font.pixelSize: 11
                 }
             }
@@ -1607,11 +1647,11 @@ PanelWindow {
         signal activated(var item)
         spacing: 6
 
-        Text {
+                        DS.QuietText {
             text: title
-            color: Theme.text
-            font.family: Theme.fontFamily
-            font.pixelSize: Theme.fontSizeSm
+            color: DS.Tokens.textPrimary
+            font.family: DS.Tokens.fontUi
+            font.pixelSize: DS.Tokens.fontSizeSm
         }
         Repeater {
             model: section.model
@@ -1624,42 +1664,42 @@ PanelWindow {
                 radius: Theme.radiusSm
                 color: {
                     if (modelData.connected)
-                        return row.hovered ? Theme.glassTileActiveHover : Theme.glassTileActive
-                    return row.hovered ? Theme.glassSurfaceHover : Theme.glassSurface
+                        return row.hovered ? DS.Tokens.raisedStrong : DS.Tokens.raisedStrong
+                    return row.hovered ? DS.Tokens.raised : "transparent"
                 }
                 border.width: 1
                 border.color: modelData.connected
-                    ? Theme.glassTileBorder
-                    : Theme.glassBorderSubtle
+                    ? DS.Tokens.raisedRim
+                    : DS.Tokens.fieldRim
                 RowLayout {
                     anchors.fill: parent
                     anchors.margins: 8
                     ColumnLayout {
                         Layout.fillWidth: true
                         spacing: 2
-                        Text {
+                        DS.QuietText {
                             text: modelData.label || ""
-                            color: Theme.text
-                            font.family: Theme.fontFamily
-                            font.pixelSize: Theme.fontSizeSm
+                            color: DS.Tokens.textPrimary
+                            font.family: DS.Tokens.fontUi
+                            font.pixelSize: DS.Tokens.fontSizeSm
                             elide: Text.ElideRight
                             Layout.fillWidth: true
                         }
-                        Text {
+                        DS.QuietText {
                             visible: !!(modelData.detail)
                             text: modelData.detail || ""
-                            color: Theme.textMuted
-                            font.family: Theme.fontFamily
+                            color: DS.Tokens.textSecondary
+                            font.family: DS.Tokens.fontUi
                             font.pixelSize: 10
                             elide: Text.ElideRight
                             Layout.fillWidth: true
                         }
                     }
-                    Text {
+                    DS.QuietText {
                         text: modelData.connected ? "Connected" : section.buttonLabel
-                        color: Theme.primary
-                        font.family: Theme.fontFamily
-                        font.pixelSize: Theme.fontSizeSm
+                        color: DS.Tokens.textSecondary
+                        font.family: DS.Tokens.fontUi
+                        font.pixelSize: DS.Tokens.fontSizeSm
                     }
                 }
                 MouseArea {
