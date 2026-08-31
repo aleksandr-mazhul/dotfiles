@@ -621,3 +621,11 @@ hl.window_rule({
     },
     float = true,
 })
+
+-- Files AMENDMENT (feat/glass-files): Nautilus rounding only.
+-- Do not change decoration.rounding. Do not set opacity, border, shadow, no_blur.
+hl.window_rule({
+    name = "nautilus-glass-rounding",
+    match = { class = "^(org\\.gnome\\.Nautilus|Nautilus|nautilus)$" },
+    rounding = 16,
+})

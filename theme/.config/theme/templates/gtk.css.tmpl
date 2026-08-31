@@ -172,7 +172,7 @@ window.nautilus-window:not(.popup):not(.tooltip),
   --sidebar-shade-color: transparent;
   --view-bg-color: rgba(0, 0, 0, 0.10);
   --card-bg-color: rgba(255, 255, 255, 0.055);
-  --popover-bg-color: rgba(0, 0, 0, 0.92);
+  --popover-bg-color: rgba(92, 92, 92, 0.96);
   --accent-fg-color: rgba(255, 255, 255, 0.94);
   --accent-color: rgba(255, 255, 255, 0.86);
   --accent-bg-color: transparent;
@@ -195,6 +195,7 @@ window.nautilus-window *,
   --sidebar-bg-color: rgba(255, 255, 255, 0.038);
   --sidebar-backdrop-color: rgba(255, 255, 255, 0.038);
   --view-bg-color: rgba(0, 0, 0, 0.10);
+  --popover-bg-color: rgba(92, 92, 92, 0.96);
   --accent-bg-color: transparent;
   --accent-color: rgba(255, 255, 255, 0.86);
   --accent-fg-color: rgba(255, 255, 255, 0.94);
@@ -286,31 +287,45 @@ window.nautilus-window .sidebar-pane {
   color: rgba(255, 255, 255, 0.62);
 }
 
+window.nautilus-window .navigation-sidebar > row,
+window.nautilus-window list.navigation-sidebar > row,
+window.nautilus-window listview.navigation-sidebar > row,
+window.nautilus-window placessidebar list.navigation-sidebar > row,
 .nautilus-window list.navigation-sidebar row,
 .nautilus-window listview.navigation-sidebar > row,
 .nautilus-window .navigation-sidebar row {
   background: none;
   border: none;
   box-shadow: none;
-  border-radius: 10px;
+  outline: none;
+  border-radius: 16px;
   color: rgba(255, 255, 255, 0.94);
 }
 
 .nautilus-window list.navigation-sidebar row:hover,
 .nautilus-window listview.navigation-sidebar > row:hover,
-.nautilus-window .navigation-sidebar row:hover {
+.nautilus-window .navigation-sidebar row:hover,
+window.nautilus-window .navigation-sidebar > row:hover {
   background-color: rgba(255, 255, 255, 0.04);
 }
 
 .nautilus-window list.navigation-sidebar row:selected,
-.nautilus-window list.navigation-sidebar row:selected label,
 .nautilus-window listview.navigation-sidebar > row:selected,
-.nautilus-window listview.navigation-sidebar > row:selected label,
 .nautilus-window .navigation-sidebar row:selected,
-.nautilus-window .navigation-sidebar row:selected label {
+window.nautilus-window .navigation-sidebar > row:selected,
+window.nautilus-window list.navigation-sidebar > row:selected {
   background-color: rgba(255, 255, 255, 0.06);
   color: rgba(255, 255, 255, 0.94);
   box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.34);
+  border-radius: 16px;
+}
+
+.nautilus-window list.navigation-sidebar row:selected label,
+.nautilus-window listview.navigation-sidebar > row:selected label,
+.nautilus-window .navigation-sidebar row:selected label {
+  background: none;
+  box-shadow: none;
+  color: rgba(255, 255, 255, 0.94);
 }
 
 .nautilus-window .nautilus-list-view columnview > listview > row,
@@ -320,7 +335,7 @@ window.nautilus-window .sidebar-pane {
   border: none;
   box-shadow: none;
   outline: none;
-  border-radius: 10px;
+  border-radius: 16px;
 }
 
 .nautilus-window .nautilus-list-view columnview > listview > row:hover,
@@ -334,6 +349,7 @@ window.nautilus-window .sidebar-pane {
   background-color: rgba(255, 255, 255, 0.06);
   color: rgba(255, 255, 255, 0.94);
   box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.34);
+  border-radius: 16px;
 }
 
 .nautilus-window .nautilus-list-view columnview > listview > row:selected > cell,
@@ -348,7 +364,7 @@ window.nautilus-window .sidebar-pane {
   border: none;
   box-shadow: none;
   outline: none;
-  border-radius: 10px;
+  border-radius: 16px;
 }
 
 .nautilus-window .nautilus-grid-view gridview > child:hover {
@@ -361,6 +377,7 @@ window.nautilus-window .nautilus-grid-view gridview > child:selected:hover,
   background-color: rgba(255, 255, 255, 0.06);
   color: rgba(255, 255, 255, 0.94);
   box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.34);
+  border-radius: 16px;
 }
 
 window.nautilus-window .nautilus-grid-view gridview > child:selected .nautilus-view-cell,
@@ -372,15 +389,31 @@ window.nautilus-window .nautilus-view-cell:selected,
   border: none;
 }
 
-.nautilus-window selection,
-.nautilus-window *:selected {
+.nautilus-window selection {
   background-color: rgba(255, 255, 255, 0.06);
+  color: rgba(255, 255, 255, 0.94);
+}
+
+.nautilus-window *:selected {
   color: rgba(255, 255, 255, 0.94);
 }
 
 .nautilus-window *:selected label,
 .nautilus-window *:selected cell label {
+  background: none;
+  box-shadow: none;
   color: rgba(255, 255, 255, 0.94);
+}
+
+/* One pill: fill+rim on the row/child only — never revealer/box/label. */
+.nautilus-window row:selected *,
+.nautilus-window listview > row:selected *,
+.nautilus-window .nautilus-grid-view gridview > child:selected * {
+  background: none;
+  background-color: transparent;
+  box-shadow: none;
+  border: none;
+  outline: none;
 }
 
 #NautilusPathBar,
@@ -393,7 +426,7 @@ window.nautilus-window .nautilus-view-cell:selected,
   color: rgba(255, 255, 255, 0.94);
   caret-color: rgba(255, 255, 255, 0.94);
   border: none;
-  border-radius: 10px;
+  border-radius: 16px;
   box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.22);
 }
 
@@ -412,7 +445,14 @@ window.nautilus-window .nautilus-view-cell:selected,
 #NautilusPathButton:hover,
 #NautilusPathButton.current-dir,
 .nautilus-window .nautilus-path-button,
-.nautilus-window .nautilus-path-button:hover {
+.nautilus-window .nautilus-path-button:hover,
+.nautilus-window .nautilus-path-button.current-dir,
+.nautilus-window .nautilus-pathbar button,
+.nautilus-window .nautilus-pathbar button:hover,
+.nautilus-window .nautilus-pathbar button:checked,
+.nautilus-window .nautilus-pathbar > menubutton > button,
+.nautilus-window .nautilus-pathbar > menubutton > button:hover,
+.nautilus-window .nautilus-pathbar > menubutton > button:checked {
   background: none;
   box-shadow: none;
   border: none;
@@ -427,8 +467,7 @@ window.nautilus-window .nautilus-view-cell:selected,
   box-shadow: none;
 }
 
-.nautilus-window button:hover,
-.nautilus-window .nautilus-path-button:hover {
+.nautilus-window button:hover {
   background-color: rgba(255, 255, 255, 0.04);
   color: rgba(255, 255, 255, 0.94);
 }
@@ -447,7 +486,7 @@ window.nautilus-window .nautilus-view-cell:selected,
 .nautilus-window .nautilus-grid-view rubberband {
   background-color: rgba(255, 255, 255, 0.06);
   border: 1px solid rgba(255, 255, 255, 0.34);
-  border-radius: 10px;
+  border-radius: 16px;
   box-shadow: none;
 }
 
@@ -469,21 +508,42 @@ window.nautilus-window .nautilus-view-cell:selected,
 }
 
 .nautilus-window popover > contents,
-.nautilus-window popover.menu contents {
-  background-color: rgba(0, 0, 0, 0.92);
+.nautilus-window popover.menu contents,
+.nautilus-window menu {
+  background-color: rgba(92, 92, 92, 0.96);
   color: rgba(255, 255, 255, 0.94);
-  border: 1px solid rgba(255, 255, 255, 0.22);
-  border-radius: 12px;
-  box-shadow: none;
+  border: none;
+  border-radius: 16px;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.34);
 }
 
 .nautilus-window popover > contents modelbutton:hover,
-.nautilus-window popover > contents modelbutton:selected,
 .nautilus-window popover.menu contents modelbutton:hover,
-.nautilus-window popover.menu contents modelbutton:selected {
-  background-color: rgba(255, 255, 255, 0.04);
+.nautilus-window popover.menu contents list > row:hover,
+.nautilus-window menu menuitem:hover {
+  background-color: rgba(255, 255, 255, 0.10);
   color: rgba(255, 255, 255, 0.94);
-  border-radius: 8px;
+  border-radius: 10px;
+}
+
+.nautilus-window popover > contents modelbutton:selected,
+.nautilus-window popover > contents modelbutton:checked,
+.nautilus-window popover.menu contents modelbutton:selected,
+.nautilus-window popover.menu contents modelbutton:checked,
+.nautilus-window popover.menu contents list > row:selected,
+.nautilus-window popover.menu contents list > row:checked,
+.nautilus-window menu menuitem:selected,
+.nautilus-window menu menuitem:checked {
+  background-color: rgba(255, 255, 255, 0.16);
+  color: rgba(255, 255, 255, 0.94);
+  box-shadow: none;
+  border-radius: 10px;
+}
+
+.nautilus-window popover label.accelerator,
+.nautilus-window popover accelerator,
+.nautilus-window menu menuitem accelerator {
+  color: rgba(255, 255, 255, 0.62);
 }
 
 .nautilus-window .nautilus-image,
