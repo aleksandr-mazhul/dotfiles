@@ -29,6 +29,13 @@ M.catalog = {
         cmd = home .. "/.local/bin/cursor", -- wrapper → ~/applications/Cursor.AppImage
     },
     {
+        id = "code",
+        class_re = "^(code|Code)$",
+        workspace = 16,
+        classes = { "code", "Code" },
+        cmd = "code",
+    },
+    {
         id = "firefox",
         class_re = "^(firefox|Firefox)$",
         workspace = 3,
@@ -82,7 +89,7 @@ M.catalog = {
         class_re = "^kitty$",
         workspace = 7,
         classes = { "kitty" },
-        cmd = "kitty",
+        cmd = "/usr/bin/kitty",
     },
     {
         id = "nautilus",
@@ -186,36 +193,103 @@ M.state_dir = state_home .. "/hypr"
 M.state_file = M.state_dir .. "/session-apps"
 M.restoring_file = M.state_dir .. "/session-apps.restoring"
 
+function M.entry_workspace(entry)
+    if type(entry) == "number" then
+        return entry
+    end
+    if type(entry) == "table" then
+        return entry.ws
+    end
+    return nil
+end
+
+function M.entry_side(entry)
+    if type(entry) == "table" then
+        local side = entry.side
+        if side == "L" or side == "R" or side == "A" then
+            return side
+        end
+    end
+    return "A"
+end
+
+-- Map keyed by app id (last row wins). Placement uses this.
 function M.parse_snapshot(path)
     local targets = {}
+    for _, row in ipairs(M.parse_snapshot_rows(path)) do
+        targets[row.id] = { ws = row.ws, side = row.side }
+    end
+    return targets
+end
+
+-- All snapshot rows, including duplicate ids (two kitties, two Cursors, …).
+function M.parse_snapshot_rows(path)
+    local rows = {}
     local file = io.open(path or M.state_file, "r")
     if not file then
-        return targets
+        return rows
     end
-    for line in file:lines() do
-        local id, ws = line:match("^([a-z][a-z0-9_-]*)%s+(%d+)%s*$")
+    for raw in file:lines() do
+        local line = raw:gsub("\r$", "")
+        local id, ws, side = line:match("^([a-z][a-z0-9_-]*)%s+(%d+)%s+([LRA])%s*$")
+        if not id then
+            id, ws = line:match("^([a-z][a-z0-9_-]*)%s+(%d+)%s*$")
+            side = "A"
+        end
         if id and ws then
             local n = tonumber(ws)
             if n and n >= 1 and n <= 16 and M.by_id[id] then
-                targets[id] = n
+                rows[#rows + 1] = { id = id, ws = n, side = side or "A" }
             end
         end
     end
     file:close()
-    return targets
+    return rows
+end
+
+local function snapshot_rows_from(entries)
+    local rows = {}
+    if type(entries) ~= "table" then
+        return rows
+    end
+    if entries[1] and type(entries[1]) == "table" and entries[1].id then
+        for _, row in ipairs(entries) do
+            local ws = M.entry_workspace(row) or row.ws
+            if row.id and ws then
+                rows[#rows + 1] = { id = row.id, ws = ws, side = M.entry_side(row) }
+            end
+        end
+        return rows
+    end
+    for id, entry in pairs(entries) do
+        local ws = M.entry_workspace(entry)
+        if type(id) == "string" and ws then
+            rows[#rows + 1] = { id = id, ws = ws, side = M.entry_side(entry) }
+        end
+    end
+    return rows
 end
 
 function M.format_snapshot(entries)
-    local ids = {}
-    for id in pairs(entries) do
-        ids[#ids + 1] = id
-    end
-    table.sort(ids)
-    local chunks = { "# session-apps: id workspace\n" }
-    for _, id in ipairs(ids) do
-        chunks[#chunks + 1] = string.format("%s %d\n", id, entries[id])
+    local rows = snapshot_rows_from(entries)
+    table.sort(rows, function(a, b)
+        if a.id ~= b.id then
+            return a.id < b.id
+        end
+        if a.ws ~= b.ws then
+            return a.ws < b.ws
+        end
+        return (a.side or "A") < (b.side or "A")
+    end)
+    local chunks = { "# session-apps: id workspace side\n" }
+    for _, row in ipairs(rows) do
+        chunks[#chunks + 1] = string.format("%s %d %s\n", row.id, row.ws, row.side)
     end
     return table.concat(chunks)
+end
+
+function M.snapshot_row_count(entries)
+    return #snapshot_rows_from(entries)
 end
 
 function M.ensure_state_dir()
@@ -227,7 +301,15 @@ function M.restoring_flag_present()
     if not file then
         return false
     end
+    local first = file:read("*l")
     file:close()
+    local ts = tonumber(first)
+    -- Empty leftover from an old `touch`, or timestamp older than 2 minutes.
+    -- hyprctl reload kills the Lua cleanup timer; drop the file so saves resume.
+    if not ts or (os.time() and (os.time() - ts) > 120) then
+        pcall(os.remove, M.restoring_file)
+        return false
+    end
     return true
 end
 

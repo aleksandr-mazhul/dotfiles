@@ -192,11 +192,29 @@ local function place_catalog_window(win)
         return
     end
 
+    local workspaces = session_apps.restore_workspaces(app.id)
+    local current = win.workspace and win.workspace.id
     if session_apps.is_restoring() then
-        local target = session_apps.restore_workspace(app.id)
-        if target then
-            move_to_workspace_silent(win, target)
+        -- Autostart already asked for workspace=N silent. Only yank a window
+        -- that landed somewhere that is not one of this app's saved letters.
+        if current then
+            for _, ws in ipairs(workspaces) do
+                if ws == current then
+                    return
+                end
+            end
         end
+        if workspaces[1] then
+            move_to_workspace_silent(win, workspaces[1])
+        end
+        return
+    end
+
+    -- Last session wins over the catalog "home" letter (otherwise Cursor jumps
+    -- back to C after the restore freeze while Zen stays on V).
+    local target = workspaces[1]
+    if target then
+        move_to_workspace_silent(win, target)
         return
     end
 

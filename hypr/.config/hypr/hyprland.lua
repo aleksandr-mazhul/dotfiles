@@ -245,6 +245,8 @@ local session_apps = require("session-apps")
 
 hl.on("hyprland.start", function()
     session_apps.begin_restore()
+    -- Flag before wallpaper: apply-wallpaper-theme must not SIGUSR1 a restoring kitty.
+    hl.exec_cmd("mkdir -p \"$HOME/.local/state/hypr\" && date +%s > \"$HOME/.local/state/hypr/session-apps.restoring\"")
     -- VPN first — no delay; script retries until helper is ready.
     hl.exec_cmd("~/.config/hypr/scripts/vpn-autostart.sh")
     -- Rice owns notifications; stop swaync if it grabbed the bus.
