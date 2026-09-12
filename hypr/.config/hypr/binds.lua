@@ -60,6 +60,21 @@ local function is_code_like(class)
         or class:find("cursor", 1, true) ~= nil
 end
 
+local function is_jetbrains(class)
+    class = string.lower(class or "")
+    return class:find("jetbrains-", 1, true) ~= nil
+        or class:find("webstorm", 1, true) ~= nil
+        or class:find("pycharm", 1, true) ~= nil
+        or class:find("clion", 1, true) ~= nil
+        or class:find("goland", 1, true) ~= nil
+        or class:find("datagrip", 1, true) ~= nil
+        or class:find("phpstorm", 1, true) ~= nil
+        or class:find("rubymine", 1, true) ~= nil
+        or class:find("rider", 1, true) ~= nil
+        or class == "idea"
+        or class:find("intellij", 1, true) ~= nil
+end
+
 -- VS Code / Cursor title: "{file} - {folder} - {app}" vs empty "{folder} - {app}".
 -- Agents/Glass chats usually have no app suffix — leave those to the app.
 -- IMPORTANT: string.find(..., plain=true) takes a literal needle. Do not pass
@@ -516,8 +531,24 @@ hl.bind(secondMod .. " + G", function()
     stack_mark_address = win.address
 end)
 
-hl.bind(secondMod .. " + TAB", hl.dsp.group.next())
-hl.bind(secondMod .. " + SHIFT + TAB", hl.dsp.group.prev())
+-- Super+Tab: Hyprland tabbed stacks. In JetBrains, pass through — Command+Tab
+-- with key-repeat was slamming editor tabs / group focus instead.
+hl.bind(secondMod .. " + TAB", function()
+    local focused = hl.get_active_window()
+    if focused and is_jetbrains(focused.class) then
+        hl.dispatch(hl.dsp.pass({ window = focused }))
+        return
+    end
+    hl.dispatch(hl.dsp.group.next())
+end)
+hl.bind(secondMod .. " + SHIFT + TAB", function()
+    local focused = hl.get_active_window()
+    if focused and is_jetbrains(focused.class) then
+        hl.dispatch(hl.dsp.pass({ window = focused }))
+        return
+    end
+    hl.dispatch(hl.dsp.group.prev())
+end)
 -- Quickshell rice overlays (shared RicePanel design)
 hl.bind(secondMod .. " + Q", hl.dsp.exec_cmd("qs -c rice ipc call clipboard toggle"))
 hl.bind(mainMod .. " + O", hl.dsp.exec_cmd(p.menu))
