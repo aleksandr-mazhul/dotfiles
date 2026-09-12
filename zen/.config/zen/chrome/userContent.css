@@ -1,0 +1,11 @@
+/* Local Vite / dev servers: opaque white page so wallpaper does not show through
+ * when Zen has browser.tabs.allow_transparent_browser enabled. */
+@-moz-document url-prefix("http://localhost"),
+               url-prefix("https://localhost"),
+               url-prefix("http://127.0.0.1"),
+               url-prefix("https://127.0.0.1") {
+  html,
+  body {
+    background-color: #ffffff !important;
+  }
+}

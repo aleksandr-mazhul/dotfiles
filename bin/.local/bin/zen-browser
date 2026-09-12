@@ -37,6 +37,9 @@ sync_tracked() {
     if [[ -f "$chrome_src/userChrome.css" ]]; then
       cp -f "$chrome_src/userChrome.css" "$profile/chrome/userChrome.css"
     fi
+    if [[ -f "$chrome_src/userContent.css" ]]; then
+      cp -f "$chrome_src/userContent.css" "$profile/chrome/userContent.css"
+    fi
   fi
 }
 
