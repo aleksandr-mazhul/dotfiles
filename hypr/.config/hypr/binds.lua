@@ -62,6 +62,8 @@ end
 
 -- VS Code / Cursor title: "{file} - {folder} - {app}" vs empty "{folder} - {app}".
 -- Agents/Glass chats usually have no app suffix — leave those to the app.
+-- IMPORTANT: string.find(..., plain=true) takes a literal needle. Do not pass
+-- Lua patterns like " %- " with plain=true — that looks for a literal "%-".
 local function editor_has_file_tab(title)
     title = (title or ""):gsub("^●%s*", ""):gsub("^•%s*", "")
     if title == "" then
@@ -75,7 +77,13 @@ local function editor_has_file_tab(title)
         return false
     end
     local rest = title:sub(1, #title - #app - 3)
-    return rest:find(" %- ", 1, true) ~= nil
+    return rest:find(" - ", 1, true) ~= nil
+end
+
+-- Separate Agents window (title often just "Cursor Agents") — never compositor-close.
+local function is_cursor_agents_window(title)
+    title = title or ""
+    return title:find("Agents", 1, true) ~= nil and not title:match(" %- Cursor$")
 end
 
 -- Zoom keeps respawning the Workplace/Home dashboard if you closewindow it
@@ -158,9 +166,9 @@ hl.bind("CTRL + W", function()
         return
     end
     -- Cursor/VS Code empty workbench (logo, no tabs) ignores Ctrl+W. Close it
-    -- here; pass through when a file tab is actually open.
+    -- here; pass through when a file tab is actually open (or Agents window).
     if is_code_like(focused.class) then
-        if editor_has_file_tab(focused.title) then
+        if editor_has_file_tab(focused.title) or is_cursor_agents_window(focused.title) then
             hl.dispatch(hl.dsp.pass({ window = focused }))
         else
             hl.dispatch(hl.dsp.window.close({ window = focused }))
