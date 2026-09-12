@@ -8,10 +8,12 @@ Stowed to `~/.config/zen/`:
 | `user.js` | Safe startup prefs (compact UI, userChrome enable, Vimium storage mode, …) |
 | `vimium-options.json` | Vimium settings mirror (CSS still SSOT-rendered) |
 | `chrome/userChrome.css` | Liquid-glass chrome; selected tab = hover highlight (copied into profile) |
+| `chrome/userContent.css` | Page overrides (e.g. opaque white on localhost / 127.0.0.1) |
 | `chrome/autoscroll.*` | Middle-click autoscroll origin (glass disc; copied into profile) |
 
 `zen-browser` / `zen-bin` copy shortcuts + `user.js` + `chrome/userChrome.css`
-(+ autoscroll assets) into the active profile on launch, and write shortcut
-edits back on exit. Restart Zen after editing `userChrome.css`.
++ `chrome/userContent.css` (+ autoscroll assets) into the active profile on
+launch, and write shortcut edits back on exit. Restart Zen after editing
+`userChrome.css` or `userContent.css`.
 
 Do **not** commit the full profile (`prefs.js`, `logins.json`, cookies, …).
