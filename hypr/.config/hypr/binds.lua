@@ -1,6 +1,16 @@
 local mainMod = "ALT"
 local secondMod = "SUPER"
 local p = programs
+local pip = require("pip")
+
+-- Zen PiP: Ctrl+Super+F — open floating PiP, or close it and YouTube-fullscreen
+hl.bind("CTRL + SUPER + F", function()
+    if pip.find_pip() then
+        pip.close_to_youtube()
+        return
+    end
+    pip.open_via_pass()
+end)
 
 -- Mac-like app window management (Cmd → Ctrl):
 --   Ctrl+W → close tab inside tabbed apps (browser/editor/…); otherwise close window
@@ -101,78 +111,24 @@ local function is_cursor_agents_window(title)
     return title:find("Agents", 1, true) ~= nil and not title:match(" %- Cursor$")
 end
 
--- Zoom keeps respawning the Workplace/Home dashboard if you closewindow it
--- during a call. Stash it on special:zoom instead (toggle back: Alt+S style
--- won't show it — use Super+… or focus from zoom; Ctrl+W again restores).
-local function is_zoom_home(win)
-    local class = string.lower(win.class or "")
-    if class ~= "zoom" and not class:find("zoom", 1, true) then
+-- JetBrains: "project – File.tsx" while a tab is open; bare "project" when empty.
+-- IMPORTANT: do not use UTF-8 dashes inside Lua pattern char classes — they break
+-- (en-dash is 3 bytes). Use plain find instead.
+local function jetbrains_has_editor_tab(title)
+    title = (title or ""):gsub("^●%s*", ""):gsub("^•%s*", "")
+    if title == "" then
         return false
     end
-    local title = win.title or ""
-    if title == "Meeting" or title:find("^Meeting ") then
+    if title:find("Welcome", 1, true) then
         return false
     end
-    if title:find("security", 1, true) then
-        return false
-    end
-    -- "Zoom Workplace - …", bare "Zoom", chat/mail shells, etc.
-    return title:find("Zoom Workplace", 1, true) ~= nil
-        or title == "Zoom"
-        or title:find("^Zoom ")
-end
-
-local function zoom_home_on_special(win)
-    local ws = win.workspace
-    return ws and (ws.name == "special:zoom" or (type(ws.id) == "number" and ws.id < 0 and tostring(ws.name or ""):find("zoom", 1, true)))
-end
-
-local function zoom_has_meeting()
-    for _, w in ipairs(hl.get_windows()) do
-        local class = string.lower(w.class or "")
-        local title = w.title or ""
-        if (class == "zoom" or class:find("zoom", 1, true)) and (title == "Meeting" or title:find("^Meeting ")) then
+    for _, sep in ipairs({ " – ", " — ", " - " }) do
+        local a, b = title:find(sep, 1, true)
+        if a and a > 1 and b < #title then
             return true
         end
     end
     return false
-end
-
-local function stash_zoom_home(win)
-    hl.dispatch(hl.dsp.window.move({
-        window = win,
-        workspace = "special:zoom",
-        silent = true,
-    }))
-end
-
-local function restore_zoom_home(win)
-    -- Prefer the Meeting workspace; else current workspace.
-    local target = nil
-    for _, w in ipairs(hl.get_windows()) do
-        local class = string.lower(w.class or "")
-        local title = w.title or ""
-        if (class == "zoom" or class:find("zoom", 1, true)) and (title == "Meeting" or title:find("^Meeting ")) then
-            if w.workspace and w.workspace.id then
-                target = w.workspace.id
-                break
-            end
-        end
-    end
-    if not target then
-        local active = hl.get_active_workspace()
-        if active and active.id then
-            target = active.id
-        end
-    end
-    if not target then
-        return
-    end
-    hl.dispatch(hl.dsp.window.move({
-        window = win,
-        workspace = target,
-        silent = true,
-    }))
 end
 
 hl.bind("CTRL + W", function()
@@ -190,19 +146,19 @@ hl.bind("CTRL + W", function()
         end
         return
     end
+    -- WebStorm / JetBrains: pass Ctrl+W to close editor tab; if no tabs left
+    -- (title is bare project name), close the window.
+    if is_jetbrains(focused.class) then
+        if jetbrains_has_editor_tab(focused.title) then
+            hl.dispatch(hl.dsp.pass({ window = focused }))
+        else
+            hl.dispatch(hl.dsp.window.close({ window = focused }))
+        end
+        return
+    end
     -- Like macOS: apps with tabs handle Cmd/Ctrl+W themselves (close tab)
     if is_tabbed_app(focused.class) then
         hl.dispatch(hl.dsp.pass({ window = focused }))
-        return
-    end
-    -- Zoom Home: during a call, hide ↔ restore (closewindow respawns it).
-    -- With no meeting, actually close — otherwise Workplace can never be quit.
-    if is_zoom_home(focused) and zoom_has_meeting() then
-        if zoom_home_on_special(focused) then
-            restore_zoom_home(focused)
-        else
-            stash_zoom_home(focused)
-        end
         return
     end
     hl.dispatch(hl.dsp.window.close({ window = focused }))
@@ -268,6 +224,20 @@ hl.bind("CTRL + SHIFT + C", function()
     local class = string.lower(focused.class or "")
     if class:find("yandex", 1, true) then
         hl.dispatch(hl.dsp.exec_cmd("~/.config/hypr/scripts/copy-browser-url.sh"))
+        return
+    end
+    hl.dispatch(hl.dsp.pass({ window = focused }))
+end, { dont_inhibit = true })
+
+-- Google Chrome: Ctrl+S → collapse/expand the vertical tab strip (Chrome's own
+-- shortcut is Ctrl+Shift+L), same as Zen. Elsewhere: pass through (save, etc.).
+hl.bind("CTRL + S", function()
+    local focused = hl.get_active_window()
+    if not focused then
+        return
+    end
+    if string.lower(focused.class or "") == "google-chrome" then
+        hl.dispatch(hl.dsp.send_shortcut({ mods = "CTRL SHIFT", key = "L", window = focused }))
         return
     end
     hl.dispatch(hl.dsp.pass({ window = focused }))
@@ -451,10 +421,8 @@ end)
 -- Float: was Alt+V (taken by skhd workspace V) → Super+Shift+V; also service-mode `f`
 hl.bind(secondMod .. " + SHIFT + V", hl.dsp.window.float({ action = "toggle" }))
 hl.bind(mainMod .. " + F", hl.dsp.window.fullscreen())
--- Zoom-fullscreen (skhd Alt+Shift+F); bar hide/show → Super+B (Shift+B alias)
+-- Zoom-fullscreen (skhd Alt+Shift+F); bar hide/show → Super+W (не Super+B)
 hl.bind(mainMod .. " + SHIFT + F", hl.dsp.window.fullscreen())
-hl.bind(secondMod .. " + B", hl.dsp.exec_cmd("qs -c rice ipc call bar toggle"))
-hl.bind(secondMod .. " + SHIFT + B", hl.dsp.exec_cmd("qs -c rice ipc call bar toggle"))
 -- Pin: was Alt+Shift+P (taken by move→P) → Super+Shift+P
 hl.bind(secondMod .. " + SHIFT + P", hl.dsp.window.pin({ action = "toggle" }))
 -- Pseudo: was Alt+P (taken by workspace P) → Ctrl+Alt+P
@@ -595,9 +563,6 @@ local function focus_or_launch(id, cmd)
     hl.dispatch(hl.dsp.exec_cmd(cmd))
 end
 
-hl.bind(secondMod .. " + E", function()
-    focus_or_launch("nautilus", p.fileManager)
-end)
 hl.bind(secondMod .. " + X", function()
     focus_or_launch("chatgpt", p.chatgpt)
 end)
@@ -635,7 +600,8 @@ hl.bind(secondMod .. " + L", clipboard_pane_or_pass("focusPreview"))
 hl.bind(secondMod .. " + H", clipboard_pane_or_pass("focusList"))
 
 hl.bind(secondMod .. " + SHIFT + L", hl.dsp.exec_cmd("~/.config/hypr/scripts/hyprlock-with-repair.sh"))
-hl.bind(secondMod .. " + W", hl.dsp.exec_cmd("qs -c rice ipc call wallpaper toggle"))
+-- Super+W → toggle верхней панели (раньше wallpaper; обои: Super+Shift/Alt+W)
+hl.bind(secondMod .. " + W", hl.dsp.exec_cmd("qs -c rice ipc call bar toggle"))
 -- Overlay type filter (shown in panel footers)
 hl.bind("CTRL + P", hl.dsp.exec_cmd("qs -c rice ipc call overlay filter"))
 hl.bind(secondMod .. " + SHIFT + W", hl.dsp.exec_cmd("~/.local/bin/wallpaper-random"))

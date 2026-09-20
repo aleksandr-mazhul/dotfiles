@@ -101,6 +101,7 @@ hl.window_rule({
 
 local apps = require("apps")
 local session_apps = require("session-apps")
+local pip = require("pip")
 
 for _, app in ipairs(apps.catalog) do
     hl.window_rule({
@@ -184,6 +185,9 @@ end
 local function place_catalog_window(win)
     win = unwrap_window(win)
     if not win then
+        return
+    end
+    if pip.is_pip_window(win) then
         return
     end
     local class = win.class
@@ -505,67 +509,6 @@ hl.window_rule({
     opaque = true,
 })
 
--- During a call Zoom often opens Workplace/Home next to Meeting. Closing it
--- makes Zoom recreate it; park Home on special:zoom instead (Ctrl+W toggles).
-local function zoom_has_meeting()
-    for _, w in ipairs(hl.get_windows()) do
-        local class = string.lower(w.class or "")
-        if (class == "zoom" or class:find("zoom", 1, true)) and (w.title == "Meeting" or (w.title or ""):find("^Meeting ")) then
-            return true
-        end
-    end
-    return false
-end
-
-local function maybe_stash_zoom_home(win)
-    if type(win) == "table" and win.window then
-        win = win.window
-    end
-    if type(win) ~= "userdata" and type(win) ~= "table" then
-        return
-    end
-    local class = string.lower(win.class or "")
-    if class ~= "zoom" and not class:find("zoom", 1, true) then
-        return
-    end
-    local title = win.title or ""
-    if title ~= "Meeting" and not title:find("^Meeting ") then
-        -- Home / Workplace shell
-        if title:find("Zoom Workplace", 1, true) or title == "Zoom" then
-            if zoom_has_meeting() then
-                pcall(function()
-                    hl.dispatch(hl.dsp.window.move({
-                        window = win,
-                        workspace = "special:zoom",
-                        silent = true,
-                    }))
-                end)
-            end
-        end
-        return
-    end
-    -- Meeting just appeared: stash any existing Home windows.
-    for _, other in ipairs(hl.get_windows()) do
-        if other.address ~= win.address then
-            local oc = string.lower(other.class or "")
-            local ot = other.title or ""
-            if (oc == "zoom" or oc:find("zoom", 1, true))
-                and (ot:find("Zoom Workplace", 1, true) or ot == "Zoom")
-            then
-                pcall(function()
-                    hl.dispatch(hl.dsp.window.move({
-                        window = other,
-                        workspace = "special:zoom",
-                        silent = true,
-                    }))
-                end)
-            end
-        end
-    end
-end
-
-hl.on("window.open", maybe_stash_zoom_home)
-
 -- Log every Zoom window (title/class) so we can identify annotate/whiteboard popups.
 -- Also auto-close known draw/whiteboard shells that aren't the real Meeting.
 local function zoom_draw_spam(win)
@@ -644,6 +587,13 @@ hl.window_rule({
     name = "auth-login-float",
     match = { title = ".*(Authentication|Login|Sign In).*" },
     float = true,
+})
+
+-- JetBrains: skip Hypr blur — focus switches + blur on NVIDIA stall the EDT.
+hl.window_rule({
+    name = "jetbrains-no-blur",
+    match = { class = "^jetbrains-.*$" },
+    no_blur = true,
 })
 
 -- JetBrains floating dialogs (subset of yabai JETBRAINS_FLOAT_PATTERNS)
