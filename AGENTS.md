@@ -98,3 +98,6 @@ not one-off machine copies (unless they are the stowed consumer like `gtk.css`).
 - OBS `obs-websocket` password, `gh` `hosts.yml`, Zen full profile, `.env`, private keys
 - `chromium-ffmpeg/` nested repo, `*.bak`, `.tmp-*`, `nvim.log`
 - `git commit --amend` / force-push unless user rules explicitly allow
+- AI attribution: no `Co-Authored-By:` / `Co-authored-by:` trailers (Claude, Cursor, or
+  any agent), no "Generated with …" lines in commits or PR bodies, and never commit as an
+  AI author — the owner does not want agents listed as GitHub contributors
