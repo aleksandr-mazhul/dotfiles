@@ -143,10 +143,10 @@ NOT restored (by design — secrets / machine-local):
   • SSH keys, GPG, gh auth tokens
   • Discord / Spotify / JetBrains / VS Code app data
   • OBS websocket password
-  • Your wallpaper library (copy pictures/wallpapers yourself)
+  • Your wallpaper library (run wallpapers-fetch, or copy pictures/wallpapers yourself)
 
 Manual follow-ups:
-  1. Copy wallpapers → ~/pictures/wallpapers && apply-wallpaper-theme <file>
+  1. wallpapers-fetch (or copy wallpapers → ~/pictures/wallpapers) && apply-wallpaper-theme <file>
   2. gh auth login   /  restore SSH keys
   3. Open Zen once via zen-browser (syncs shortcuts + Vimium CSS)
   4. Re-login if kanata needs input group

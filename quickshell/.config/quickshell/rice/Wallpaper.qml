@@ -10,6 +10,7 @@ DS.SearchListChrome {
     property var walls: []
     property var filtered: []
     property var markedPaths: []
+    property string transitionMode: "random"
     property string wallDir: Quickshell.env("HOME") + "/pictures/wallpapers"
     filterValue: "all"
     filterOptions: [{ value: "all", label: "All" }]
@@ -30,6 +31,7 @@ DS.SearchListChrome {
     footerHints: [
         { keys: ["↑", "↓"], label: "Navigate" },
         { keys: ["⇧", "⏎"], label: "Mark" },
+        { keys: ["⌃", "T"], label: "Anim: " + transitionMode },
         { keys: ["⏎"], label: applyHintLabel }
     ]
 
@@ -37,6 +39,7 @@ DS.SearchListChrome {
         markedPaths = []
         filterValue = "all"
         refresh.running = true
+        modeGet.running = true
     }
     onPageLeft: markedPaths = []
     onSearchTextChanged: applyFilter()
@@ -47,6 +50,11 @@ DS.SearchListChrome {
         if ((event.key === Qt.Key_Return || event.key === Qt.Key_Enter)
                 && (event.modifiers & Qt.ShiftModifier)) {
             toggleMarkAt(root.selectedIndex)
+            return true
+        }
+        if (event.key === Qt.Key_T && (event.modifiers & Qt.ControlModifier)
+                && !(event.modifiers & (Qt.ShiftModifier | Qt.AltModifier | Qt.MetaModifier))) {
+            modeCycle.exec(["wallpaper-transition", "cycle"])
             return true
         }
         return false
@@ -163,6 +171,21 @@ DS.SearchListChrome {
 
     Process { id: applyProc }
 
+    Process {
+        id: modeGet
+        command: ["wallpaper-transition", "get"]
+        stdout: StdioCollector {
+            onStreamFinished: root.transitionMode = text.trim() || "random"
+        }
+    }
+
+    Process {
+        id: modeCycle
+        stdout: StdioCollector {
+            onStreamFinished: root.transitionMode = text.trim() || "random"
+        }
+    }
+
     rowDelegate: Item {
         required property var modelData
         required property int index
@@ -185,8 +208,8 @@ DS.SearchListChrome {
             spacing: DS.Tokens.gapInline
 
             Rectangle {
-                Layout.preferredWidth: 56
-                Layout.preferredHeight: 36
+                Layout.preferredWidth: 80
+                Layout.preferredHeight: 44
                 radius: 6
                 color: Qt.rgba(0, 0, 0, 0.28)
                 clip: true
@@ -197,6 +220,9 @@ DS.SearchListChrome {
                     fillMode: Image.PreserveAspectCrop
                     asynchronous: true
                     cache: true
+                    // Decode small: the library holds hundreds of 4K files
+                    sourceSize.width: 160
+                    sourceSize.height: 96
                 }
 
                 Rectangle {

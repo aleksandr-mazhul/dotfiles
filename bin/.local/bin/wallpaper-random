@@ -20,6 +20,8 @@ fi
 ((${#files[@]})) || { hyprctl notify 1 3000 "rgb(ff5555)" "Нет обоев"; exit 1; }
 pgrep -x swww-daemon >/dev/null || { swww-daemon & sleep 0.4; }
 img="${files[RANDOM % ${#files[@]}]}"
-swww img "$img" --transition-type any --transition-duration 1.2 --transition-fps 60
+# shellcheck disable=SC2046
+swww img "$img" $(wallpaper-transition args 2>/dev/null \
+  || echo "--transition-type any --transition-duration 1.2 --transition-fps 60")
 hyprctl notify 1 4000 "rgb(00ff99)" "RANDOM: $(basename "$img")"
 [[ -x "$HOME/.local/bin/apply-wallpaper-theme" ]] && "$HOME/.local/bin/apply-wallpaper-theme" "$img" >/dev/null 2>&1 || true

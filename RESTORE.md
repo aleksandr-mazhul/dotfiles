@@ -9,10 +9,10 @@ cd ~/dotfiles
 # ./bootstrap.sh --rice # smaller package set
 ```
 
-Optional wallpaper override:
+Wallpaper library (not in git): `wallpapers-fetch`. Optional wallpaper override:
 
 ```bash
-BOOTSTRAP_WALLPAPER=~/pictures/wallpapers/nature/foo.jpg ./bootstrap.sh
+BOOTSTRAP_WALLPAPER=~/pictures/wallpapers/old/nature-01.jpg ./bootstrap.sh
 ```
 
 ## What is in git (restorable)

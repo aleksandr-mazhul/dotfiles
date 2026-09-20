@@ -32,7 +32,7 @@ cd ~/dotfiles
 Обои при bootstrap (опционально):
 
 ```bash
-BOOTSTRAP_WALLPAPER=~/pictures/wallpapers/nature/foo.jpg ./bootstrap.sh
+BOOTSTRAP_WALLPAPER=~/pictures/wallpapers/old/nature-01.jpg ./bootstrap.sh
 ```
 
 После установки: скопировать обои и ключи, `gh auth login`, один раз открыть Zen через `zen-browser`, `exec fish`.
@@ -53,6 +53,14 @@ theme-extract → theme-match → theme-build → palette.toml (SSOT)
     ▼           ▼          ▼         ▼        ▼        ▼          ▼
   Kitty      Hyprland   Quickshell  GTK    nvim     tmux/starship  …
   Zen/Vimium  lock      wofi/yazi   bat    btop     cava/glow/…
+```
+
+Обои и анимации смены:
+
+```bash
+wallpapers-fetch                 # скачать библиотеку (~500 обоев, dharmx/walls) в ~/pictures/wallpapers
+wallpaper-transition list        # ~40 пресетов: swipe / diag / wave / explode / implode / tear / slash
+wallpaper-transition set random  # random (по умолчанию) или имя пресета; в лаунчере: Ctrl+T
 ```
 
 После смены обоев:
@@ -222,7 +230,7 @@ theme-vimium
 | SSH / GPG / `gh` tokens | секреты |
 | Discord, Spotify, JetBrains, VS Code data | тяжёлые и machine-local |
 | Пароль OBS websocket | gitignored |
-| Библиотека обоев | копировать в `~/pictures/wallpapers` |
+| Библиотека обоев | `wallpapers-fetch` (или копировать в `~/pictures/wallpapers`) |
 | `chromium-ffmpeg/` | nested / ignored |
 
 ---
