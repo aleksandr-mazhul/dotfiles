@@ -81,3 +81,15 @@ and renames it locally, so the vdirs stay at a fixed
 `~/.local/share/calendars-g{map,apm}/g{map,apm}/` that `khal` and `qs-calendar.sh`
 can hardcode. To follow a different Google calendar, change the third element of
 that pair's `collections` entry to the calendar's id.
+
+## Claude Code notifications
+
+`~/.claude/settings.json` is not stowed (the app rewrites it). After a restore:
+
+```bash
+herdr integration install claude   # herdr agent state + toasts/sound
+```
+
+then add `~/.local/bin/claude-notify` as a `Stop` and `Notification` hook and set
+`"preferredNotifChannel": "notifications_disabled"` (the hook replaces OSC 99, which
+herdr swallows). The script skips Claude Desktop sessions (`CLAUDE_CODE_ENTRYPOINT`).

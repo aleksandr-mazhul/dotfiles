@@ -24,3 +24,9 @@ surface_dim = "#3b4f54"
 
 [ui]
 accent = "#90c4c6"
+
+[ui.toast]
+enabled = true
+
+[ui.sound]
+enabled = true
