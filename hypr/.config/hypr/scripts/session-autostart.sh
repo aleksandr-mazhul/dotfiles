@@ -28,9 +28,8 @@ launch_cmd() {
     telegram) printf '%s\n' "$HOME/.local/bin/Telegram" ;;
     nautilus) printf '%s\n' "$HOME/.local/bin/nautilus-dark --new-window" ;;
     chatgpt) printf '%s\n' chatgpt ;;
-    claude) printf '%s\n' claude ;;
-    discord) printf '%s\n' "$HOME/.local/bin/discord" ;;
-    spotify) printf '%s\n' spotify ;;
+    claude) printf '%s\n' claude-desktop ;;
+    spotify) printf '%s\n' "spotify-launcher --skip-update" ;;
     obsidian) printf '%s\n' obsidian ;;
     code) printf '%s\n' code ;;
     thunderbird) printf '%s\n' thunderbird ;;
@@ -90,6 +89,12 @@ spawn() {
     echo "session-autostart: skip $id (missing $cmd)" >&2
     return 0
   }
+  # Claude needs the VPN: launch detached, only after Windscribe is connected.
+  if [[ "$id" == "claude" ]]; then
+    echo "session-autostart: defer $id ws=$ws until VPN is up" >&2
+    setsid -f "$HOME/.config/hypr/scripts/after-vpn-launch.sh" "$ws" "$cmd" >/dev/null 2>&1
+    return 0
+  fi
   # Theme reload SIGUSR1 races the first kitty; give wallpaper post_command time.
   if [[ "$id" == "kitty" && -z "$skip_delay" ]]; then
     sleep 2.5
@@ -113,6 +118,9 @@ read_snapshot() {
     else
       continue
     fi
+    # Claude always lives on C (2); Discord is never auto-started.
+    [[ "$id" == "discord" ]] && continue
+    [[ "$id" == "claude" ]] && ws=2
     printf '%s %s %s\n' "$id" "$ws" "$side"
   done
 }
@@ -134,6 +142,13 @@ if ((${#entries[@]} == 0)); then
     )
   fi
 fi
+
+# Claude is always autostarted (on C, after VPN) even if it was closed last session.
+have_claude=0
+for entry in "${entries[@]}"; do
+  [[ "${entry%% *}" == "claude" ]] && have_claude=1
+done
+((have_claude)) || entries+=("claude 2 A")
 
 extra=8
 for entry in "${entries[@]}"; do

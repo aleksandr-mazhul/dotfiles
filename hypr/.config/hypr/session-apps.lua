@@ -39,6 +39,10 @@ function M.restore_side(id)
 end
 
 function M.restore_workspaces(id)
+    local app = apps.by_id[id]
+    if app and app.home_only then
+        return { app.workspace }
+    end
     local list = {}
     for _, row in ipairs(M._rows or {}) do
         if row.id == id then
@@ -136,6 +140,17 @@ local function collect_running()
     return entries
 end
 
+-- Poweroff/reboot/logout SIGTERMs apps one by one while Hyprland is still up.
+-- Saves triggered by those closes would shrink the snapshot.
+local function system_stopping()
+    local ok, _, code = os.execute(
+        [[sh -c 'case "$(systemctl is-system-running 2>/dev/null)" in stopping) exit 0;; esac; ]]
+            .. [[case "$(systemctl --user is-system-running 2>/dev/null)" in stopping) exit 0;; esac; ]]
+            .. [[systemctl --user is-active --quiet graphical-session.target || exit 0; exit 1']]
+    )
+    return ok == true or ok == 0 or code == 0
+end
+
 local function file_row_count()
     return #apps.parse_snapshot_rows()
 end
@@ -146,6 +161,10 @@ end
 
 local function flush_save()
     if M.is_restoring() then
+        return
+    end
+    if not M._shutting_down and system_stopping() then
+        M._shutting_down = true
         return
     end
     local entries = collect_running()
