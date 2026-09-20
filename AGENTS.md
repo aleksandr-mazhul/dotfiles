@@ -33,6 +33,7 @@ Do all of the following in one session (or explain what you blocked on):
    - Put files under the right Stow package, e.g. `misc/.config/<app>/…` or a new top-level package.
    - Add the package name to `restow.sh` `packages=(…)` if new.
    - Run `./restow.sh` (or stow that package) so `~/.config` links into the repo.
+   - Exception: `mimeapps.list` must be a **regular file** at `~/.config/mimeapps.list` (not a Stow symlink). GIO cannot save “Always use for this type” next to a relative symlink. Edit `misc/.config/mimeapps.list` and copy, or let the desktop write the live file.
    - Do **not** vendor caches, cookies, `logs/`, `*.sqlite`, or credential files.
 
 4. **Theme / colors (if the app is themable)**

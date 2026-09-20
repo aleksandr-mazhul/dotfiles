@@ -36,10 +36,10 @@ if ! pgrep -x swww-daemon >/dev/null 2>&1; then
   sleep 0.4
 fi
 
-swww img "$selected" \
-  --transition-type grow \
-  --transition-duration 1.4 \
-  --transition-fps 60
+# Transition preset: random by default, or whatever `wallpaper-transition set` chose
+# shellcheck disable=SC2046
+swww img "$selected" $(wallpaper-transition args 2>/dev/null \
+  || echo "--transition-type grow --transition-duration 1.4 --transition-fps 60")
 
 if [[ -x "${HOME}/.local/bin/apply-wallpaper-theme" ]]; then
   "${HOME}/.local/bin/apply-wallpaper-theme" "$selected" >/dev/null 2>&1 || true

@@ -23,6 +23,7 @@ VPN has no hotkey — use launcher (`vpn`) or QuickSettings.
 | Super+W | Wallpaper picker |
 | Super+Shift+W | Random wallpaper |
 | Super+Alt+W | Waypaper |
+| Ctrl+T | В пикере обоев: сменить анимацию (random → swipe → diag → wave → explode → …) |
 | Alt+O | App launcher |
 | Super+E | Files (Nautilus); focus if already open |
 | Super+X | ChatGPT; focus if already open |

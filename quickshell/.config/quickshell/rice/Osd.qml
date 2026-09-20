@@ -51,7 +51,7 @@ Scope {
         const muted = !!sink.audio.muted
         const vol = sink.audio.volume
         const headphones = sinkLooksLikeHeadphones(sink)
-        osdValue = muted ? 0 : vol
+        osdValue = vol
         osdIconName = volumeIconName(vol, headphones, muted)
         osdCustomSource = ""
         osdStruck = muted && headphones

@@ -12,7 +12,7 @@ M.catalog = {
         class_re = "^jetbrains-webstorm$",
         workspace = 1,
         classes = { "jetbrains-webstorm" },
-        cmd = "webstorm",
+        cmd = "$HOME/.local/bin/webstorm",
     },
     {
         id = "clion",
@@ -73,9 +73,10 @@ M.catalog = {
     {
         id = "claude",
         class_re = "^com\\.anthropic\\.Claude$",
-        workspace = 6,
+        workspace = 2, -- C
+        home_only = true, -- always C: ignore last-session workspace
         classes = { "com.anthropic.Claude" },
-        cmd = "claude",
+        cmd = "claude-desktop",
     },
     {
         id = "chatgpt",
@@ -110,7 +111,7 @@ M.catalog = {
         class_re = "^(discord|Discord)$",
         workspace = 10,
         classes = { "discord", "Discord" },
-        cmd = home .. "/.local/bin/discord",
+        cmd = nil, -- no autostart / session restore; placement only
     },
     {
         id = "preview",
@@ -133,7 +134,7 @@ M.catalog = {
         class_re = "^(spotify|Spotify)$",
         workspace = 13,
         classes = { "spotify", "Spotify" },
-        cmd = "spotify",
+        cmd = "spotify-launcher --skip-update",
     },
     {
         id = "zoom",

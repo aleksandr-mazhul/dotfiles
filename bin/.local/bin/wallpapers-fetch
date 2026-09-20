@@ -1,0 +1,67 @@
+#!/usr/bin/env bash
+# Download a big wallpaper library into ~/pictures/wallpapers/<category>/
+# Source: https://github.com/dharmx/walls (sparse + shallow clone, idempotent).
+# Usage: wallpapers-fetch [category…]   (no args = default set below)
+set -euo pipefail
+
+REPO="https://github.com/dharmx/walls.git"
+DEST="${WALLPAPER_DIR:-$HOME/pictures/wallpapers}"
+MIN_W="${WALLPAPER_MIN_W:-1600}"
+MIN_H="${WALLPAPER_MIN_H:-900}"
+DEFAULT_CATS=(nature mountain aerial fogsmoke calm cold nord gruvbox minimal abstract outrun poly)
+
+cats=("$@")
+((${#cats[@]})) || cats=("${DEFAULT_CATS[@]}")
+
+command -v git >/dev/null || { echo "wallpapers-fetch: git not found" >&2; exit 1; }
+
+tmp="$(mktemp -d "${XDG_CACHE_HOME:-$HOME/.cache}/wallpapers-fetch.XXXXXX")"
+trap 'rm -rf "$tmp"' EXIT
+
+echo ":: cloning $REPO (${cats[*]})"
+git clone --quiet --depth 1 --filter=blob:none --sparse "$REPO" "$tmp/walls"
+git -C "$tmp/walls" sparse-checkout set "${cats[@]}"
+
+mkdir -p "$DEST"
+added=0
+for cat in "${cats[@]}"; do
+  [[ -d "$tmp/walls/$cat" ]] || { echo "warn: no such category: $cat" >&2; continue; }
+  mkdir -p "$DEST/$cat"
+  while IFS= read -r -d '' f; do
+    base="$(basename "$f")"
+    # Keep names launcher-friendly (no spaces); never overwrite existing files.
+    safe="${base// /_}"
+    [[ -e "$DEST/$cat/$safe" ]] && continue
+    # Skip logos / icons / portrait and low-res files (blurry on a 1440p screen)
+    if command -v identify >/dev/null; then
+      read -r w h < <(identify -format '%w %h\n' "${f}[0]" 2>/dev/null | head -1) || continue
+      [[ "${w:-0}" -ge "$MIN_W" && "${h:-0}" -ge "$MIN_H" && "$w" -ge "$h" ]] || continue
+    fi
+    cp -n "$f" "$DEST/$cat/$safe"
+    added=$((added + 1))
+  done < <(find "$tmp/walls/$cat" -maxdepth 1 -type f \
+    \( -iname '*.jpg' -o -iname '*.jpeg' -o -iname '*.png' -o -iname '*.webp' \) -print0)
+done
+
+# Distro packs from pacman (sudo pacman -S archlinux-wallpaper gnome-backgrounds):
+# symlink them so the launcher lists them as "archlinux/…" and "gnome/…".
+declare -A SYSTEM_PACKS=([archlinux]=/usr/share/backgrounds/archlinux [gnome]=/usr/share/backgrounds/gnome)
+for name in "${!SYSTEM_PACKS[@]}"; do
+  src="${SYSTEM_PACKS[$name]}"
+  if [[ -d "$src" && ! -e "$DEST/$name" ]]; then
+    ln -s "$src" "$DEST/$name"
+    echo ":: linked $name -> $src"
+  fi
+done
+
+cat >"$DEST/CREDITS.md" <<'EOF'
+# Wallpaper credits
+
+`old/` holds the original hand-picked set; `archlinux/` and `gnome/` link the
+pacman packages archlinux-wallpaper and gnome-backgrounds. Everything else comes from
+https://github.com/dharmx/walls — see that repository for authorship and license.
+Fetched by `wallpapers-fetch` (dotfiles: bin/.local/bin/wallpapers-fetch).
+EOF
+
+total="$(find -L "$DEST" -type f \( -iname '*.jpg' -o -iname '*.jpeg' -o -iname '*.png' -o -iname '*.webp' \) | wc -l)"
+echo ":: added $added new files, $total total in $DEST"

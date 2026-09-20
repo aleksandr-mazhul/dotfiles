@@ -43,4 +43,5 @@ tamasfe.even-better-toml
 tim-koehler.helm-intellisense
 timonwong.shellcheck
 usernamehw.errorlens
+vscodevim.vim
 zxh404.vscode-proto3

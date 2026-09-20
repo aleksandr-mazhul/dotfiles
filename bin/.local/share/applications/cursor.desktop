@@ -2,13 +2,13 @@
 Name=Cursor
 Comment=The AI Code Editor.
 GenericName=Text Editor
-Exec=/home/stranger/.local/bin/cursor %F
+Exec=/home/stranger/.local/bin/cursor %U
 Icon=co.anysphere.cursor
 Type=Application
 StartupNotify=false
 StartupWMClass=Cursor
 Categories=TextEditor;Development;IDE;
-MimeType=application/x-cursor-workspace;
+MimeType=application/x-cursor-workspace;text/plain;text/markdown;text/x-markdown;text/x-rst;text/csv;text/tab-separated-values;text/xml;application/xml;application/json;application/schema+json;application/toml;text/x-toml;application/x-yaml;application/yaml;text/yaml;text/x-yaml;application/javascript;text/javascript;text/css;application/x-shellscript;text/x-shellscript;text/x-python;text/x-python3;text/x-lua;text/x-go;text/x-rust;text/x-java;text/x-c;text/x-c++;text/x-makefile;text/x-cmake;text/x-log;application/x-zerosize;
 Actions=new-empty-window;
 Keywords=cursor;code;editor;ide;
 Terminal=false
@@ -16,5 +16,5 @@ Terminal=false
 [Desktop Action new-empty-window]
 Name=New Empty Window
 Name[ru]=Новое пустое окно
-Exec=/home/stranger/.local/bin/cursor --classic --new-window %F
+Exec=/home/stranger/.local/bin/cursor --classic --new-window %U
 Icon=co.anysphere.cursor

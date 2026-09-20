@@ -1,6 +1,7 @@
 7zip
 age
 ansible
+archlinux-wallpaper
 asciiquarium
 aws-cli-v2
 bandwhich
@@ -50,6 +51,7 @@ git
 git-delta
 github-cli
 glow
+gnome-backgrounds
 gnome-keyring
 go-yq
 gping

@@ -98,6 +98,13 @@ hl.config({
         },
     },
 
+    -- XWayland clients render at native pixels instead of being bitmap-upscaled
+    -- by the 1.25 monitor scale (blurry). Apps must scale themselves (e.g.
+    -- QT_SCALE_FACTOR in scripts/zoom.sh).
+    xwayland = {
+        force_zero_scaling = true,
+    },
+
     misc = {
         force_default_wallpaper = -1,
         disable_hyprland_logo = true,
@@ -282,5 +289,6 @@ end)
 require("colors-matugen")
 require("gloview")
 require("dynamic-cursors")
+require("pip")
 require("binds")
 require("rules")

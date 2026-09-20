@@ -87,6 +87,22 @@ def active_window_address() -> str:
         return ""
 
 
+def active_window_class() -> str:
+    try:
+        data = json.loads(
+            subprocess.check_output(["hyprctl", "-j", "activewindow"], text=True)
+        )
+        return str(data.get("class") or "")
+    except Exception:
+        return ""
+
+
+def force_english_app(class_name: str) -> bool:
+    """Coding IDEs: always EN when focusing the window."""
+    c = (class_name or "").lower()
+    return c.startswith("jetbrains-") or "webstorm" in c or "pycharm" in c or "clion" in c
+
+
 def acquire_lock():
     LOCK_PATH.parent.mkdir(parents=True, exist_ok=True)
     fh = open(LOCK_PATH, "w", encoding="utf-8")
@@ -177,6 +193,14 @@ def handle_line(line: str, layouts: dict[str, int], prev: str) -> str:
 
         if prev and prev != addr:
             layouts[prev] = current_layout_index()
+
+        # WebStorm / JetBrains: при фокусе всегда английская раскладка
+        if force_english_app(active_window_class()):
+            layouts[addr] = 0
+            if current_layout_index() != 0:
+                set_all_layouts(0)
+                log(f"force EN {addr}")
+            return addr
 
         if addr in layouts:
             want = layouts[addr]
