@@ -141,6 +141,25 @@ ok_link() {
   fi
 }
 
+# mimeapps.list must be a regular file. GIO writes mimeapps.list.XXXX next to
+# it; a relative Stow symlink makes Nautilus "Always use for this type" fail.
+mime_src="$ROOT/misc/.config/mimeapps.list"
+mime_dst="$TARGET/.config/mimeapps.list"
+if [[ -f "$mime_src" ]]; then
+  mkdir -p "$TARGET/.config"
+  if [[ -L "$mime_dst" ]]; then
+    real="$(readlink -f "$mime_dst")"
+    echo "==> mimeapps.list: replace relative symlink with regular file"
+    rm -f "$mime_dst"
+    cp -a "$real" "$mime_dst"
+    chmod 644 "$mime_dst"
+  elif [[ ! -e "$mime_dst" ]]; then
+    echo "==> mimeapps.list: install regular file"
+    cp -a "$mime_src" "$mime_dst"
+    chmod 644 "$mime_dst"
+  fi
+fi
+
 echo "==> Verify"
 for p in \
   .config/hypr \

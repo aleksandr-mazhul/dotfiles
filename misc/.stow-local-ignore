@@ -1,0 +1,5 @@
+# GIO/Nautilus atomically saves mimeapps.list.XXXX next to the file.
+# A relative Stow symlink makes that write fail:
+#   Failed to create file "../dotfiles/misc/.config/mimeapps.list.XXXX"
+# Live file is a regular copy at ~/.config/mimeapps.list (see restow.sh).
+^\.config/mimeapps\.list$

@@ -23,3 +23,6 @@ obs/.config/obs-studio/.sentinel/
 chromium-ffmpeg/
 *.bak
 obs/.config/obs-studio/plugin_config/obs-websocket/config.json
+
+# OBS profiler dumps
+obs/.config/obs-studio/profiler_data/
