@@ -32,3 +32,5 @@ set -g fish_greeting
 
 # User-local bins (theme-*, zen-browser, …)
 fish_add_path -g "$HOME/.local/bin"
+# npm global prefix (claude — the native updater gets 403, so it is installed via npm)
+fish_add_path -g "$HOME/.npm-global/bin"
