@@ -14,15 +14,14 @@ PanelWindow {
     property int viewYear: new Date().getFullYear()
     property int viewMonth: new Date().getMonth()
     property int selectedDay: new Date().getDate()
-    property var eventDays: ({}) // { "1": ["work","home"], ... }
+    property var eventDays: ({}) // { "1": ["Рабочий","Домашний"], ... } (khal calendar names)
     property int eventDaysRev: 0
     property var events: []
-    property var calColors: ({
-        home: "#34AADC",
-        work: "#CB30E0",
-        uni: "#0088FF",
-        reminders: "#B14BC9"
-    })
+    // Filled from `qs-calendar.sh calendars`: every calendar khal knows, so
+    // calendars added in Apple/Google show up without touching this file.
+    property var calColors: ({})
+    property var calendarList: [] // [{ id, label, color, readOnly, isDefault }]
+    property string defaultCalendar: ""
 
     property bool formOpen: false
     property bool formEditing: false
@@ -32,7 +31,7 @@ PanelWindow {
 
     property string draftTitle: ""
     property string draftLocation: ""
-    property string draftCalendar: "home"
+    property string draftCalendar: root.defaultCalendar
     property bool draftAllDay: false
     property int draftStartH: 10
     property int draftStartM: 0
@@ -83,7 +82,10 @@ PanelWindow {
         for (let d = 1; d <= daysInMonth; d++) {
             const key = String(d)
             const raw = root.eventDays ? root.eventDays[key] : null
-            const cals = Array.isArray(raw) ? raw.slice(0, 3) : []
+            // Cap at the number of calendars we actually have, so a busy day
+            // never silently drops a marker (Уник used to fall off at 3).
+            const cap = Object.keys(root.calColors || {}).length || 7
+            const cals = Array.isArray(raw) ? raw.slice(0, cap) : []
             cells.push({
                 day: d,
                 today: isCurrentMonth && d === today.getDate(),
@@ -219,7 +221,7 @@ PanelWindow {
         editUid = ""
         draftTitle = ""
         draftLocation = ""
-        draftCalendar = "home"
+        draftCalendar = root.defaultCalendar
         draftAllDay = false
         draftStartH = 10
         draftStartM = 0
@@ -233,12 +235,22 @@ PanelWindow {
         })
     }
 
+    function isReadOnlyCal(name) {
+        const n = String(name || "")
+        return root.calendarList.some(c => c.id === n && c.readOnly)
+    }
+
     function openEdit(ev) {
+        if (isReadOnlyCal(ev.calendar)) {
+            statusText = "Только чтение — зеркало внешнего расписания"
+            statusClear.start()
+            return
+        }
         formEditing = true
         editUid = ev.uid || ""
         draftTitle = ev.title || ""
         draftLocation = ev.location || ""
-        draftCalendar = ev.calendar || "home"
+        draftCalendar = ev.calendar || root.defaultCalendar
         const s = String(ev["start-time"] || "")
         const e = String(ev["end-time"] || "")
         draftAllDay = !s && !e
@@ -263,7 +275,7 @@ PanelWindow {
             return
         }
         const loc = draftLocation.trim()
-        const cal = draftCalendar || "home"
+        const cal = draftCalendar || root.defaultCalendar
         const start = draftAllDay ? "allday" : timeStr(draftStartH, draftStartM)
         const end = draftAllDay ? "allday" : timeStr(draftEndH, draftEndM)
         busy = true
@@ -318,8 +330,11 @@ PanelWindow {
             closeAnim.stop()
             OverlayHub.closeAll()
             refreshColors()
-            // Local markers first, then sync pulls remote updates.
-            refreshMonth()
+            // Re-anchor on today rather than reusing viewYear/viewMonth: those are
+            // initialised once and survive config reloads, so a panel opened after
+            // a long uptime (or with a wrong clock at first start) stays parked on
+            // a stale month forever. Also refreshes markers before the sync lands.
+            goToday()
             syncAndRefresh()
             watchProc.running = true
             openAnim.play()
@@ -889,22 +904,22 @@ PanelWindow {
                             }
                         }
 
-                        RowLayout {
+                        GridLayout {
                             Layout.fillWidth: true
-                            spacing: 6
+                            columns: 4
+                            rowSpacing: 6
+                            columnSpacing: 6
 
                             Repeater {
-                                model: [
-                                    { id: "home", label: "Home" },
-                                    { id: "work", label: "Work" },
-                                    { id: "uni", label: "Uni" }
-                                ]
+                                model: root.calendarList
 
                                 Rectangle {
                                     id: calChip
                                     required property var modelData
                                     property bool hovered: chipMouse.containsMouse
-                                    readonly property bool active: root.draftCalendar === calChip.modelData.id
+                                    readonly property bool readOnly: calChip.modelData.readOnly === true
+                                    readonly property bool active: !calChip.readOnly && root.draftCalendar === calChip.modelData.id
+                                    opacity: calChip.readOnly ? 0.5 : 1
                                     Layout.fillWidth: true
                                     Layout.preferredHeight: 28
                                     radius: DS.Tokens.innerRadius(DS.Tokens.radiusSurface, DS.Tokens.paddingSurface)
@@ -935,6 +950,8 @@ PanelWindow {
                                         }
                                         DS.QuietText {
                                             text: modelData.label
+                                            elide: Text.ElideRight
+                                            Layout.maximumWidth: calChip.width - 30
                                             color: calChip.active ? DS.Tokens.textPrimary : DS.Tokens.textSecondary
                                             font.family: DS.Tokens.fontUi
                                             font.pixelSize: DS.Tokens.fontSizeSm
@@ -944,7 +961,8 @@ PanelWindow {
                                     MouseArea {
                                         id: chipMouse
                                         anchors.fill: parent
-                                        hoverEnabled: true
+                                        enabled: !calChip.readOnly
+                                        hoverEnabled: !calChip.readOnly
                                         cursorShape: Qt.PointingHandCursor
                                         onClicked: root.draftCalendar = modelData.id
                                     }
@@ -1175,6 +1193,7 @@ PanelWindow {
                         implicitSize: 14
                         width: 14
                         height: 14
+                        visible: !root.isReadOnlyCal(ev.modelData.calendar)
                         anchors.right: parent.right
                         anchors.rightMargin: 10
                         anchors.verticalCenter: parent.verticalCenter
@@ -1193,7 +1212,7 @@ PanelWindow {
                             anchors.margins: -8
                             hoverEnabled: true
                             cursorShape: Qt.PointingHandCursor
-                            enabled: !root.busy
+                            enabled: !root.busy && trashBtn.visible
                             onClicked: root.deleteEvent(ev.modelData.uid || "")
                         }
                     }
@@ -1232,13 +1251,35 @@ PanelWindow {
 
     Process {
         id: colorsProc
-        command: ["bash", root.script, "colors"]
+        command: ["bash", root.script, "calendars"]
         stdout: StdioCollector {
             onStreamFinished: {
                 try {
                     const obj = JSON.parse(text.trim())
-                    if (obj && typeof obj === "object")
-                        root.calColors = obj
+                    if (!obj || typeof obj !== "object" || Array.isArray(obj))
+                        return
+                    const colors = {}
+                    const list = []
+                    let def = ""
+                    for (const id of Object.keys(obj)) {
+                        const c = obj[id]
+                        if (c.color)
+                            colors[id] = c.color
+                        if (c.default && !c.readonly)
+                            def = id
+                        list.push({ id: id, label: c.label || id, readOnly: c.readonly === true })
+                    }
+                    // Writable calendars first; read-only mirrors trail.
+                    list.sort((x, y) => Number(x.readOnly) - Number(y.readOnly))
+                    if (!def) {
+                        const w = list.find(c => !c.readOnly)
+                        def = w ? w.id : ""
+                    }
+                    root.calColors = colors
+                    root.calendarList = list
+                    root.defaultCalendar = def
+                    if (!root.formOpen || !root.draftCalendar)
+                        root.draftCalendar = def
                 } catch (e) {}
             }
         }
@@ -1285,6 +1326,8 @@ PanelWindow {
         stdout: StdioCollector {
             onStreamFinished: {
                 root.statusText = ""
+                // The sync may have discovered/removed calendars.
+                root.refreshColors()
                 root.refreshMonth()
             }
         }
@@ -1315,8 +1358,10 @@ PanelWindow {
         command: ["bash", root.script, "watch", "20"]
         stdout: SplitParser {
             onRead: chunk => {
-                if (String(chunk).indexOf("changed") >= 0)
+                if (String(chunk).indexOf("changed") >= 0) {
+                    root.refreshColors()
                     root.refreshMonth()
+                }
             }
         }
     }

@@ -78,6 +78,9 @@ case "$cmd" in
     down)
         rate_ok || { get_pct || true; exit 0; }
         cur="$(get_pct)" || exit 0
+        # Unmute on lower too (macOS): otherwise down changes level under mute
+        # while OSD stays at 0% and audio stays silent — feels like down is dead.
+        wpctl set-mute "$SINK" 0 >/dev/null 2>&1 || true
         set_pct "$(mac_snap "$cur" -1)"
         ;;
     mute)
