@@ -19,4 +19,17 @@ fi
 # Avoid FUSE mount of the AppImage so quitAndInstall/zsync can replace the file.
 export APPIMAGE_EXTRACT_AND_RUN="${APPIMAGE_EXTRACT_AND_RUN:-1}"
 
-exec "$APP" "$@"
+# Nautilus/GIO pass file:// URIs. Electron accepts them, but normalize to
+# paths so a second instance reliably hands the file to the running Cursor.
+if (( $# )); then
+  mapfile -d '' -t args < <(python3 -c '
+import sys, urllib.parse
+for a in sys.argv[1:]:
+    if a.startswith("file://"):
+        a = urllib.parse.unquote(urllib.parse.urlparse(a).path)
+    sys.stdout.buffer.write(a.encode() + b"\0")
+' "$@")
+  exec "$APP" "${args[@]}"
+fi
+
+exec "$APP"
