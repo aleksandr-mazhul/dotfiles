@@ -17,11 +17,24 @@ except ImportError:
     print("python-websocket-client is required", file=sys.stderr)
     sys.exit(1)
 
+def _load_password() -> str:
+    """Secret lives outside the repo: $OBS_WEBSOCKET_PASSWORD or ~/.config/obs-record-toggle/password."""
+    env = os.environ.get("OBS_WEBSOCKET_PASSWORD")
+    if env:
+        return env
+    try:
+        return (Path.home() / ".config" / "obs-record-toggle" / "password").read_text().strip()
+    except OSError:
+        return ""
+
+
+PASSWORD = _load_password()
+
 HOST = "127.0.0.1"
 PORT = 4455
-PASSWORD = "18332c4lL6KhspXxvuF-hg"
 OBS_BIN = "obs"
 NOTIFY = ["notify-send", "-a", "OBS", "-u", "low"]
+RECORD_DIR = Path.home() / "OBS" / "videos"
 
 
 def notify(title: str, body: str = "") -> None:
@@ -140,7 +153,7 @@ def main() -> int:
             st = obs_request("GetRecordStatus")
             if not st.get("outputActive"):
                 obs_request("StartRecord")
-                notify("Recording started", str(Path.home() / "Videos" / "OBS"))
+                notify("Recording started", str(RECORD_DIR))
             else:
                 notify("Already recording")
             return 0
@@ -148,7 +161,7 @@ def main() -> int:
             st = obs_request("GetRecordStatus")
             if st.get("outputActive"):
                 obs_request("StopRecord")
-                notify("Recording stopped", str(Path.home() / "Videos" / "OBS"))
+                notify("Recording stopped", str(RECORD_DIR))
             else:
                 notify("Not recording")
             return 0
@@ -160,9 +173,9 @@ def main() -> int:
             st = obs_request("GetRecordStatus")
             active = st.get("outputActive")
         if active:
-            notify("Recording started", str(Path.home() / "Videos" / "OBS"))
+            notify("Recording started", str(RECORD_DIR))
         else:
-            notify("Recording stopped", str(Path.home() / "Videos" / "OBS"))
+            notify("Recording stopped", str(RECORD_DIR))
         return 0
     except Exception as exc:
         notify("OBS error", str(exc))
