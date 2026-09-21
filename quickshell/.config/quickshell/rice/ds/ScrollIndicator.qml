@@ -34,7 +34,7 @@ Item {
         radius: 2
         height: Math.max(24, root.height * Math.max(0.05, Math.min(1, ratio)))
         y: (root.height - height) * root.progress
-        color: Qt.rgba(1, 1, 1, 0.40)
-        opacity: 0.55
+        color: GlassGrade.textTertiary
+        opacity: 0.7
     }
 }

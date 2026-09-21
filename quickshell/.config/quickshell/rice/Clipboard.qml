@@ -994,7 +994,7 @@ Item {
                                                 anchors.centerIn: parent
                                                 visible: !rowImage
                                                 text: rowCode ? "{ }" : "Aa"
-                                                color: DS.Tokens.textTertiary
+                                                color: DS.GlassGrade.textTertiary
                                                 font.family: DS.Tokens.fontUi
                                                 font.pixelSize: DS.Tokens.fontSizeSm
                                                 fontWeight: Font.Medium
@@ -1005,7 +1005,7 @@ Item {
                                             Layout.fillWidth: true
                                             Layout.fillHeight: true
                                             text: modelData.item ? (modelData.item.label || "") : ""
-                                            color: DS.Tokens.textPrimary
+                                            color: DS.GlassGrade.textPrimary
                                             font.family: DS.Tokens.fontUi
                                             font.pixelSize: DS.Tokens.fontSize
                                             fontWeight: Font.Medium
@@ -1017,7 +1017,7 @@ Item {
                                             visible: !!(modelData.item && root.itemClock(modelData.item))
                                             Layout.fillHeight: true
                                             text: modelData.item ? root.itemClock(modelData.item) : ""
-                                            color: DS.Tokens.textTertiary
+                                            color: DS.GlassGrade.textTertiary
                                             font.family: DS.Tokens.fontUi
                                             font.pixelSize: DS.Tokens.fontSizeSm
                                             verticalAlignment: Text.AlignVCenter
@@ -1057,7 +1057,7 @@ Item {
                                 text: (indexProc.running || cacheProc.running) && (!root.items || root.items.length === 0)
                                       ? "Loading…"
                                       : "Nothing found"
-                                color: DS.Tokens.textTertiary
+                                color: DS.GlassGrade.textTertiary
                                 font.family: DS.Tokens.fontUi
                                 font.pixelSize: DS.Tokens.fontSize
                             }
@@ -1078,7 +1078,7 @@ Item {
                         Layout.fillHeight: true
                         Layout.topMargin: 10
                         Layout.bottomMargin: 10
-                        color: DS.Tokens.hairline
+                        color: DS.GlassGrade.hairline
                     }
 
                     Item {
@@ -1120,7 +1120,7 @@ Item {
                                     TextEdit {
                                         id: previewEdit
                                         width: previewFlick.width
-                                        color: DS.Tokens.textPrimary
+                                        color: DS.GlassGrade.textPrimary
                                         font.family: root.selectedIsCode ? Colors.font_mono : DS.Tokens.fontUi
                                         font.pixelSize: DS.Tokens.fontSize
                                         font.weight: Font.Medium
@@ -1131,12 +1131,12 @@ Item {
                                         persistentSelection: true
                                         activeFocusOnPress: true
                                         cursorVisible: activeFocus
-                                        selectionColor: DS.Tokens.raisedStrong
-                                        selectedTextColor: DS.Tokens.textPrimary
+                                        selectionColor: DS.GlassGrade.filmStrong
+                                        selectedTextColor: DS.GlassGrade.textPrimary
 
                                         cursorDelegate: Rectangle {
                                             width: 2
-                                            color: DS.Tokens.textPrimary
+                                            color: DS.GlassGrade.textPrimary
                                             visible: previewEdit.activeFocus
                                             SequentialAnimation on opacity {
                                                 running: previewEdit.activeFocus
@@ -1178,7 +1178,7 @@ Item {
                                     anchors.margins: 16
                                     visible: root.previewLoading
                                     text: "loading…"
-                                    color: DS.Tokens.textTertiary
+                                    color: DS.GlassGrade.textTertiary
                                     font.family: DS.Tokens.fontUi
                                     font.pixelSize: DS.Tokens.fontSizeSm
                                 }
@@ -1193,7 +1193,7 @@ Item {
                                 anchors.bottomMargin: 12
                                 visible: !!root.selectedItem && !root.previewLoading && root.previewMeta.length > 0
                                 text: root.previewMeta
-                                color: DS.Tokens.textTertiary
+                                color: DS.GlassGrade.textTertiary
                                 font.family: DS.Tokens.fontUi
                                 font.pixelSize: DS.Tokens.fontSizeSm
                                 elide: Text.ElideRight
@@ -1203,7 +1203,7 @@ Item {
                                 anchors.centerIn: parent
                                 visible: !root.selectedItem
                                 text: "Select an entry"
-                                color: DS.Tokens.textTertiary
+                                color: DS.GlassGrade.textTertiary
                                 font.family: DS.Tokens.fontUi
                                 font.pixelSize: DS.Tokens.fontSize
                             }

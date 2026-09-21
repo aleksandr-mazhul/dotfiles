@@ -18,24 +18,9 @@ Item {
     Rectangle {
         anchors.fill: parent
         radius: 6
-        color: Qt.rgba(1, 1, 1, (root.active ? 0.12 : 0.07)
-            * (1 - AdaptiveContrast.contrast * 0.75))
+        color: root.active ? GlassGrade.filmStrong : GlassGrade.film
         border.width: 1
-        border.color: root.menuOpen
-            ? Tokens.focusRim
-            : Qt.rgba(1, 1, 1, 0.22 + AdaptiveContrast.contrast * 0.10)
-
-        Rectangle {
-            anchors.left: parent.left
-            anchors.right: parent.right
-            anchors.top: parent.top
-            height: Math.round(parent.height * 0.45)
-            radius: parent.radius
-            gradient: Gradient {
-                GradientStop { position: 0.0; color: Qt.rgba(1, 1, 1, 0.10) }
-                GradientStop { position: 1.0; color: "transparent" }
-            }
-        }
+        border.color: root.menuOpen ? GlassGrade.focusRim : GlassGrade.hairline
     }
 
     Row {
@@ -45,7 +30,7 @@ Item {
 
         QuietText {
             text: root.label
-            color: root.active ? Tokens.textPrimary : Tokens.textSecondary
+            color: root.active ? GlassGrade.textPrimary : GlassGrade.textSecondary
             font.family: Tokens.fontUi
             font.pixelSize: Tokens.fontSizeSm - 1
             width: implicitWidth
@@ -54,7 +39,7 @@ Item {
         }
         QuietText {
             text: "˅"
-            color: Tokens.textTertiary
+            color: GlassGrade.textTertiary
             font.family: Tokens.fontUi
             font.pixelSize: 10
             width: implicitWidth

@@ -1,10 +1,10 @@
 import QtQuick
-import QtQuick.Effects
 import ".."
 
-// Search Pattern v2 (ADR-0005): the search field is the visual anchor of a popup —
-// a lighter glass level (material.field) on the plate, glass-in-glass.
-// Same light language as the plate: soft rim, no drawn frame.
+// The search field is the visual anchor of a popup: a sheet inset INTO the
+// plate, read as a groove rather than as a bordered input box. A groove is one
+// film, one shaded top edge and one lit bottom edge — the inverse of the raised
+// SelectionPill, which is what makes the two read as different depths.
 Item {
     id: root
 
@@ -20,47 +20,35 @@ Item {
     implicitHeight: Tokens.searchFieldHeight
 
     Rectangle {
-        anchors.fill: field
-        radius: Tokens.radiusField
-        color: Tokens.searchScrim
-    }
-
-    RectangularShadow {
-        anchors.fill: field
-        offset: Qt.vector2d(0, 0)
-        radius: field.radius
-        blur: 14
-        spread: 0
-        color: Tokens.focusGlow
-        opacity: input.activeFocus ? 1 : 0
-        Behavior on opacity {
-            NumberAnimation { duration: Tokens.stateMs; easing.type: Easing.OutCubic }
-        }
-    }
-
-    Rectangle {
         id: field
         anchors.fill: parent
         radius: Tokens.radiusField
-        color: Tokens.fieldFill
+        color: GlassGrade.film
         border.width: 1
-        border.color: input.activeFocus ? Tokens.focusRim : Tokens.fieldRim
+        border.color: input.activeFocus ? GlassGrade.focusRim : GlassGrade.hairline
 
         Behavior on border.color {
             ColorAnimation { duration: Tokens.stateMs; easing.type: Easing.OutCubic }
         }
 
+        // Inset: shaded at the top where the plate overhangs it, lit at the
+        // bottom where light reaches the far wall of the groove.
         Rectangle {
             anchors.left: parent.left
             anchors.right: parent.right
             anchors.top: parent.top
             anchors.margins: 1
-            height: Math.round(parent.height * 0.42)
-            radius: parent.radius
-            gradient: Gradient {
-                GradientStop { position: 0.0; color: Qt.rgba(1, 1, 1, 0.10) }
-                GradientStop { position: 1.0; color: "transparent" }
-            }
+            height: 1
+            color: GlassGrade.edgeShade
+        }
+        Rectangle {
+            anchors.left: parent.left
+            anchors.right: parent.right
+            anchors.bottom: parent.bottom
+            anchors.margins: 1
+            height: 1
+            color: GlassGrade.edgeLit
+            opacity: 0.7
         }
     }
 
@@ -70,10 +58,10 @@ Item {
         anchors.leftMargin: Tokens.paddingFieldX
         anchors.verticalCenter: parent.verticalCenter
         customSource: Qt.resolvedUrl("../assets/search.svg")
-        tint: Tokens.textIcon
+        tint: GlassGrade.textIcon
         implicitSize: 16
         halo: true
-        haloColor: Tokens.iconHalo
+        haloColor: GlassGrade.textHalo
     }
 
     TextInput {
@@ -83,18 +71,18 @@ Item {
         anchors.right: hintRow.visible ? hintRow.left : parent.right
         anchors.rightMargin: Tokens.paddingFieldX
         anchors.verticalCenter: parent.verticalCenter
-        color: Tokens.textPrimary
+        color: GlassGrade.textPrimary
         font.family: Tokens.fontUi
         font.pixelSize: Tokens.fontSize
         clip: true
-        selectionColor: Tokens.raisedStrong
-        selectedTextColor: Tokens.textPrimary
+        selectionColor: GlassGrade.filmStrong
+        selectedTextColor: GlassGrade.textPrimary
 
         QuietText {
             anchors.fill: parent
             verticalAlignment: Text.AlignVCenter
             text: root.placeholder
-            color: Qt.rgba(1, 1, 1, 0.58 + Tokens.contrast * 0.12)
+            color: GlassGrade.textTertiary
             font: input.font
             visible: input.text.length === 0
         }

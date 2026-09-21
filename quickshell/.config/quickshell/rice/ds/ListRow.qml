@@ -51,7 +51,7 @@ Item {
 
         QuietText {
             text: root.primary
-            color: Tokens.textPrimary
+            color: GlassGrade.textPrimary
             font.family: Tokens.fontUi
             font.pixelSize: Tokens.fontSize
             fontWeight: Font.Medium
@@ -64,7 +64,7 @@ Item {
         QuietText {
             visible: root.secondary.length > 0
             text: root.secondary
-            color: Tokens.textSecondary
+            color: GlassGrade.textSecondary
             font.family: Tokens.fontUi
             font.pixelSize: Tokens.fontSize
             elide: Text.ElideRight
@@ -93,7 +93,7 @@ Item {
         RiceIcon {
             visible: root.chevron && root.trailingKeys.length === 0
             customSource: Qt.resolvedUrl("../assets/chevron-right.svg")
-            tint: (root.selected || root.pointerOver) ? Tokens.textSecondary : Tokens.textTertiary
+            tint: (root.selected || root.pointerOver) ? GlassGrade.textSecondary : GlassGrade.textTertiary
             implicitSize: 14
         }
     }

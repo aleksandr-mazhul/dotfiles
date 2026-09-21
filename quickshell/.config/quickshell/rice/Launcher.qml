@@ -1213,10 +1213,10 @@ DS.SearchListPopup {
                 RiceIcon {
                     anchors.centerIn: parent
                     customSource: Qt.resolvedUrl("assets/" + (rowItem.modelData.monoIcon || "app-fallback.svg"))
-                    tint: DS.Tokens.textIcon
+                    tint: DS.GlassGrade.textIcon
                     implicitSize: 22
                     halo: true
-                    haloColor: DS.Tokens.iconHalo
+                    haloColor: DS.GlassGrade.textHalo
                 }
             }
         }
@@ -1239,7 +1239,7 @@ DS.SearchListPopup {
                     anchors.fill: parent
                     visible: appIcon.status === Image.Error
                     customSource: Qt.resolvedUrl("assets/app-fallback.svg")
-                    tint: DS.Tokens.textSecondary
+                    tint: DS.GlassGrade.textSecondary
                     implicitSize: DS.Tokens.leadingSize
                 }
             }

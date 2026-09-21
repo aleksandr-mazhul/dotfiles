@@ -1,6 +1,9 @@
 singleton AdaptiveContrast AdaptiveContrast.qml
 singleton Tokens Tokens.qml
+singleton GlassGrade GlassGrade.qml
 GlassSurface GlassSurface.qml
+GlassBackdrop GlassBackdrop.qml
+LiquidGlass LiquidGlass.qml
 GlassEdge GlassEdge.qml
 Hairline Hairline.qml
 SectionLabel SectionLabel.qml

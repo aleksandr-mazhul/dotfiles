@@ -1,6 +1,7 @@
 import QtQuick
 
-// Footer is part of the smoked plate — hairline, compact keycaps, quiet type.
+// Footer is part of the plate — one hairline, compact keycaps, quiet type.
+// No band behind it: a second fill here reads as a toolbar, not as glass.
 Item {
     id: root
 
@@ -10,12 +11,6 @@ Item {
     property var closeHint: ({ keys: ["esc"], label: "Close" })
 
     implicitHeight: Tokens.footerHeight
-
-    ContentScrim {
-        anchors.fill: parent
-        radius: Tokens.radiusMin
-        color: Tokens.footerScrim
-    }
 
     Hairline {
         anchors.left: parent.left
@@ -38,7 +33,7 @@ Item {
         }
         QuietText {
             text: hint.label
-            color: Tokens.textSecondary
+            color: GlassGrade.textSecondary
             font.family: Tokens.fontUi
             font.pixelSize: Tokens.fontSizeSm
             anchors.verticalCenter: parent.verticalCenter

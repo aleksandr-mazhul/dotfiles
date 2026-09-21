@@ -838,7 +838,7 @@ DS.SearchListChrome {
                     return ""
                 }
                 visible: text.length > 0
-                color: DS.Tokens.textIcon
+                color: DS.GlassGrade.textIcon
                 font.family: DS.Tokens.fontUi
                 font.pixelSize: DS.Tokens.fontSizeSm
                 fontBold: true
@@ -849,7 +849,7 @@ DS.SearchListChrome {
                 Layout.fillWidth: true
                 Layout.fillHeight: true
                 text: modelData.label || ""
-                color: isEmpty ? DS.Tokens.textTertiary : DS.Tokens.textPrimary
+                color: isEmpty ? DS.GlassGrade.textTertiary : DS.GlassGrade.textPrimary
                 font.family: DS.Tokens.fontUi
                 font.pixelSize: DS.Tokens.fontSize
                 fontWeight: (isCurrent || isBusyRow) ? Font.Medium : Font.Normal
@@ -859,7 +859,7 @@ DS.SearchListChrome {
             DS.QuietText {
                 visible: isFav && !isBusyRow && !isEmpty && !isCancel
                 text: "★"
-                color: DS.Tokens.textSecondary
+                color: DS.GlassGrade.textSecondary
                 font.family: DS.Tokens.fontUi
                 font.pixelSize: DS.Tokens.fontSize
                 Layout.preferredWidth: visible ? 18 : 0
@@ -880,7 +880,7 @@ DS.SearchListChrome {
             DS.QuietText {
                 visible: !isEmpty && !isBusyRow && !!(modelData.detail)
                 text: modelData.detail || ""
-                color: DS.Tokens.textTertiary
+                color: DS.GlassGrade.textTertiary
                 font.family: DS.Tokens.fontUi
                 font.pixelSize: DS.Tokens.fontSizeSm
                 Layout.preferredWidth: visible ? 58 : 0

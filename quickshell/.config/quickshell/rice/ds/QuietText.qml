@@ -1,6 +1,12 @@
 import QtQuick
 
-// White UI type with a 1px drop shadow instead of a hard outline.
+// UI type with a 1px drop shadow instead of a hard outline.
+//
+// The shadow follows THIS label's own ink, not a global: light type on a busy
+// surface needs the separation, dark type does not, and a dark shadow under
+// dark type only thickens the stroke. Deriving it from the colour keeps the
+// rule local, so the same type serves the launcher's flipping ink and the bar's
+// fixed white without either having to plumb a polarity flag through.
 Item {
     id: root
 
@@ -14,6 +20,13 @@ Item {
     property int maximumLineCount: 1
     property bool fontBold: false
     property int fontWeight: Font.Normal
+
+    // 1 for white ink, ~0 for dark ink.
+    readonly property real inkLuma: {
+        const c = fg.color
+        const l = 0.2126 * c.r + 0.7152 * c.g + 0.0722 * c.b
+        return Math.min(1, Math.max(0, (l - 0.35) / 0.35))
+    }
 
     implicitWidth: fg.implicitWidth
     implicitHeight: Math.max(fg.implicitHeight, fg.font.pixelSize + 4)
@@ -31,7 +44,7 @@ Item {
         maximumLineCount: fg.maximumLineCount
         horizontalAlignment: fg.horizontalAlignment
         verticalAlignment: fg.verticalAlignment
-        color: Qt.rgba(0, 0, 0, 0.12 + Tokens.contrast * 0.18)
+        color: Qt.rgba(0, 0, 0, (0.12 + Tokens.contrast * 0.18) * root.inkLuma)
         visible: fg.text.length > 0
         z: 0
     }
@@ -49,7 +62,7 @@ Item {
         maximumLineCount: fg.maximumLineCount
         horizontalAlignment: fg.horizontalAlignment
         verticalAlignment: fg.verticalAlignment
-        color: Tokens.textShadow
+        color: Qt.rgba(0, 0, 0, Tokens.textShadow.a * root.inkLuma)
         visible: fg.text.length > 0
         z: 0
     }
@@ -69,7 +82,7 @@ Item {
         font.weight: root.fontWeight
         font.bold: root.fontBold
         style: Text.Outline
-        styleColor: Tokens.textHalo
+        styleColor: Qt.rgba(0, 0, 0, Tokens.textHalo.a * root.inkLuma)
         z: 1
     }
 }

@@ -238,7 +238,7 @@ DS.SearchListChrome {
                     DS.QuietText {
                         anchors.centerIn: parent
                         text: "✓"
-                        color: DS.Tokens.textPrimary
+                        color: DS.GlassGrade.textPrimary
                         font.pixelSize: 10
                         fontBold: true
                     }
@@ -249,7 +249,7 @@ DS.SearchListChrome {
                 Layout.fillWidth: true
                 Layout.fillHeight: true
                 text: modelData.name
-                color: DS.Tokens.textPrimary
+                color: DS.GlassGrade.textPrimary
                 font.family: DS.Tokens.fontUi
                 font.pixelSize: DS.Tokens.fontSize
                 fontWeight: Font.Medium

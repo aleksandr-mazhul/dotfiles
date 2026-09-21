@@ -1,34 +1,16 @@
 import QtQuick
 
-// Neutral glass keycap.
+// Keycap: one film, one hairline. No scrim, no gradient — at 20px tall a
+// gradient is noise, not material.
 Rectangle {
     property string key: ""
 
     implicitWidth: Math.max(implicitHeight, label.implicitWidth + 12)
     implicitHeight: 20
     radius: 6
-    color: Qt.rgba(1, 1, 1, 0.12 * (1 - AdaptiveContrast.contrast * 0.75))
+    color: GlassGrade.film
     border.width: 1
-    border.color: Qt.rgba(1, 1, 1, 0.22 + AdaptiveContrast.contrast * 0.10)
-
-    Rectangle {
-        anchors.fill: parent
-        radius: parent.radius
-        color: Tokens.fieldScrim
-        z: -1
-    }
-
-    Rectangle {
-        anchors.left: parent.left
-        anchors.right: parent.right
-        anchors.top: parent.top
-        height: Math.round(parent.height * 0.45)
-        radius: parent.radius
-        gradient: Gradient {
-            GradientStop { position: 0.0; color: Qt.rgba(1, 1, 1, 0.10) }
-            GradientStop { position: 1.0; color: "transparent" }
-        }
-    }
+    border.color: GlassGrade.hairline
 
     QuietText {
         id: label
@@ -36,7 +18,7 @@ Rectangle {
         width: implicitWidth
         height: implicitHeight
         text: key
-        color: Qt.rgba(1, 1, 1, 0.78 + AdaptiveContrast.contrast * 0.12)
+        color: GlassGrade.textSecondary
         font.family: Tokens.fontUi
         font.pixelSize: Tokens.fontSizeSm - 1
     }

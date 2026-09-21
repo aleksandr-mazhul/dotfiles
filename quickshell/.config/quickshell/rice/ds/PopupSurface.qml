@@ -20,6 +20,8 @@ PanelWindow {
     // function(event) -> bool; runs before the default Esc-close.
     property var keyHandler: null
     property bool parked: false
+    // The sheet stays hidden until its backdrop frame has landed.
+    property bool revealed: false
     // Optional: refocus the active input after compositor focus is restored.
     property var refocusHandler: null
 
@@ -101,9 +103,14 @@ PanelWindow {
     function present() {
         root.refreshScene(false)
         parked = false
+        revealed = false
         open = true
+        // Grab the backdrop while the sheet is still hidden: a live capture
+        // would photograph the glass and refract it into itself.
+        // Decide the ink polarity while nothing is on screen yet.
+        GlassGrade.latch()
+        backdrop.arm()
         popupOpened()
-        openAnim.play()
         grabFocus()
     }
 
@@ -119,6 +126,7 @@ PanelWindow {
             return
         openAnim.stop()
         open = false
+        revealed = false
         pane.opacity = 1
         pane.scale = 1
         popupClosed()
@@ -130,6 +138,7 @@ PanelWindow {
         parked = true
         openAnim.stop()
         open = false
+        revealed = false
         pane.opacity = 1
         pane.scale = 1
     }
@@ -137,9 +146,12 @@ PanelWindow {
     function resume() {
         parked = false
         root.refreshScene(false)
+        revealed = false
         open = true
+        // Decide the ink polarity while nothing is on screen yet.
+        GlassGrade.latch()
+        backdrop.arm()
         resumed()
-        openAnim.play()
         grabFocus()
     }
 
@@ -190,6 +202,11 @@ PanelWindow {
             // Re-arm after workspace switch (compositor may briefly drop layer focus).
             focusGrab.active = false
             root.refreshScene(true)
+            // A different workspace is different pixels, and the sheet is
+            // refracting a frozen frame of the old one. Hide it while the new
+            // frame is grabbed, or the capture photographs the sheet itself.
+            root.revealed = false
+            backdrop.arm()
             Qt.callLater(() => {
                 if (!root.open)
                     return
@@ -199,8 +216,21 @@ PanelWindow {
         }
     }
 
+    GlassBackdrop {
+        id: backdrop
+        captureSource: root.screen
+        active: root.open
+        onCaptured: {
+            if (!root.open)
+                return
+            root.revealed = true
+            openAnim.play()
+        }
+    }
+
     Item {
         id: pane
+        visible: root.revealed
         anchors.horizontalCenter: parent.horizontalCenter
         y: Math.round(root.height * root.anchorY)
         width: Math.min(root.surfaceWidth, Math.max(480, root.width - 80))
@@ -232,8 +262,17 @@ PanelWindow {
             // Absorb clicks on empty glass so they do not close the popup.
         }
 
-        GlassSurface {
+        LiquidGlass {
+            id: glass
             anchors.fill: parent
+            // The shader draws its own contact shadow in a padding ring, so the
+            // item overflows the pane on every side.
+            anchors.margins: -glass.pad
+            backdrop: backdrop
+            // pane is horizontalCenter-anchored and y-bound, so both notify.
+            originX: pane.x - glass.pad
+            originY: pane.y - glass.pad
+            radius: Tokens.radiusSurface
 
             Item {
                 id: inner

@@ -17,15 +17,9 @@ Item {
     Rectangle {
         anchors.fill: parent
         radius: Tokens.radiusField
-        color: Tokens.fieldFill
+        color: GlassGrade.filmStrong
         border.width: 1
-        border.color: Tokens.focusRim
-    }
-
-    Rectangle {
-        anchors.fill: parent
-        radius: Tokens.radiusField
-        color: Tokens.fieldScrim
+        border.color: GlassGrade.hairline
     }
 
     Column {
@@ -58,7 +52,7 @@ Item {
                     anchors.rightMargin: 12
                     anchors.verticalCenter: parent.verticalCenter
                     text: modelData.label || ""
-                    color: Tokens.textPrimary
+                    color: GlassGrade.textPrimary
                     font.family: Tokens.fontUi
                     font.pixelSize: Tokens.fontSizeSm
                     elide: Text.ElideRight

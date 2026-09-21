@@ -5,5 +5,5 @@ import QtQuick
 Rectangle {
     implicitHeight: 1
     height: 1
-    color: Tokens.hairline
+    color: GlassGrade.hairline
 }

@@ -483,7 +483,7 @@ Item {
                         anchors.centerIn: parent
                         visible: !root.model || root.model.length === 0
                         text: "Nothing found"
-                        color: Tokens.textTertiary
+                        color: GlassGrade.textTertiary
                         font.family: Tokens.fontUi
                         font.pixelSize: Tokens.fontSize
                     }

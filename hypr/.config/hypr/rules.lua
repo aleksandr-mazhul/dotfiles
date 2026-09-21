@@ -54,11 +54,17 @@ hl.layer_rule({
 
 -- DS popup surface (launcher + wallpaper / VPN / clipboard pages):
 -- one glass sheet, no fullscreen dim. Pages share namespace rice-popup.
+--
+-- NO compositor blur here, deliberately. This layer frosts itself: ds/GlassBackdrop
+-- screencopies the output and ds/liquidglass.frag refracts that capture, so the
+-- sheet is already opaque by the time Hyprland composites it and blurring behind
+-- it is wasted GPU. Worse, the sheet's contact shadow is semi-transparent, so
+-- ignore_alpha would let the blur through exactly there and paint a frosted halo
+-- in the one place the design wants a clean shadow.
 hl.layer_rule({
-    name = "rice-popup-glass",
+    name = "rice-popup-no-blur",
     match = { namespace = "^rice-(popup|clipboard)$" },
-    blur = true,
-    ignore_alpha = 0.03,
+    blur = false,
 })
 
 hl.window_rule({

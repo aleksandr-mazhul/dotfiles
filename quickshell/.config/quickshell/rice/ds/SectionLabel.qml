@@ -6,7 +6,7 @@ QuietText {
     property string label: ""
 
     text: label.toUpperCase()
-    color: Tokens.textTertiary
+    color: GlassGrade.textTertiary
     font.family: Tokens.fontUi
     font.pixelSize: Tokens.fontSizeSection
     font.letterSpacing: Tokens.sectionTracking

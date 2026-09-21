@@ -1,7 +1,11 @@
 import QtQuick
-import QtQuick.Effects
 
-// Selected row is a second glass sheet floating on the plate.
+// The selected row is a second, thinner sheet resting on the plate.
+//
+// Three layers, not six: a film of light, a lit top edge, one hairline. The
+// old pill stacked two RectangularShadows, a scrim, a fill, a border, an inner
+// border and a gradient — which is how a row ends up reading as a chrome widget
+// instead of as glass.
 Item {
     id: root
 
@@ -13,44 +17,15 @@ Item {
     readonly property int pillRadius: Tokens.innerRadius(Tokens.radiusSurface, Tokens.paddingSurface)
     readonly property bool showMuted: root.muted && !root.selected
 
-    RectangularShadow {
-        anchors.fill: fill
-        visible: root.selected
-        offset: Qt.vector2d(0, 6)
-        radius: root.pillRadius
-        blur: 18
-        spread: 0
-        color: Qt.rgba(0, 0, 0, 0.04)
-    }
-
-    RectangularShadow {
-        anchors.fill: fill
-        visible: root.selected
-        offset: Qt.vector2d(0, 0)
-        radius: root.pillRadius
-        blur: 16
-        spread: 0
-        color: Tokens.selectGlow
-    }
-
-    Rectangle {
-        anchors.fill: fill
-        radius: root.pillRadius
-        color: Tokens.selectScrim
-        visible: root.selected
-    }
-
     Rectangle {
         id: fill
         anchors.fill: parent
         radius: root.pillRadius
         color: root.selected
-            ? Tokens.raisedStrong
-            : (root.showMuted || root.hovered ? Tokens.raised : "transparent")
-        border.width: (root.selected || root.showMuted || root.hovered) ? 1 : 0
-        border.color: root.selected
-            ? Tokens.raisedRim
-            : (root.showMuted ? Tokens.hairline : Qt.rgba(1, 1, 1, 0.08))
+            ? GlassGrade.filmStrong
+            : (root.hovered ? GlassGrade.film
+                            : (root.showMuted ? GlassGrade.film : "transparent"))
+        opacity: root.showMuted && !root.hovered ? 0.6 : 1
 
         Behavior on color {
             ColorAnimation {
@@ -60,29 +35,23 @@ Item {
         }
     }
 
-    Rectangle {
-        visible: root.selected
-        anchors.fill: parent
-        anchors.margins: 1
-        radius: Math.max(Tokens.radiusMin, root.pillRadius - 1)
-        color: "transparent"
-        border.width: 1
-        border.color: Qt.rgba(1, 1, 1, 0.07)
-    }
-
+    // Light catches the top lip of the raised sheet.
     Rectangle {
         visible: root.selected
         anchors.left: parent.left
         anchors.right: parent.right
         anchors.top: parent.top
-        anchors.leftMargin: 2
-        anchors.rightMargin: 2
-        anchors.topMargin: 1
-        height: Math.round(parent.height * 0.42)
+        anchors.margins: 1
+        height: 1
+        color: GlassGrade.edgeLit
+    }
+
+    Rectangle {
+        visible: root.selected || root.showMuted
+        anchors.fill: parent
         radius: root.pillRadius
-        gradient: Gradient {
-            GradientStop { position: 0.0; color: Qt.rgba(1, 1, 1, 0.10) }
-            GradientStop { position: 1.0; color: "transparent" }
-        }
+        color: "transparent"
+        border.width: 1
+        border.color: GlassGrade.hairline
     }
 }
