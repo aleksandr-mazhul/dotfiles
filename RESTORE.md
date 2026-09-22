@@ -93,3 +93,25 @@ herdr integration install claude   # herdr agent state + toasts/sound
 then add `~/.local/bin/claude-notify` as a `Stop` and `Notification` hook and set
 `"preferredNotifChannel": "notifications_disabled"` (the hook replaces OSC 99, which
 herdr swallows). The script skips Claude Desktop sessions (`CLAUDE_CODE_ENTRYPOINT`).
+
+## tmux session persistence
+
+Stow installs the unit but does not enable it. After a restore:
+
+```bash
+systemctl --user enable --now tmux-save.service   # saves on logout / shutdown
+```
+
+The rest is config: hooks in `.tmux.conf` save on structural change (debounced
+~4s by `~/.config/tmux/tmux-save.sh`), `client-detached` saves immediately, and
+continuum's 5-minute tick stays as a floor. Every path goes through the wrapper
+— it is the only thing holding a lock, and resurrect corrupts its own snapshot
+without one.
+
+Two settings are load-order sensitive and fail silently if moved:
+`@resurrect-save-script-path` must be set **after** `run tpm` (resurrect rewrites
+it on load) and **via run-shell** (continuum calls it quoted, so a literal `~`
+never expands). `status-right` must keep continuum's `#()` hook, or the periodic
+save stops.
+
+Debug a save with `TMUX_SAVE_LOG=/tmp/save.log ~/.config/tmux/tmux-save.sh worker-now`.
