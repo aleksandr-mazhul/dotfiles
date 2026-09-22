@@ -253,34 +253,39 @@ local function is_zoom(class)
     return class == "zoom" or class:find("zoom", 1, true) ~= nil
 end
 
+-- Zoom only. Everything else reaches the app by itself: these binds are
+-- non_consuming, so Hyprland forwards the real press AND release untouched.
+--
+-- Do NOT go back to `hl.dsp.pass` here. Hyprland 0.56.2 swallows the real press
+-- of a consuming bind, and `pass` injects a synthetic press into the client —
+-- but on release, KeybindManager only re-runs the callback when the bind's
+-- handler is "pass"/"global"/"sendshortcut", and every Lua bind's handler is
+-- "__lua". So the callback never fires on release, the real release stays
+-- swallowed, and the client is left holding a key that is never released.
+-- kitty then repeats it forever (25/s, and bare — it re-encodes each repeat
+-- against the live modifier state, so Ctrl is already gone): a flood of ^[[6~.
 local function zoom_tab_or_pass(dir)
     local focused = hl.get_active_window()
-    if not focused then
-        return
-    end
-    if is_zoom(focused.class) then
+    if focused and is_zoom(focused.class) then
         hl.dispatch(hl.dsp.exec_cmd("~/.config/hypr/scripts/zoom-tab.sh " .. dir))
-        return
     end
-    -- One pass only — apps (Zen) / kitty handle Ctrl+PgUp themselves
-    hl.dispatch(hl.dsp.pass({ window = focused }))
 end
 
 -- After kanata: Super+Shift+[ ] arrives as Ctrl+Page_Up/Down
 hl.bind("CTRL + Page_Up", function()
     zoom_tab_or_pass("prev")
-end, { dont_inhibit = true })
+end, { dont_inhibit = true, non_consuming = true })
 hl.bind("CTRL + Page_Down", function()
     zoom_tab_or_pass("next")
-end, { dont_inhibit = true })
+end, { dont_inhibit = true, non_consuming = true })
 
 -- Direct Ctrl+Shift+[ ] (keyboard, no kanata)
 hl.bind("CTRL + SHIFT + bracketleft", function()
     zoom_tab_or_pass("prev")
-end, { dont_inhibit = true })
+end, { dont_inhibit = true, non_consuming = true })
 hl.bind("CTRL + SHIFT + bracketright", function()
     zoom_tab_or_pass("next")
-end, { dont_inhibit = true })
+end, { dont_inhibit = true, non_consuming = true })
 
 -- Do NOT bind SUPER+SHIFT+bracket*: kanata already remaps those to Ctrl+PgUp/Dn.
 -- Binding both caused a second pass → skipped tabs in Zen and windows in tmux.
