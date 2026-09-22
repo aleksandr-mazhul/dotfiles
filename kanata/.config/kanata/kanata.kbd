@@ -33,18 +33,20 @@
   ;; HRM anti-roll: same finger sequence as Mac config (A S D F / J K L ;),
   ;; not remapped onto Linux Super-Alt-Ctrl-Shift key names.
   tap-hold-require-prior-idle 120
-  ;; Overrides tap their output key instead of holding it for the whole chord.
+  ;; Do NOT set override-release-on-activation here. It makes an override tap
+  ;; its output instead of holding it, which kills key repeat for EVERY override
+  ;; in this file — holding Alt+←/→ stopped running through words, and
+  ;; Alt+Backspace stopped deleting word after word.
   ;;
-  ;; NOTE: this was added believing kanata caused the ^[[6~ flood. It did not —
-  ;; measured, kanata emits exactly one pgdn press+release per activation and
-  ;; never an autorepeat event. The flood came from Hyprland swallowing the key
-  ;; release of a Lua `pass` bind (see hypr/binds.lua); fixed there.
+  ;; It was added to stop a ^[[6~ flood that kanata never caused: measured over
+  ;; a 3.5h session, kanata emitted 10 PageDown presses total, zero autorepeat
+  ;; events, and one activation produced exactly one press+release even while
+  ;; the chord was "held" (the mouse firmware sends a fixed ~4ms macro, so there
+  ;; is no hold to repeat). The flood was Hyprland swallowing the release of a
+  ;; Lua `pass` bind — fixed in hypr/binds.lua.
   ;;
-  ;; Kept because it still bounds a HELD keyboard chord (the mouse can't hold
-  ;; one — its firmware emits a fixed ~4ms macro regardless).
-  ;; Trade-off, and it applies to EVERY override in this file: holding Alt+←/→
-  ;; no longer repeats word motion — one jump per press.
-  override-release-on-activation yes
+  ;; Consequence of leaving it off: holding Super+Shift+[ ] ON THE KEYBOARD now
+  ;; cycles tabs while held. That is ordinary key repeat, not the old bug.
   ;; Exact kbd nodes only — name filters still match duplicate HID interfaces
   ;; (Ergohaven "… Keyboard", multiple Dragonfly nodes) and break Alt+arrows in Qt.
   ;; kanata watches /dev/input (inotify IN_CREATE), so a device listed here is
