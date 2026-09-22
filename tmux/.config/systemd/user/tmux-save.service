@@ -1,0 +1,24 @@
+[Unit]
+Description=Save tmux session state on logout / shutdown
+Documentation=https://github.com/tmux-plugins/tmux-resurrect
+After=graphical-session.target
+
+# Belt and braces. The client-detached hook in .tmux.conf already saves when the
+# last terminal closes, which covers the normal "I'm done for the day" path.
+# This unit catches the rest: a shutdown that never detaches cleanly, or a
+# logout while a client is still attached. Without it, nothing saves at exit —
+# continuum's periodic save only runs while a client is attached (it hooks
+# status-right, and tmux runs #() jobs only while drawing a status line), so
+# detaching used to freeze the snapshot until the next attach.
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/bin/true
+# worker-now, not `now`: run the save in THIS process so systemd waits for it.
+# `now` would setsid away and systemd would kill it as the unit stops.
+ExecStop=%h/.config/tmux/tmux-save.sh worker-now
+TimeoutStopSec=45
+
+[Install]
+WantedBy=default.target
