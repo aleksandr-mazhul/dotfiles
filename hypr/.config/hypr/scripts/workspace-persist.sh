@@ -24,7 +24,7 @@ save_current() {
   local id
   id="$(current_id)"
   # Only persist normal numbered workspaces (1–10 in this rice).
-  if [[ "$id" =~ ^(10|[1-9])$ ]]; then
+  if [[ "$id" =~ ^([1-9]|1[0-6])$ ]]; then
     printf '%s\n' "$id" >"$STATE_FILE"
   fi
 }
@@ -33,7 +33,7 @@ restore_saved() {
   [[ -r "$STATE_FILE" ]] || return 0
   local id
   id="$(<"$STATE_FILE")"
-  [[ "$id" =~ ^(10|[1-9])$ ]] || return 0
+  [[ "$id" =~ ^([1-9]|1[0-6])$ ]] || return 0
   # Let monitors / rename / silent autostart settle first.
   sleep 1.2
   focus_workspace "$id"
@@ -52,7 +52,7 @@ watch_and_save() {
   while true; do
     local id
     id="$(current_id)"
-    if [[ "$id" =~ ^(10|[1-9])$ && "$id" != "$last" ]]; then
+    if [[ "$id" =~ ^([1-9]|1[0-6])$ && "$id" != "$last" ]]; then
       printf '%s\n' "$id" >"$STATE_FILE"
       last="$id"
     fi
