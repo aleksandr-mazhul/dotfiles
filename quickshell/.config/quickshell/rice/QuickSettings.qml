@@ -749,7 +749,8 @@ PanelWindow {
                     label: "Log Out"
                     detail: "End Hyprland session"
                     iconName: "system-log-out"
-                    onActivated: Quickshell.execDetached(["hyprctl", "dispatch", "exit"])
+                    // Lua config: `hyprctl dispatch exit` is a no-op; dispatch via eval.
+                    onActivated: Quickshell.execDetached(["hyprctl", "eval", "hl.dispatch(hl.dsp.exit())"])
                 }
             }
 
