@@ -63,6 +63,16 @@ if [[ "$DO_PKGS" -eq 1 ]]; then
     || echo "warn: some packages failed to install (see the summary above)" >&2
 fi
 
+# swww was renamed awww in the Arch repos (same author, same CLI); the scripts
+# still call swww / swww-daemon.
+mkdir -p "$HOME/.local/bin"
+for pair in swww:awww swww-daemon:awww-daemon; do
+  old="${pair%%:*}" new="${pair##*:}"
+  if ! command -v "$old" >/dev/null 2>&1 && command -v "$new" >/dev/null 2>&1; then
+    ln -s "$(command -v "$new")" "$HOME/.local/bin/$old"
+  fi
+done
+
 if ! command -v stow >/dev/null 2>&1; then
   log "Installing stow"
   need_cmd sudo
