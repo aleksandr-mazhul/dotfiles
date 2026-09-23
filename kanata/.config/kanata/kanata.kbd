@@ -56,6 +56,10 @@
     /dev/input/by-id/usb-Ergohaven_K:03_v3_v4_vial:f64c2b3c-event-kbd
     /dev/input/by-id/usb-Compx_VGN_Dragonfly_4K_Receiver-event-kbd
   )
+  ;; These are THIS machine's keyboards. Elsewhere none exist and kanata would
+  ;; exit and crash-loop under Restart=on-failure; keep running and wait for
+  ;; hotplug instead. Add the new machine's /dev/input/by-id/*-event-kbd above.
+  linux-continue-if-no-devs-found yes
 )
 
 (defvar
