@@ -2,8 +2,21 @@
 
 local home = os.getenv("HOME") or ""
 
-hl.plugin.load(home .. "/.local/lib/hypr/gloview.so")
-hl.plugin.load(home .. "/.local/lib/hypr/dynamic-cursors.so")
+-- Plugins are built by hand (scripts/install-gloview.sh …). On a fresh machine
+-- the .so files are missing; gloview.lua would then index a nil
+-- hl.plugin.gloview and abort the require chain before binds.lua loads,
+-- leaving a session with no keybinds. Load what exists, skip the rest.
+local function load_plugin(name)
+    local path = home .. "/.local/lib/hypr/" .. name .. ".so"
+    local f = io.open(path, "r")
+    if not f then
+        return false
+    end
+    f:close()
+    return (pcall(hl.plugin.load, path))
+end
+local has_gloview = load_plugin("gloview")
+local has_dynamic_cursors = load_plugin("dynamic-cursors")
 
 require("monitors")
 require("workspaces")
@@ -286,8 +299,12 @@ hl.on("hyprland.start", function()
 end)
 
 require("colors-matugen")
-require("gloview")
-require("dynamic-cursors")
+if has_gloview and hl.plugin.gloview then
+    require("gloview")
+end
+if has_dynamic_cursors then
+    require("dynamic-cursors")
+end
 require("pip")
 require("binds")
 require("rules")
