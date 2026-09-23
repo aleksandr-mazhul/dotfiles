@@ -278,8 +278,7 @@ hl.on("hyprland.start", function()
     hl.exec_cmd("~/.config/hypr/scripts/eh-default-layer.sh")
     -- Each window remembers EN/RU; restores on focus (pauses while launcher forces EN).
     hl.exec_cmd("~/.config/hypr/scripts/eh-window-layout.py")
-    -- Names match Mac skhd/yabai spaces.sh (W C V D G X Z E T I P Q U Y R A)
-    hl.exec_cmd("hyprctl dispatch renameworkspace 1 W & hyprctl dispatch renameworkspace 2 C & hyprctl dispatch renameworkspace 3 V & hyprctl dispatch renameworkspace 4 D & hyprctl dispatch renameworkspace 5 G & hyprctl dispatch renameworkspace 6 X & hyprctl dispatch renameworkspace 7 Z & hyprctl dispatch renameworkspace 8 E & hyprctl dispatch renameworkspace 9 T & hyprctl dispatch renameworkspace 10 I & hyprctl dispatch renameworkspace 11 P & hyprctl dispatch renameworkspace 12 Q & hyprctl dispatch renameworkspace 13 U & hyprctl dispatch renameworkspace 14 Y & hyprctl dispatch renameworkspace 15 R & hyprctl dispatch renameworkspace 16 A")
+    -- Workspace names (W C V D G …) come from default_name in workspaces.lua.
     -- Restore last workspace and keep saving focus changes across reboots.
     hl.exec_cmd("~/.config/hypr/scripts/workspace-persist.sh watch")
     -- Clipboard index last: thumbs + JSON after apps, so Super+Q opens with history ready.

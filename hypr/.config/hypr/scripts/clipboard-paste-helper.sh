@@ -9,7 +9,7 @@ restore_focus() {
   if [[ -f "$PREV_ADDR_FILE" ]]; then
     addr="$(tr -d '[:space:]' <"$PREV_ADDR_FILE")"
     if [[ -n "$addr" ]]; then
-      hyprctl dispatch focuswindow "address:$addr" >/dev/null || true
+      hyprctl dispatch "hl.dsp.focus({ window = \"address:$addr\" })" >/dev/null || true
     fi
   fi
 }
