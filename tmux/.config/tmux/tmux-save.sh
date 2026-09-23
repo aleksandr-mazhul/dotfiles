@@ -116,6 +116,9 @@ case "${1:-request}" in
       [ "$(mtime "$STAMP")" = "$seen" ] && break
       [ "$(date +%s)" -ge "$deadline" ] && { log "maxwait hit"; break; }
     done
+    # Release before saving: a request that lands mid-save must be able to
+    # start the next worker, or that change waits for the next continuum tick.
+    exec 8>&-
     do_save
     ;;
   *) request ;;
