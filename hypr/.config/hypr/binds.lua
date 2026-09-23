@@ -253,8 +253,10 @@ local function is_zoom(class)
     return class == "zoom" or class:find("zoom", 1, true) ~= nil
 end
 
--- Zoom only. Everything else reaches the app by itself: these binds are
--- non_consuming, so Hyprland forwards the real press AND release untouched.
+-- Zoom gets Ctrl+Tab via zoom-tab.sh and the real key is swallowed; everything
+-- else gets the real press back via `pass_event`. Callers must PROPAGATE the
+-- return value. (non_consuming was used before, but it forwarded the key to Zoom
+-- too, so Zoom saw Ctrl+Page_Up/Down on top of the wtyped Ctrl+Tab.)
 --
 -- Do NOT go back to `hl.dsp.pass` here. Hyprland 0.56.2 swallows the real press
 -- of a consuming bind, and `pass` injects a synthetic press into the client —
@@ -268,24 +270,26 @@ local function zoom_tab_or_pass(dir)
     local focused = hl.get_active_window()
     if focused and is_zoom(focused.class) then
         hl.dispatch(hl.dsp.exec_cmd("~/.config/hypr/scripts/zoom-tab.sh " .. dir))
+        return
     end
+    return { pass_event = true }
 end
 
 -- After kanata: Super+Shift+[ ] arrives as Ctrl+Page_Up/Down
 hl.bind("CTRL + Page_Up", function()
-    zoom_tab_or_pass("prev")
-end, { dont_inhibit = true, non_consuming = true })
+    return zoom_tab_or_pass("prev")
+end, { dont_inhibit = true })
 hl.bind("CTRL + Page_Down", function()
-    zoom_tab_or_pass("next")
-end, { dont_inhibit = true, non_consuming = true })
+    return zoom_tab_or_pass("next")
+end, { dont_inhibit = true })
 
 -- Direct Ctrl+Shift+[ ] (keyboard, no kanata)
 hl.bind("CTRL + SHIFT + bracketleft", function()
-    zoom_tab_or_pass("prev")
-end, { dont_inhibit = true, non_consuming = true })
+    return zoom_tab_or_pass("prev")
+end, { dont_inhibit = true })
 hl.bind("CTRL + SHIFT + bracketright", function()
-    zoom_tab_or_pass("next")
-end, { dont_inhibit = true, non_consuming = true })
+    return zoom_tab_or_pass("next")
+end, { dont_inhibit = true })
 
 -- Do NOT bind SUPER+SHIFT+bracket*: kanata already remaps those to Ctrl+PgUp/Dn.
 -- Binding both caused a second pass → skipped tabs in Zen and windows in tmux.
