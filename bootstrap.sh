@@ -99,6 +99,9 @@ fi
     sudo usermod -aG video,i2c "$USER"
 } || echo "warn: i2c/video group setup failed" >&2
 
+log "System files (/etc: udev rules, zram, docker socket)"
+"$ROOT/system/install.sh" || echo "warn: system/install.sh failed" >&2
+
 if command -v tmux >/dev/null 2>&1; then
   log "tmux plugins (tpm)"
   tpm="$HOME/.tmux/plugins/tpm"

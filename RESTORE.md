@@ -48,6 +48,13 @@ other hardware it does nothing. For new keyboards add their
 `/dev/input/by-id/*-event-kbd` to `linux-dev` in `kanata.kbd` and their names to
 `KANATA_OWNED` in `kanata/.local/bin/hid-kbd-swallow.py`.
 
+## System files (`system/`)
+
+Not stowed — `system/install.sh` (run by bootstrap, idempotent, sudo) copies
+`system/etc/**` into `/etc`: USB HID no-autosuspend, Vial hidraw access, RAPL
+readout for MangoHud, zram (`ram / 2`, zstd), and switches docker to socket
+activation. After editing a file there, run `./system/install.sh` again.
+
 ## restow.sh modes
 
 | Command | Effect |
@@ -82,6 +89,7 @@ BOOTSTRAP_WALLPAPER=~/pictures/wallpapers/old/nature-01.jpg ./bootstrap.sh
 | GTK / wofi / yazi / waypaper / … | matching packages |
 | Global git config | `git/.gitconfig` |
 | SDDM theme assets | `sddm/` (applied via `sddm/install.sh`) |
+| `/etc` udev rules, zram, docker socket | `system/` (applied via `system/install.sh`) |
 
 SSOT-generated files (`~/.config/cava/themes/ssot`, `btop` theme, `glow/ssot.json`,
 `peaclock`, `bottom.toml`, `lazygit`, `bat`, Vimium CSS, …) are **rebuilt** by
