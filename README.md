@@ -30,7 +30,7 @@ cd ~/dotfiles
 | `./restow.sh` | Stow-симлинки в `$HOME`; конфликтующие файлы → `~/.dotfiles-backup/<ts>/` |
 | `./restow.sh --check` / `--adopt` | Только проверить / забрать живые файлы в репо |
 
-После bootstrap — **перелогиниться** (группы `input`, `i2c`, `video` для kanata и ddcutil). `hid-kbd-swallow.service` включается вручную после проверки allow-list — см. [RESTORE.md](RESTORE.md).
+После bootstrap — **перелогиниться** (группы `input`, `i2c`, `video` для kanata и ddcutil). Новые клавиатуры: добавить в `kanata.kbd` (`linux-dev`) и `hid-kbd-swallow.py` — см. [RESTORE.md](RESTORE.md).
 
 Обои при bootstrap (опционально):
 

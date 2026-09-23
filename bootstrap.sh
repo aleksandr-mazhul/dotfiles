@@ -109,10 +109,9 @@ fi
 log "User services"
 systemctl --user daemon-reload || true
 # Every unit this repo ships that is enabled on the reference machine.
-# NOT hid-kbd-swallow.service: it grabs every "* Keyboard" not on its
-# allow-list, so on another PC it can swallow the only working keyboard.
-# Enable it by hand after checking the device list in hid-kbd-swallow.py.
-for unit in kanata.service tmux-save.service icloud-calendar-sync.timer \
+# hid-kbd-swallow only grabs "* Keyboard" siblings of a kanata-owned device, so
+# on a machine without those keyboards it idles.
+for unit in kanata.service hid-kbd-swallow.service tmux-save.service icloud-calendar-sync.timer \
   vscode-cursor-sync.path vscode-cursor-sync-idle.timer cursor-update.timer; do
   [[ -f "$HOME/.config/systemd/user/$unit" ]] || continue
   systemctl --user enable --now "$unit" || {
@@ -185,7 +184,7 @@ Manual follow-ups:
   2. gh auth login   /  restore SSH keys
   3. Open Zen once via zen-browser (syncs shortcuts + Vimium CSS)
   4. Re-login so the input / i2c / video groups apply (kanata, ddcutil)
-  5. hid-kbd-swallow.service is NOT enabled: check the allow-list in
-     hid-kbd-swallow.py, then systemctl --user enable --now it
+  5. New keyboards: add their /dev/input/by-id/*-event-kbd to kanata.kbd linux-dev
+     and their names to KANATA_OWNED in hid-kbd-swallow.py
 ============================================================
 EOF

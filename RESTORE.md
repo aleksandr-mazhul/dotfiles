@@ -42,10 +42,11 @@ udev rule, adds you to `input`), loads `i2c-dev` and adds you to `i2c` and
 | `i2c` | `ddcutil` — external monitor brightness (DDC/CI) |
 | `video` | backlight / brightness |
 
-`hid-kbd-swallow.service` is **not** enabled: it grabs every `* Keyboard` not on
-its allow-list and can swallow the only keyboard on another PC. Check the list
-in `kanata/.local/bin/hid-kbd-swallow.py`, then
-`systemctl --user enable --now hid-kbd-swallow.service`.
+`hid-kbd-swallow.service` only grabs a `* Keyboard` node that shares
+vendor:product with a keyboard kanata owns (the duplicate HID interface), so on
+other hardware it does nothing. For new keyboards add their
+`/dev/input/by-id/*-event-kbd` to `linux-dev` in `kanata.kbd` and their names to
+`KANATA_OWNED` in `kanata/.local/bin/hid-kbd-swallow.py`.
 
 ## restow.sh modes
 
