@@ -8,9 +8,6 @@ jetbrains-toolbox
 kanata-bin
 peaclock
 pipes.sh
-python-imageio-ffmpeg
-python-pkg_resources
-python-screeninfo
 spicetify-bin
 tty-clock
 vibepanel-bin
@@ -20,4 +17,3 @@ yandex-browser
 yay
 zen-browser-bin
 zoom
-chatgpt-desktop-bin

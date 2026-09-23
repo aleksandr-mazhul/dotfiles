@@ -28,8 +28,6 @@ direnv
 discord
 dive
 docker
-docker-buildx
-docker-compose
 doggo
 dolphin
 duf
