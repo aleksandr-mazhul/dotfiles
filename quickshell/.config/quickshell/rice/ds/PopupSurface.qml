@@ -50,9 +50,10 @@ PanelWindow {
 
     function grabFocus() {
         Qt.callLater(() => {
-            root.forceActiveFocus()
-            if (typeof refocusHandler === "function")
-                refocusHandler()
+            // PanelWindow is not an Item: focus the pane (it owns the Esc handler).
+            pane.forceActiveFocus()
+            if (typeof root.refocusHandler === "function")
+                root.refocusHandler()
         })
     }
 
@@ -66,15 +67,11 @@ PanelWindow {
             h = 420
         const lx = Math.round((root.width - w) / 2)
         const ly = Math.round(root.height * root.anchorY)
-        let gx = lx
-        let gy = ly
-        if (typeof root.mapToGlobal === "function") {
-            const p = root.mapToGlobal(Qt.point(lx, ly))
-            if (p) {
-                gx = Math.round(p.x)
-                gy = Math.round(p.y)
-            }
-        }
+        // The surface is anchored to all edges with ExclusionMode.Ignore, so
+        // window-local coords map to global by the screen's layout origin.
+        const scr = root.screen
+        let gx = lx + Math.round(scr ? scr.x : 0)
+        let gy = ly + Math.round(scr ? scr.y : 0)
         if (gx < 0)
             gx = 0
         if (gy < 0)
@@ -199,7 +196,9 @@ PanelWindow {
         }
     }
 
-    Item {
+    // FocusScope so forceActiveFocus() lands on the content's focused child
+    // (e.g. a search field) instead of stealing focus from it.
+    FocusScope {
         id: pane
         anchors.horizontalCenter: parent.horizontalCenter
         y: Math.round(root.height * root.anchorY)
