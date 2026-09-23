@@ -27,6 +27,18 @@ match="${self_dir}/theme-match"
 build="${self_dir}/theme-build"
 render="${self_dir}/theme-render"
 
+# Serialize concurrent runs (waypaper post_command + QS panel clicks): each run
+# rewrites extract.json/match.json/palette.toml and every rendered config.
+# A newer request waits for the running one, then applies its own wallpaper
+# (last writer wins). Released before reloads so daemons spawned below
+# (qs -d, …) never inherit the lock fd.
+lock_file="${XDG_RUNTIME_DIR:-/tmp}/theme-apply.lock"
+exec 9>"$lock_file"
+if ! flock -w 120 9; then
+  echo "apply-wallpaper-theme: timed out waiting for $lock_file" >&2
+  exit 1
+fi
+
 mkdir -p "$sddm_cache" "$cfg/theme"
 
 # Keep hyprlock background in sync
@@ -60,6 +72,10 @@ if [[ -d "$sddm_theme" && -w "$sddm_theme" ]]; then
     cp -f "$sddm_cache/colors.conf" "$sddm_theme/colors.conf" 2>/dev/null || true
   fi
 fi
+
+# All file writes done — let a queued run proceed.
+flock -u 9
+exec 9>&-
 
 if ((restoring_at_start == 0)); then
   hyprctl reload >/dev/null 2>&1 || true
