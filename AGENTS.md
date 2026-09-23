@@ -28,6 +28,10 @@ Do all of the following in one session (or explain what you blocked on):
    ```
    Commit updates to `packages/repo.txt` and/or `packages/aur.txt`.
    If it is part of the rice baseline, also add it to `packages/rice-repo.txt` or `packages/rice-aur.txt`.
+   Hardware-specific packages (drivers, microcode, bootloader) go to the matching
+   `packages/hw-*.txt`; a tool a repo script calls goes to `packages/required.txt`.
+   `export.sh` leaves both out of `repo.txt`/`aur.txt`. Check the name exists
+   (`pacman -Si` / AUR) — `install.sh` skips unknown names with a warning.
 
 3. **Track config (if any)**
    - Put files under the right Stow package, e.g. `misc/.config/<app>/…` or a new top-level package.

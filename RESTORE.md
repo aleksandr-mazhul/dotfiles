@@ -3,11 +3,59 @@
 ## One command
 
 ```bash
-git clone git@github.com:aleksandr-mazhul/dotfiles.git ~/dotfiles
+git clone https://github.com/aleksandr-mazhul/dotfiles.git ~/dotfiles  # HTTPS: SSH keys come later
 cd ~/dotfiles
 ./bootstrap.sh          # everything
 # ./bootstrap.sh --rice # smaller package set
 ```
+
+Package names that no longer exist (repo or AUR) are warned about and skipped;
+a failed AUR build is retried alone and listed at the end — bootstrap still
+restows. No listed package needs `[multilib]`; enable it in `/etc/pacman.conf`
+by hand only if you add `lib32-*`/Steam.
+
+## Packages: generic vs hardware
+
+| List | Installed by |
+| --- | --- |
+| `repo.txt`, `aur.txt` | full mode (`./packages/install.sh`) |
+| `required.txt` | every mode but `--aur` — runtime deps of the repo's scripts (pillow, ripgrep, wl-clipboard, jq, matugen, uv, khal, vdirsyncer, waypaper, …) |
+| `rice-*.txt` | `--rice` (no hw lists) |
+| `hw-nvidia.txt`, `hw-intel-gpu.txt`, `hw-amd-gpu.txt` | full/`--repo`, auto: GPU vendor from PCI class `03xx` |
+| `hw-intel-cpu.txt`, `hw-amd-cpu.txt` | full/`--repo`, auto: `vendor_id` in `/proc/cpuinfo` (microcode) |
+| `hw-boot.txt` | only with `--boot` (kernel + headers, GRUB, efibootmgr, plymouth) |
+
+Override detection with `HW="amd-gpu amd-cpu" ./packages/install.sh` or skip it
+with `--no-hw`. `export.sh` never writes names from `hw-*.txt`/`required.txt`
+back into `repo.txt`/`aur.txt` — edit those lists by hand.
+
+## Device access and groups
+
+Bootstrap runs `kanata/.local/bin/kanata-setup.sh` (loads `uinput`, adds the
+udev rule, adds you to `input`), loads `i2c-dev` and adds you to `i2c` and
+`video`. **Re-login** afterwards, otherwise kanata cannot open `/dev/uinput` and
+`ddcutil` brightness fails.
+
+| Group | For |
+| --- | --- |
+| `input` | kanata (`/dev/uinput`, keyboard devices) |
+| `i2c` | `ddcutil` — external monitor brightness (DDC/CI) |
+| `video` | backlight / brightness |
+
+`hid-kbd-swallow.service` is **not** enabled: it grabs every `* Keyboard` not on
+its allow-list and can swallow the only keyboard on another PC. Check the list
+in `kanata/.local/bin/hid-kbd-swallow.py`, then
+`systemctl --user enable --now hid-kbd-swallow.service`.
+
+## restow.sh modes
+
+| Command | Effect |
+| --- | --- |
+| `./restow.sh` | links everything; conflicting real files move to `~/.dotfiles-backup/<timestamp>/` |
+| `./restow.sh --adopt` | pulls live files **into** the repo — only on a machine whose configs are yours; review `git diff` |
+| `./restow.sh --check` | reports what is not linked, changes nothing |
+
+Bootstrap warns if the repo has uncommitted changes after restow.
 
 Wallpaper library (not in git): `wallpapers-fetch`. Optional wallpaper override:
 
@@ -19,7 +67,7 @@ BOOTSTRAP_WALLPAPER=~/pictures/wallpapers/old/nature-01.jpg ./bootstrap.sh
 
 | Area | Location |
 | --- | --- |
-| Package inventory | `packages/repo.txt`, `packages/aur.txt`, curated `rice-*.txt` |
+| Package inventory | `packages/repo.txt`, `aur.txt`, `required.txt`, `hw-*.txt`, curated `rice-*.txt` |
 | Hyprland / scripts | `hypr/` |
 | Kitty, Fish, Tmux, Starship | `kitty/`, `fish/`, `tmux/`, `starship/` |
 | Kanata + systemd unit | `kanata/` |
@@ -96,10 +144,13 @@ herdr swallows). The script skips Claude Desktop sessions (`CLAUDE_CODE_ENTRYPOI
 
 ## tmux session persistence
 
-Stow installs the unit but does not enable it. After a restore:
+Bootstrap clones tpm into `~/.tmux/plugins/tpm`, runs its `install_plugins` and
+enables `tmux-save.service` (saves on logout / shutdown). By hand:
 
 ```bash
-systemctl --user enable --now tmux-save.service   # saves on logout / shutdown
+git clone https://github.com/tmux-plugins/tpm ~/.tmux/plugins/tpm
+~/.tmux/plugins/tpm/bin/install_plugins
+systemctl --user enable --now tmux-save.service
 ```
 
 The rest is config: hooks in `.tmux.conf` save on structural change (debounced
