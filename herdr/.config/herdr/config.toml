@@ -6,24 +6,24 @@ name = "vesper"
 
 [theme.custom]
 panel_bg = "reset"
-accent = "#90c4c6"
-green = "#b1c7c7"
-yellow = "#c2be9c"
+accent = "#ffb688"
+green = "#e5bfa9"
+yellow = "#cac993"
 red = "#ffb4ab"
-blue = "#90c4c6"
-teal = "#b1c7c7"
-peach = "#8ba6a7"
-mauve = "#b1c7c7"
+blue = "#ffb688"
+teal = "#e5bfa9"
+peach = "#c4a882"
+mauve = "#e5bfa9"
 text = "#ebe1d4"
 subtext0 = "#d1c5b4"
-overlay0 = "#3b4f54"
-overlay1 = "#8ba6a7"
-surface0 = "#1a2224"
-surface1 = "#222d30"
-surface_dim = "#3b4f54"
+overlay0 = "#574451"
+overlay1 = "#c4a882"
+surface0 = "#292126"
+surface1 = "#342931"
+surface_dim = "#574451"
 
 [ui]
-accent = "#90c4c6"
+accent = "#ffb688"
 
 [ui.toast]
 enabled = true
