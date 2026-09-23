@@ -10,8 +10,20 @@ flock 9
 
 tmux has-session 2>/dev/null && exit 0
 
+# Own scope, ordered Before=tmux-save.service, so on shutdown systemd runs the
+# final save BEFORE it SIGTERMs the server: stop order is the reverse of start
+# order, so the unit that starts first stops last. (After= here is the trap: it
+# reads right but kills the server first -- verified with dummy units.) Started
+# bare, the server lands in the launching Kitty's scope, which has no ordering
+# against tmux-save.service: both stop in parallel and the save races a dying
+# server. Pane scopes (tmux-spawn-*) are stopped before the server's scope by
+# tmux itself, so the chain is: save -> server -> panes. Fallback: a bare
+# server beats no server.
 # 9>&- : the daemonised server must not inherit (and forever hold) the lock fd
-tmux new-session -d -s 0 9>&- || exit 0
+systemd-run --user --scope --quiet --unit=tmux-server -p Before=tmux-save.service \
+  tmux new-session -d -s 0 9>&- 2>/dev/null \
+  || tmux has-session 2>/dev/null \
+  || tmux new-session -d -s 0 9>&- || exit 0
 restore="$HOME/.tmux/plugins/tmux-resurrect/scripts/restore.sh"
 last="$HOME/.local/share/tmux/resurrect/last"
 # run-shell (not a direct call): restore.sh derives the socket from $TMUX, which is empty outside tmux.
