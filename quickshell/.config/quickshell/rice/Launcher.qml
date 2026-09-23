@@ -136,7 +136,7 @@ DS.SearchListPopup {
         sessionRoot = ""
         // EN for search typing; restore previous layout on close.
         // eh-layout-sync keeps Ergohaven firmware in step with Hyprland.
-        Quickshell.execDetached(["bash", "-lc", "~/.config/hypr/scripts/launcher-layout.sh open"])
+        Quickshell.execDetached(["bash", "-c", "~/.config/hypr/scripts/launcher-layout.sh open"])
         refreshRunning()
         buildCommands()
         loadApps()
@@ -159,7 +159,7 @@ DS.SearchListPopup {
         viewStack = []
         sessionRoot = ""
         pendingPage = ""
-        Quickshell.execDetached(["bash", "-lc", "~/.config/hypr/scripts/launcher-layout.sh close"])
+        Quickshell.execDetached(["bash", "-c", "~/.config/hypr/scripts/launcher-layout.sh close"])
     }
     onSearchTextChanged: applyFilter()
     onActivated: (item, index) => {
@@ -452,7 +452,7 @@ DS.SearchListPopup {
 
     Process {
         id: sinkListProc
-        command: ["bash", "-lc", "~/.config/hypr/scripts/qs-audio-devices.sh sinks"]
+        command: ["bash", "-c", "~/.config/hypr/scripts/qs-audio-devices.sh sinks"]
         stdout: StdioCollector {
             onStreamFinished: {
                 root.audioSinks = root.parseAudioRows(text, "sink")
@@ -464,7 +464,7 @@ DS.SearchListPopup {
 
     Process {
         id: sourceListProc
-        command: ["bash", "-lc", "~/.config/hypr/scripts/qs-audio-devices.sh sources"]
+        command: ["bash", "-c", "~/.config/hypr/scripts/qs-audio-devices.sh sources"]
         stdout: StdioCollector {
             onStreamFinished: {
                 root.audioSources = root.parseAudioRows(text, "source")
@@ -847,7 +847,7 @@ DS.SearchListPopup {
         if (entry.command && entry.command.length)
             Quickshell.execDetached(entry.command.slice())
         else if (entry.execString)
-            Quickshell.execDetached(["bash", "-lc", entry.execString])
+            Quickshell.execDetached(["bash", "-c", entry.execString])
     }
 
     function focusOrLaunch(entry) {

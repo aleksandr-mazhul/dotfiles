@@ -106,14 +106,14 @@ PanelWindow {
     function setBrightness(v) {
         const pct = Math.round(Math.max(0, Math.min(1, v)) * 100)
         root.brightness = pct / 100
-        brightSetProc.command = ["bash", "-lc", "~/.config/hypr/scripts/qs-brightness.sh set " + pct]
+        brightSetProc.command = ["bash", "-c", "~/.config/hypr/scripts/qs-brightness.sh set " + pct]
         brightSetProc.running = true
     }
 
     function setBrightTarget(id) {
         root.brightTarget = String(id)
         brightTargetProc.command = [
-            "bash", "-lc",
+            "bash", "-c",
             "~/.config/hypr/scripts/qs-brightness.sh target " + String(id)
         ]
         brightTargetProc.running = true
@@ -154,7 +154,7 @@ PanelWindow {
     function runNetworkQuick() {
         // Join the strongest Wi‑Fi (ethernet stays as-is).
         Quickshell.execDetached([
-            "bash", "-lc",
+            "bash", "-c",
             "nmcli radio wifi on; " +
             "ssid=$(nmcli -t -f SSID,SIGNAL,IN-USE device wifi list 2>/dev/null | awk -F: '$1!=\"\" && $3!=\"*\"{print $2\"\\t\"$1}' | sort -nr | head -1 | cut -f2-); " +
             "if [ -n \"$ssid\" ]; then nmcli device wifi connect \"$ssid\"; fi; " +
@@ -167,7 +167,7 @@ PanelWindow {
     function runBluetoothQuick() {
         const enable = root.btStatus !== "Enabled"
         Quickshell.execDetached([
-            "bash", "-lc",
+            "bash", "-c",
             enable ? "bluetoothctl power on" : "bluetoothctl power off"
         ])
         root.btStatus = enable ? "Enabled" : "Disabled"
@@ -188,17 +188,17 @@ PanelWindow {
         if (action === "disconnect") {
             root.vpnStatus = "… Disconnecting"
             root.vpnConnected = false
-            Quickshell.execDetached(["bash", "-lc", "~/.config/hypr/scripts/qs-vpn.sh disconnect"])
+            Quickshell.execDetached(["bash", "-c", "~/.config/hypr/scripts/qs-vpn.sh disconnect"])
         } else if (action === "best" || loc === "best") {
             root.vpnStatus = "… Connecting"
             root.vpnConnected = false // not ON until settled
-            Quickshell.execDetached(["bash", "-lc", "~/.config/hypr/scripts/qs-vpn.sh best"])
+            Quickshell.execDetached(["bash", "-c", "~/.config/hypr/scripts/qs-vpn.sh best"])
         } else {
             root.vpnStatus = "… Connecting"
             root.vpnConnected = false
             const safe = String(loc || "").replace(/'/g, "")
             Quickshell.execDetached([
-                "bash", "-lc",
+                "bash", "-c",
                 "~/.config/hypr/scripts/qs-vpn.sh connect '" + safe + "'"
             ])
         }
@@ -520,7 +520,7 @@ PanelWindow {
                 onActivated: item => {
                     if (item && item.mac)
                         Quickshell.execDetached([
-                            "bash", "-lc",
+                            "bash", "-c",
                             "bluetoothctl pair '" + item.mac + "' 2>/dev/null; bluetoothctl connect '" + item.mac + "'"
                         ])
                 }
@@ -552,7 +552,7 @@ PanelWindow {
                     iconName: "bluetooth"
                     onActivated: {
                         root.close()
-                        Quickshell.execDetached(["bash", "-lc", "command -v blueman-manager >/dev/null && blueman-manager || gnome-control-center bluetooth || true"])
+                        Quickshell.execDetached(["bash", "-c", "command -v blueman-manager >/dev/null && blueman-manager || gnome-control-center bluetooth || true"])
                     }
                 }
             }
@@ -942,7 +942,7 @@ PanelWindow {
 
     Process {
         id: netProc
-        command: ["bash", "-lc", "nmcli -t -f TYPE,STATE,CONNECTION device | awk -F: '$2==\"connected\"{print $1\"|\"$3; exit}'"]
+        command: ["bash", "-c", "nmcli -t -f TYPE,STATE,CONNECTION device | awk -F: '$2==\"connected\"{print $1\"|\"$3; exit}'"]
         stdout: StdioCollector {
             onStreamFinished: {
                 const t = text.trim()
@@ -957,14 +957,14 @@ PanelWindow {
     }
     Process {
         id: btProc
-        command: ["bash", "-lc", "bluetoothctl show 2>/dev/null | awk -F': ' '/Powered/{print $2; exit}'"]
+        command: ["bash", "-c", "bluetoothctl show 2>/dev/null | awk -F': ' '/Powered/{print $2; exit}'"]
         stdout: StdioCollector {
             onStreamFinished: root.btStatus = (text.trim() === "yes") ? "Enabled" : "Disabled"
         }
     }
     Process {
         id: vpnProc
-        command: ["bash", "-lc", "~/.config/hypr/scripts/qs-vpn.sh status 2>/dev/null | head -1"]
+        command: ["bash", "-c", "~/.config/hypr/scripts/qs-vpn.sh status 2>/dev/null | head -1"]
         stdout: StdioCollector {
             onStreamFinished: {
                 const t = text.trim() || "○ Disconnected"
@@ -994,7 +994,7 @@ PanelWindow {
     }
     Process {
         id: updatesProc
-        command: ["bash", "-lc", "~/.config/hypr/scripts/qs-updates.sh count"]
+        command: ["bash", "-c", "~/.config/hypr/scripts/qs-updates.sh count"]
         stdout: StdioCollector {
             onStreamFinished: {
                 const lines = text.trim().split("\n")
@@ -1013,7 +1013,7 @@ PanelWindow {
     }
     Process {
         id: updatesListProc
-        command: ["bash", "-lc", "~/.config/hypr/scripts/qs-updates.sh list"]
+        command: ["bash", "-c", "~/.config/hypr/scripts/qs-updates.sh list"]
         stdout: StdioCollector {
             onStreamFinished: {
                 const rows = []
@@ -1036,7 +1036,7 @@ PanelWindow {
     }
     Process {
         id: vpnListProc
-        command: ["bash", "-lc", "~/.config/hypr/scripts/qs-vpn.sh locations"]
+        command: ["bash", "-c", "~/.config/hypr/scripts/qs-vpn.sh locations"]
         stdout: StdioCollector {
             onStreamFinished: {
                 const rows = []
@@ -1063,7 +1063,7 @@ PanelWindow {
     }
     Process {
         id: wifiProc
-        command: ["bash", "-lc", "nmcli -t -f SSID,SIGNAL,SECURITY device wifi list 2>/dev/null | head -12"]
+        command: ["bash", "-c", "nmcli -t -f SSID,SIGNAL,SECURITY device wifi list 2>/dev/null | head -12"]
         stdout: StdioCollector {
             onStreamFinished: {
                 const rows = []
@@ -1086,7 +1086,7 @@ PanelWindow {
     }
     Process {
         id: btListProc
-        command: ["bash", "-lc", "~/.config/hypr/scripts/qs-bt-devices.sh"]
+        command: ["bash", "-c", "~/.config/hypr/scripts/qs-bt-devices.sh"]
         stdout: StdioCollector {
             onStreamFinished: {
                 const rows = []
@@ -1125,7 +1125,7 @@ PanelWindow {
     }
     Process {
         id: brightGetProc
-        command: ["bash", "-lc", "~/.config/hypr/scripts/qs-brightness.sh get"]
+        command: ["bash", "-c", "~/.config/hypr/scripts/qs-brightness.sh get"]
         stdout: StdioCollector {
             onStreamFinished: {
                 const n = parseInt(text.trim(), 10)
@@ -1136,15 +1136,15 @@ PanelWindow {
     }
     Process {
         id: brightSetProc
-        command: ["bash", "-lc", "~/.config/hypr/scripts/qs-brightness.sh get"]
+        command: ["bash", "-c", "~/.config/hypr/scripts/qs-brightness.sh get"]
     }
     Process {
         id: brightTargetProc
-        command: ["bash", "-lc", "~/.config/hypr/scripts/qs-brightness.sh target all"]
+        command: ["bash", "-c", "~/.config/hypr/scripts/qs-brightness.sh target all"]
     }
     Process {
         id: brightListProc
-        command: ["bash", "-lc", "~/.config/hypr/scripts/qs-brightness.sh list"]
+        command: ["bash", "-c", "~/.config/hypr/scripts/qs-brightness.sh list"]
         stdout: StdioCollector {
             onStreamFinished: {
                 const rows = []
@@ -1181,7 +1181,7 @@ PanelWindow {
 
     Process {
         id: sinkListProc
-        command: ["bash", "-lc", "~/.config/hypr/scripts/qs-audio-devices.sh sinks"]
+        command: ["bash", "-c", "~/.config/hypr/scripts/qs-audio-devices.sh sinks"]
         stdout: StdioCollector {
             onStreamFinished: {
                 const rows = []
@@ -1210,7 +1210,7 @@ PanelWindow {
     }
     Process {
         id: sourceListProc
-        command: ["bash", "-lc", "~/.config/hypr/scripts/qs-audio-devices.sh sources"]
+        command: ["bash", "-c", "~/.config/hypr/scripts/qs-audio-devices.sh sources"]
         stdout: StdioCollector {
             onStreamFinished: {
                 const rows = []

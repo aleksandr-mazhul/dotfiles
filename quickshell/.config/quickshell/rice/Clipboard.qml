@@ -655,7 +655,7 @@ Item {
         if (!t || !String(t).length)
             return false
         const q = shQuote(t)
-        Quickshell.execDetached(["bash", "-lc", "printf %s " + q + " | wl-copy"])
+        Quickshell.execDetached(["bash", "-c", "printf %s " + q + " | wl-copy"])
         return true
     }
 
