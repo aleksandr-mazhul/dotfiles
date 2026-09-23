@@ -22,10 +22,16 @@ def handle_result(args: List[str], answer: str, target_window_id: int, boss: Any
     w = boss.window_id_map.get(target_window_id)
     if w is None or w.child is None:
         return
+    which = args[1] if len(args) > 1 else ''
     cmdline = w.child.foreground_cmdline
     if not cmdline or 'nvim' not in cmdline[0]:
+        # Not nvim (e.g. tmux): forward Alt-h/Alt-l, which tmux's
+        # vim-tmux-navigator bindings route to a pane or into nvim.
+        seq = {'tree': b'\x1bh', 'code': b'\x1bl'}.get(which)
+        if seq:
+            w.write_to_child(seq)
         return
-    fn = FUNCS.get(args[1] if len(args) > 1 else '')
+    fn = FUNCS.get(which)
     if not fn:
         return
     w.write_to_child(f'\x1c\x0e:lua {fn}()\r'.encode())
