@@ -89,51 +89,15 @@ Scope {
         }
     }
 
-    // Watch brightness cache written by qs-brightness.sh (never poll ddcutil).
-    // inotify via FileView; the script prefers $XDG_RUNTIME_DIR/rice and falls
-    // back to ~/.cache/rice, so try both and retry slowly while neither exists.
-    readonly property var brightPaths: [
-        Quickshell.env("XDG_RUNTIME_DIR") + "/rice/brightness.pct",
-        Quickshell.env("HOME") + "/.cache/rice/brightness.pct"
-    ]
-    property int brightPathIdx: 0
-
-    function brightRead(raw) {
-        const v = parseInt(String(raw).trim(), 10)
-        if (isNaN(v))
-            return
-        if (root.brightLast >= 0 && v !== root.brightLast && root.brightMax > 0)
-            root.showBrightness(v / root.brightMax)
-        root.brightLast = v
-    }
-
-    FileView {
-        id: brightWatch
-        path: root.brightPaths[root.brightPathIdx]
-        printErrors: false
-        watchChanges: true
-        onFileChanged: reload()
-        onLoaded: {
-            brightRetry.stop()
-            root.brightRead(text())
-        }
-        onLoadFailed: {
-            if (root.brightPathIdx + 1 < root.brightPaths.length)
-                root.brightPathIdx++
-            else
-                brightRetry.start()
-        }
-    }
-
-    Timer {
-        id: brightRetry
-        interval: 2000
-        repeat: false
-        onTriggered: {
-            if (root.brightPathIdx !== 0)
-                root.brightPathIdx = 0
-            else
-                brightWatch.reload()
+    // qs-brightness.sh calls `qs ipc call brightness level <pct>` the moment a
+    // key or slider changes the target, before the slow DDC write. Watching its
+    // cache file lost updates (truncate + write fired two events; reloads were
+    // dropped), so the OSD often never appeared.
+    IpcHandler {
+        target: "brightness"
+        function level(pct: int): void {
+            root.brightLast = pct
+            root.showBrightness(pct / (root.brightMax > 0 ? root.brightMax : 100))
         }
     }
 

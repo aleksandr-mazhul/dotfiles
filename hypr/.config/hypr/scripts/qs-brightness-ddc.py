@@ -6,6 +6,11 @@ and applies the same percentage to all of them.
 
 Usage:
   qs-brightness-ddc.py get|set <0-100>|max|list|target|picture realistic
+
+Every command holds an exclusive lock on the DDC buses: two transactions
+interleaved on one bus corrupt each other, which is what made key-repeat
+brightness lose steps. `set` writes to the cached buses without probing first
+and prints the value read back, so callers cache what the monitor really has.
 """
 from __future__ import annotations
 
@@ -24,7 +29,8 @@ VCP_COLOR_PRESET = 0x14  # 01h=sRGB, 05h=6500K, …
 CACHE_DIR = os.environ.get("XDG_RUNTIME_DIR") or os.path.join(
     os.environ.get("HOME", "/tmp"), ".cache"
 )
-BUS_LIST_CACHE = os.path.join(CACHE_DIR, "rice-ddc-buses")  # "2,5"
+BUS_LIST_CACHE = os.path.join(CACHE_DIR, "rice-ddc-buses")  # "2,5" or "2:100,5:100"
+LOCK_FILE = os.path.join(CACHE_DIR, "rice-ddc.lock")
 MAX_CACHE = os.path.join(CACHE_DIR, "rice-ddc-max")  # global UI max (=100)
 
 
@@ -154,7 +160,7 @@ def discover_all(force: bool = False) -> list[tuple[int, int, int]]:
     if cached and not force:
         ok = True
         for part in cached.split(","):
-            part = part.strip()
+            part = part.split(":")[0].strip()
             if not part.isdigit():
                 continue
             n = int(part)
@@ -173,9 +179,19 @@ def discover_all(force: bool = False) -> list[tuple[int, int, int]]:
             out.append((n, got[0], got[1]))
 
     if out:
-        write_text(BUS_LIST_CACHE, ",".join(str(b) for b, _, _ in out))
+        write_text(BUS_LIST_CACHE, ",".join(f"{b}:{mx}" for b, _, mx in out))
         # UI scale is always 0–100; per-monitor max used only for raw mapping.
         write_text(MAX_CACHE, "100")
+    return out
+
+
+def cached_buses() -> list[tuple[int, int]]:
+    """(bus, max) from the last discovery, without touching the bus."""
+    out: list[tuple[int, int]] = []
+    for part in (read_text(BUS_LIST_CACHE) or "").split(","):
+        bus, _, mx = part.strip().partition(":")
+        if bus.isdigit() and mx.isdigit() and int(mx) > 0:
+            out.append((int(bus), int(mx)))
     return out
 
 
@@ -250,6 +266,9 @@ def friendly_label(n: int) -> str:
 
 def main() -> int:
     cmd = sys.argv[1] if len(sys.argv) > 1 else "get"
+    if cmd not in ("max", "target"):
+        lock = os.open(LOCK_FILE, os.O_RDWR | os.O_CREAT, 0o600)
+        fcntl.flock(lock, fcntl.LOCK_EX)  # released when the process exits
 
     if cmd == "max":
         print(100)
@@ -294,6 +313,41 @@ def main() -> int:
         print(pct)
         return 0
 
+    if cmd == "set":
+        if len(sys.argv) < 3:
+            print("usage: set <0-100>", file=sys.stderr)
+            return 2
+        pct = max(0, min(100, int(sys.argv[2])))
+        known = [(b, 0, mx) for b, mx in cached_buses()]
+        targets = selected_mons(known) if known else selected_mons(discover_all())
+        if not targets:
+            print("no-ddc", file=sys.stderr)
+            return 1
+        readback: list[int] = []
+        for bus, _cur, mx in targets:
+            raw = mx if pct >= 100 else int(round(pct * mx / 100.0))
+            for attempt in range(3):
+                try:
+                    set_vcp(bus, VCP_BRIGHTNESS, raw, mx)
+                    time.sleep(0.05)  # DDC/CI wants >=50 ms before the next command
+                    got = get_vcp(bus, VCP_BRIGHTNESS)
+                    if got and got[0] == raw:
+                        readback.append(int(round(got[0] * 100.0 / got[1])))
+                        break
+                except OSError:
+                    pass
+                time.sleep(0.05 * (attempt + 1))
+            else:
+                print(f"bus {bus}: brightness not confirmed", file=sys.stderr)
+                try:
+                    got = get_vcp(bus, VCP_BRIGHTNESS)
+                    if got:
+                        readback.append(int(round(got[0] * 100.0 / got[1])))
+                except OSError:
+                    pass
+        print(min(readback) if readback else pct)
+        return 0
+
     mons = discover_all(force=(cmd == "get"))
     if not mons:
         print("no-ddc", file=sys.stderr)
@@ -306,26 +360,6 @@ def main() -> int:
     if cmd == "get":
         pcts = [int(round(cur * 100.0 / mx)) for _, cur, mx in mons if mx]
         print(min(pcts) if pcts else 0)
-        return 0
-
-    if cmd == "set":
-        if len(sys.argv) < 3:
-            print("usage: set <0-100>", file=sys.stderr)
-            return 2
-        pct = max(0, min(100, int(sys.argv[2])))
-        for bus, _cur, mx in mons:
-            raw = int(round(pct * mx / 100.0))
-            if pct >= 100:
-                raw = mx
-            try:
-                set_vcp(bus, VCP_BRIGHTNESS, raw, mx)
-            except OSError:
-                time.sleep(0.05)
-                try:
-                    set_vcp(bus, VCP_BRIGHTNESS, raw, mx)
-                except OSError as e:
-                    print(f"bus {bus}: {e}", file=sys.stderr)
-        print(pct)
         return 0
 
     print("usage: get|set <n>|max|list|target|picture realistic", file=sys.stderr)

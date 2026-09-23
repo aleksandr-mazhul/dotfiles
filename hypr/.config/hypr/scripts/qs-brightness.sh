@@ -5,6 +5,11 @@
 # 3) ddcutil fallback
 #
 # Usage: qs-brightness.sh get|cache|max|set <0-100>|up [n]|down [n]
+#
+# set/up/down update the cache and the OSD at once, then ONE background applier
+# pushes the latest value over DDC (~220 ms per verified write). Key repeat used
+# to start a DDC write per press; they overlapped on the bus, lost steps and
+# left the monitor out of sync with the OSD.
 set +e
 set -u
 
@@ -35,7 +40,42 @@ CACHE_FILE="${CACHE_DIR}/brightness.pct"
 
 write_cache() {
     local pct="${1:-0}"
-    ( printf '%s\n' "$pct" >"$CACHE_FILE" ) 2>/dev/null || true
+    # tmp + rename: readers never see a truncated file.
+    ( printf '%s\n' "$pct" >"$CACHE_FILE.$$" && mv -f "$CACHE_FILE.$$" "$CACHE_FILE" ) 2>/dev/null || true
+}
+
+read_cache() {
+    clamp "$(cat "$CACHE_FILE" 2>/dev/null || echo 0)"
+}
+
+notify_osd() {
+    command -v qs >/dev/null 2>&1 || return 0
+    ( qs -c rice ipc call brightness level "$1" >/dev/null 2>&1 & )
+}
+
+APPLY_LOCK="${CACHE_DIR}/brightness-apply.lock"
+STEP_LOCK="${CACHE_DIR}/brightness-step.lock"
+
+# Push the cached value to the hardware until it stops changing. Only one
+# applier runs; presses during a write just move the cache ahead of it.
+apply_loop() {
+    exec 8>"$APPLY_LOCK"
+    flock -n 8 || return 0
+    local want got
+    while :; do
+        want="$(read_cache)"
+        got="$(backend_set "$want")" || return 1
+        [[ "$(read_cache)" == "$want" ]] || continue
+        # Cache what the monitor reports, so system and monitor agree.
+        if [[ "$got" =~ ^[0-9]+$ && "$got" != "$want" ]]; then
+            write_cache "$got"
+        fi
+        return 0
+    done
+}
+
+start_apply() {
+    setsid -f "$0" __apply </dev/null >/dev/null 2>&1
 }
 
 have_backlight() {
@@ -121,24 +161,47 @@ get_pct() {
     echo "$pct"
 }
 
-set_pct() {
+# Write to hardware only; print the value it ended up at.
+backend_set() {
     local pct out
     pct="$(clamp "${1:-0}")"
     if have_backlight && command -v brightnessctl >/dev/null 2>&1; then
-        bl_set_pct "$pct"
-        out="$pct"
+        bl_set_pct "$pct" && out="$pct"
     elif out="$(raw_set "$pct")" && [[ "$out" =~ ^[0-9]+$ ]]; then
-        pct="$(clamp "$out")"
+        :
     elif command -v ddcutil >/dev/null 2>&1 && ddcutil_set "$pct"; then
         out="$pct"
     else
         echo "qs-brightness: no working backend" >&2
-        write_cache "$pct"
-        echo "$pct"
         return 1
     fi
+    clamp "$out"
+}
+
+# Record the target and let the applier catch up. $2=osd shows the HUD (keys);
+# the Quick Settings slider already shows its own level.
+set_pct() {
+    local pct
+    pct="$(clamp "${1:-0}")"
     write_cache "$pct"
+    [[ "${2:-}" == osd ]] && notify_osd "$pct"
+    start_apply
     echo "$pct"
+}
+
+# One key step. The first press after a pause re-reads the monitor, so a change
+# made with its own buttons is not stepped from a stale cache.
+step() {
+    local dir="$1" base age
+    exec 7>"$STEP_LOCK"
+    flock 7
+    age=$(( $(date +%s) - $(stat -c %Y "$CACHE_FILE" 2>/dev/null || echo 0) ))
+    if (( age > 15 )) && flock -n "$APPLY_LOCK" true 2>/dev/null; then
+        base="$(get_pct)"
+    else
+        base="$(read_cache)"
+    fi
+    set_pct "$(mac_snap "$base" "$dir")" osd
 }
 
 cache_get() {
@@ -205,12 +268,13 @@ case "$cmd" in
         ;;
     up)
         rate_ok || { cache_get; exit 0; }
-        set_pct "$(mac_snap "$(cache_get)" 1)"
+        step 1
         ;;
     down)
         rate_ok || { cache_get; exit 0; }
-        set_pct "$(mac_snap "$(cache_get)" -1)"
+        step -1
         ;;
+    __apply) apply_loop ;;
     *)
         echo "usage: $0 get|cache|max|list|target|set <n>|up|down" >&2
         exit 2
