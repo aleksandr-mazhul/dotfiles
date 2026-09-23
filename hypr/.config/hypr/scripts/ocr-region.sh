@@ -12,7 +12,8 @@ SOCK="${XDG_RUNTIME_DIR:-/tmp}/hypr-ocr.sock"
 OCR_NOTIFY_ID=424201
 
 tmp="$(mktemp --suffix=.png)"
-cleanup() { rm -f "$tmp"; }
+errf="$(mktemp)"
+cleanup() { rm -f "$tmp" "$errf"; }
 trap cleanup EXIT
 
 if [[ ! -x "$OCR_PY" ]] || ! "$OCR_PY" -c "import rapidocr" >/dev/null 2>&1; then
@@ -38,11 +39,11 @@ if [[ ! -S "$SOCK" ]]; then
   "$DAEMON_START" --now || true
 fi
 
-text="$("$OCR_PY" "$OCR_SCRIPT" ocr "$tmp" 2>/tmp/ocr-rapidocr.err || true)"
+text="$("$OCR_PY" "$OCR_SCRIPT" ocr "$tmp" 2>"$errf" || true)"
 text="$(printf '%s' "$text" | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')"
 
 if [[ -z "${text//[[:space:]]/}" ]]; then
-  err="$(tr '\n' ' ' </tmp/ocr-rapidocr.err 2>/dev/null | cut -c1-160 || true)"
+  err="$(tr '\n' ' ' <"$errf" 2>/dev/null | cut -c1-160 || true)"
   if [[ -n "$err" ]]; then
     "$NOTIFY" --id "$OCR_NOTIFY_ID" --urgency normal --time 3500 \
       OCR dialog-warning "OCR" "$err"
