@@ -3,9 +3,12 @@ if status is-interactive
     # fish_variables. After reboot the socket file can still exist while the
     # agent is dead → "Connection refused" / ssh-add rc 2 on every terminal.
     # Keep env global-only and recycle a stale pidfile agent.
-    if command -q keychain
-        ssh-add -l >/dev/null 2>&1
-        if test $status -gt 1
+    # Fast path: an agent that already holds a key needs nothing from keychain
+    # (163 of fish's 189 ms startup). ssh-add -l: 0 = keys, 1 = none, 2 = dead.
+    ssh-add -l >/dev/null 2>&1
+    set -l agent_status $status
+    if test $agent_status -ne 0; and command -q keychain
+        if test $agent_status -gt 1
             set -e SSH_AUTH_SOCK SSH_AGENT_PID
             set -Ue SSH_AUTH_SOCK 2>/dev/null
             set -Ue SSH_AGENT_PID 2>/dev/null
