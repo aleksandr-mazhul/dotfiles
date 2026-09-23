@@ -24,7 +24,8 @@ if status is-interactive
             bind -M insert \cg fzf-cd-widget
         end
 
-        # Keep the selected history entry readable against fzf's highlight.
+        # --highlight-line keeps the selected entry readable; its fg+/bg+ come
+        # from the theme-generated FZF_DEFAULT_OPTS (theme-fzf.fish).
         function fzf-history-widget -d "Show command history"
             set -l command_line (commandline)
             set -l current_line (commandline -L)
@@ -36,8 +37,7 @@ if status is-interactive
                 '--with-nth=2.. --nth=2..,.. --scheme=history --multi --no-multi-line' \
                 '--no-wrap --wrap-sign="\t\t\t↳ " --preview-wrap-sign="↳ " --freeze-left=1' \
                 '--bind="ctrl-r:toggle-sort,alt-r:toggle-raw" --highlight-line' \
-                '--accept-nth=3.. --delimiter="\t" --tabstop=4 --read0 --print0' \
-                '--color=fg+:#1a1008,bg+:#ffb688,hl+:#1a1008')
+                '--accept-nth=3.. --delimiter="\t" --tabstop=4 --read0 --print0')
             set -lx FZF_DEFAULT_OPTS_FILE
             test -z "$fish_private_mode"; and builtin history merge
             if set -l result (eval $FZF_DEFAULT_COMMAND \| (__fzfcmd) --query=$fzf_query | string split0)

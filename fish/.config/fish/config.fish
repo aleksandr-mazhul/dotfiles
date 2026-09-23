@@ -17,7 +17,9 @@ if status is-interactive
                 end
             end
         end
-        keychain --quiet add --eval --quick --ignore-missing --systemd id_ed25519 \
+        # keychain picks the --eval syntax from $SHELL; fish started from a
+        # bash-parented process (IDE, agent, script) would get sh syntax.
+        SHELL=(status fish-path) keychain --quiet add --eval --quick --ignore-missing --systemd id_ed25519 \
             | string replace -a -- ' -U ' ' -g ' \
             | source
     end
