@@ -1,0 +1,15 @@
+ffmpeg
+jq
+khal
+libnotify
+matugen
+otf-atkinsonhyperlegiblemono-nerd
+playerctl
+python-pillow
+ripgrep
+socat
+sqlite
+uv
+vdirsyncer
+waypaper
+wl-clipboard
