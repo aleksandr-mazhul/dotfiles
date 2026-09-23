@@ -2,7 +2,7 @@
 Name=Cursor
 Comment=The AI Code Editor.
 GenericName=Text Editor
-Exec=/home/stranger/.local/bin/cursor %U
+Exec=cursor %U
 Icon=co.anysphere.cursor
 Type=Application
 StartupNotify=false
@@ -16,5 +16,5 @@ Terminal=false
 [Desktop Action new-empty-window]
 Name=New Empty Window
 Name[ru]=Новое пустое окно
-Exec=/home/stranger/.local/bin/cursor --classic --new-window %U
+Exec=cursor --classic --new-window %U
 Icon=co.anysphere.cursor

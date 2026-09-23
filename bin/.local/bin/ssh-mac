@@ -1,0 +1,3 @@
+#!/bin/bash
+# OpenSSH to the Mac over Tailscale userspace (GUI Tailscale on Mac is not an SSH server).
+exec ssh mac "$@"

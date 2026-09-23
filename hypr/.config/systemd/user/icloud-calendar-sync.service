@@ -1,0 +1,8 @@
+[Unit]
+Description=Sync iCloud, Уник and Google calendars via qs-calendar.sh
+
+[Service]
+Type=oneshot
+Environment=PATH=%h/.local/bin:/usr/bin
+TimeoutStartSec=90
+ExecStart=/usr/bin/bash %h/.config/hypr/scripts/qs-calendar.sh sync
