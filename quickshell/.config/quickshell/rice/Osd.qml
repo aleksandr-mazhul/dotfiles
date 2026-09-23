@@ -83,34 +83,57 @@ Scope {
     Process {
         id: brightMaxProc
         running: true
-        command: ["bash", "-lc", "~/.config/hypr/scripts/qs-brightness.sh max"]
+        command: ["bash", "-c", "~/.config/hypr/scripts/qs-brightness.sh max"]
         stdout: StdioCollector {
             onStreamFinished: root.brightMax = parseInt(text.trim() || "100", 10) || 100
         }
     }
 
     // Watch brightness cache written by qs-brightness.sh (never poll ddcutil).
-    Process {
+    // inotify via FileView; the script prefers $XDG_RUNTIME_DIR/rice and falls
+    // back to ~/.cache/rice, so try both and retry slowly while neither exists.
+    readonly property var brightPaths: [
+        Quickshell.env("XDG_RUNTIME_DIR") + "/rice/brightness.pct",
+        Quickshell.env("HOME") + "/.cache/rice/brightness.pct"
+    ]
+    property int brightPathIdx: 0
+
+    function brightRead(raw) {
+        const v = parseInt(String(raw).trim(), 10)
+        if (isNaN(v))
+            return
+        if (root.brightLast >= 0 && v !== root.brightLast && root.brightMax > 0)
+            root.showBrightness(v / root.brightMax)
+        root.brightLast = v
+    }
+
+    FileView {
         id: brightWatch
-        running: true
-        command: [
-            "bash", "-lc",
-            "while true; do "
-                + "for f in \"$XDG_RUNTIME_DIR/rice/brightness.pct\" \"$HOME/.cache/rice/brightness.pct\"; do "
-                + "if [ -f \"$f\" ]; then cat \"$f\"; break; fi; "
-                + "done || echo 0; "
-                + "sleep 0.5; "
-                + "done"
-        ]
-        stdout: SplitParser {
-            onRead: data => {
-                const v = parseInt(String(data).trim(), 10)
-                if (isNaN(v))
-                    return
-                if (root.brightLast >= 0 && v !== root.brightLast && root.brightMax > 0)
-                    root.showBrightness(v / root.brightMax)
-                root.brightLast = v
-            }
+        path: root.brightPaths[root.brightPathIdx]
+        printErrors: false
+        watchChanges: true
+        onFileChanged: reload()
+        onLoaded: {
+            brightRetry.stop()
+            root.brightRead(text())
+        }
+        onLoadFailed: {
+            if (root.brightPathIdx + 1 < root.brightPaths.length)
+                root.brightPathIdx++
+            else
+                brightRetry.start()
+        }
+    }
+
+    Timer {
+        id: brightRetry
+        interval: 2000
+        repeat: false
+        onTriggered: {
+            if (root.brightPathIdx !== 0)
+                root.brightPathIdx = 0
+            else
+                brightWatch.reload()
         }
     }
 
