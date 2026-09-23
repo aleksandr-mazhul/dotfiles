@@ -15,3 +15,6 @@ caching = true
 # Waypaper/swww already set the wallpaper; don't let matugen fight them
 set = false
 command = ""
+
+# Empty on purpose (see header); matugen requires the table to exist.
+[templates]
