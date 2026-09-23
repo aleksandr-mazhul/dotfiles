@@ -7,6 +7,8 @@ import json
 import math
 import os
 import re
+import stat
+import tempfile
 import tomllib
 from datetime import datetime, timezone
 from pathlib import Path
@@ -24,6 +26,45 @@ HARMONIES_PATHS = (
     DOTFILES_HARMONIES,
     Path.home() / "dotfiles/theme/.config/theme/harmonies.toml",
 )
+
+
+def atomic_write(path: Path | str, text: str) -> bool:
+    """Atomically replace *path* with *text*; return False if already identical.
+
+    Readers (kitty, Quickshell live reload, fish, GTK) must never see a
+    half-written file, so write a temp file next to the target and os.replace
+    it. Targets are often stow symlinks into the dotfiles repo: resolve them and
+    replace the real file so the symlink survives. The existing mode is kept.
+    Errors (PermissionError, …) propagate to the caller.
+    """
+    real = Path(os.path.realpath(path))
+    data = text.encode()
+    try:
+        if real.read_bytes() == data:
+            return False
+    except (FileNotFoundError, IsADirectoryError, NotADirectoryError):
+        pass
+    real.parent.mkdir(parents=True, exist_ok=True)
+    try:
+        mode = stat.S_IMODE(os.stat(real).st_mode)
+    except FileNotFoundError:
+        umask = os.umask(0)
+        os.umask(umask)
+        mode = 0o666 & ~umask
+    fd, tmp = tempfile.mkstemp(dir=real.parent, prefix=f".{real.name}.", suffix=".tmp")
+    try:
+        with os.fdopen(fd, "wb") as f:
+            f.write(data)
+            f.flush()
+            os.fchmod(f.fileno(), mode)
+        os.replace(tmp, real)
+    except BaseException:
+        try:
+            os.unlink(tmp)
+        except FileNotFoundError:
+            pass
+        raise
+    return True
 
 
 def ensure_theme_dir() -> Path:

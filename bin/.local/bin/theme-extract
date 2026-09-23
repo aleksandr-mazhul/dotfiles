@@ -8,7 +8,7 @@ from pathlib import Path
 
 # Allow importing sibling module when invoked via symlink
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from _theme_core import ensure_theme_dir, extract_colors  # noqa: E402
+from _theme_core import atomic_write, ensure_theme_dir, extract_colors  # noqa: E402
 
 
 def main() -> int:
@@ -21,7 +21,7 @@ def main() -> int:
         return 1
     colors = extract_colors(path)
     out = ensure_theme_dir() / "extract.json"
-    out.write_text(json.dumps({"wallpaper": str(path), "colors": colors}, indent=2) + "\n")
+    atomic_write(out, json.dumps({"wallpaper": str(path), "colors": colors}, indent=2) + "\n")
     print(f"theme-extract: {len(colors)} colors → {out}")
     return 0
 

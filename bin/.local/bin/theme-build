@@ -8,6 +8,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from _theme_core import (  # noqa: E402
+    atomic_write,
     build_palette,
     ensure_theme_dir,
     load_harmonies,
@@ -36,7 +37,7 @@ def main() -> int:
         hid, harmony, delta = match_harmony(colors)
     pal = build_palette(wallpaper, colors, hid, harmony, delta)
     out = theme / "palette.toml"
-    out.write_text(palette_to_toml(pal))
+    atomic_write(out, palette_to_toml(pal))
     print(
         f"theme-build: {hid} primary={pal['accent']['primary']} "
         f"surface={pal['surface']['surface']} → {out}"
