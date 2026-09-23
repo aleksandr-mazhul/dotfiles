@@ -1,11 +1,37 @@
 #!/usr/bin/env bash
 # Restow all dotfiles packages into $HOME (GNU Stow)
-# Usage: ./restow.sh
+# Usage: ./restow.sh            # conflicting real files -> ~/.dotfiles-backup/<ts>/
+#        ./restow.sh --adopt    # pull live edits INTO the repo (this machine only)
+#        ./restow.sh --check    # only report what is not linked; changes nothing
+#
+# Default never touches the repo: on a fresh machine, --adopt would copy the
+# apps' default configs over the tracked ones. Use --adopt only where the live
+# files are yours, then review `git diff`.
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")" && pwd)"
 TARGET="${HOME}"
 cd "$ROOT"
+
+ADOPT=0
+CHECK=0
+case "${1:-}" in
+  --adopt) ADOPT=1 ;;
+  --check) CHECK=1 ;;
+  "") ;;
+  -h|--help) sed -n '2,9p' "$0"; exit 0 ;;
+  *) echo "Unknown option: $1 (try --help)" >&2; exit 2 ;;
+esac
+
+BACKUP="$TARGET/.dotfiles-backup/$(date +%Y%m%d-%H%M%S)"
+# Move a live path aside instead of deleting it. $1 is relative to $TARGET.
+backup() {
+  local rel="$1"
+  [[ -e "$TARGET/$rel" || -L "$TARGET/$rel" ]] || return 0
+  mkdir -p "$BACKUP/$(dirname "$rel")"
+  mv "$TARGET/$rel" "$BACKUP/$rel"
+  echo "  backup ~/$rel -> $BACKUP/$rel"
+}
 
 packages=(
   bin
@@ -38,64 +64,99 @@ packages=(
   zen
 )
 
-echo "==> Preparing conflicting real files (replace with symlinks)"
-# bin: drop real files that should come from the package
-if [[ -d bin/.local/bin ]]; then
-  mkdir -p "$TARGET/.local/bin"
-  for f in bin/.local/bin/*; do
-    [[ -f "$f" ]] || continue
-    base="$(basename "$f")"
-    dest="$TARGET/.local/bin/$base"
-    if [[ -e "$dest" && ! -L "$dest" ]]; then
-      echo "  rm real file $dest (will symlink from package)"
-      rm -f "$dest"
-    elif [[ -L "$dest" ]]; then
-      # Replace foreign symlinks (e.g. AppImage direct link) with stow-managed ones.
-      echo "  rm old symlink $dest -> $(readlink "$dest")"
-      rm -f "$dest"
-    fi
+verify() {
+  echo "==> Verify (every tracked file must resolve into the repo)"
+  ok=0; bad=0
+  for pkg in "${packages[@]}"; do
+    [[ -d "$pkg" ]] || continue
+    while IFS= read -r f; do
+      rel="${f#"$pkg"/}"
+      [[ "$rel" == .config/mimeapps.list ]] && continue   # copied on purpose, see below
+      [[ "$(basename "$rel")" == .stow-local-ignore ]] && continue
+      if [[ "$(readlink -f "$TARGET/$rel" 2>/dev/null)" == "$ROOT/$f" ]]; then
+        ok=$((ok + 1))
+      else
+        bad=$((bad + 1))
+        if [[ -L "$TARGET/$rel" || ! -e "$TARGET/$rel" ]]; then
+          echo "  MISS ~/$rel"
+        else
+          echo "  REAL ~/$rel (not linked; stow skipped it)"
+        fi
+      fi
+    done < <(git -C "$ROOT" ls-files -- "$pkg")
   done
+  echo "  $ok linked, $bad problems"
+  return 0
+}
+
+if [[ "$CHECK" -eq 1 ]]; then
+  verify
+  exit 0
 fi
 
-# bin desktop entries / icons
-if [[ -d bin/.local/share/applications ]]; then
-  mkdir -p "$TARGET/.local/share/applications"
-  for f in bin/.local/share/applications/*; do
-    [[ -f "$f" ]] || continue
-    base="$(basename "$f")"
-    dest="$TARGET/.local/share/applications/$base"
-    if [[ -e "$dest" || -L "$dest" ]]; then
-      echo "  rm $dest (will symlink from package)"
-      rm -f "$dest"
-    fi
-  done
-fi
-if [[ -d bin/.local/share/icons ]]; then
-  while IFS= read -r -d '' f; do
-    rel="${f#bin/}"
-    dest="$TARGET/$rel"
-    mkdir -p "$(dirname "$dest")"
-    if [[ -e "$dest" || -L "$dest" ]]; then
-      echo "  rm $dest (will symlink from package)"
-      rm -f "$dest"
-    fi
-  done < <(find bin/.local/share/icons -type f -print0)
-fi
-
-# entropy app settings
-if [[ -f entropy/.config/entropy/app_settings.json ]]; then
-  dest="$TARGET/.config/entropy/app_settings.json"
-  mkdir -p "$(dirname "$dest")"
-  if [[ -e "$dest" || -L "$dest" ]]; then
-    echo "  rm $dest (will symlink from package)"
-    rm -f "$dest"
+# --adopt would pull these live files INTO the repo; clear them first. Without
+# --adopt the generic conflict pass below backs up whatever is in the way.
+if [[ "$ADOPT" -eq 1 ]]; then
+  echo "==> Preparing conflicting real files (replace with symlinks)"
+  # bin: drop real files that should come from the package
+  if [[ -d bin/.local/bin ]]; then
+    mkdir -p "$TARGET/.local/bin"
+    for f in bin/.local/bin/*; do
+      [[ -f "$f" ]] || continue
+      base="$(basename "$f")"
+      dest="$TARGET/.local/bin/$base"
+      if [[ -e "$dest" && ! -L "$dest" ]]; then
+        backup ".local/bin/$base"
+      elif [[ -L "$dest" ]]; then
+        # Replace foreign symlinks (e.g. AppImage direct link) with stow-managed ones.
+        echo "  rm old symlink $dest -> $(readlink "$dest")"
+        rm -f "$dest"
+      fi
+    done
   fi
-fi
 
-# x11: .Xresources
-if [[ -e "$TARGET/.Xresources" && ! -L "$TARGET/.Xresources" ]]; then
-  echo "  rm real file $TARGET/.Xresources"
-  rm -f "$TARGET/.Xresources"
+  # bin desktop entries / icons
+  if [[ -d bin/.local/share/applications ]]; then
+    mkdir -p "$TARGET/.local/share/applications"
+    for f in bin/.local/share/applications/*; do
+      [[ -f "$f" ]] || continue
+      base="$(basename "$f")"
+      dest="$TARGET/.local/share/applications/$base"
+      if [[ -L "$dest" ]]; then
+        rm -f "$dest"
+      elif [[ -e "$dest" ]]; then
+        backup ".local/share/applications/$base"
+      fi
+    done
+  fi
+  if [[ -d bin/.local/share/icons ]]; then
+    while IFS= read -r -d '' f; do
+      rel="${f#bin/}"
+      dest="$TARGET/$rel"
+      mkdir -p "$(dirname "$dest")"
+      if [[ -L "$dest" ]]; then
+        rm -f "$dest"
+      elif [[ -e "$dest" ]]; then
+        backup "$rel"
+      fi
+    done < <(find bin/.local/share/icons -type f -print0)
+  fi
+
+  # entropy app settings
+  if [[ -f entropy/.config/entropy/app_settings.json ]]; then
+    dest="$TARGET/.config/entropy/app_settings.json"
+    mkdir -p "$(dirname "$dest")"
+    if [[ -e "$dest" && ! -L "$dest" ]]; then
+      backup .config/entropy/app_settings.json
+    elif [[ -L "$dest" ]]; then
+      rm -f "$dest"
+    fi
+  fi
+
+  # x11: .Xresources
+  if [[ -e "$TARGET/.Xresources" && ! -L "$TARGET/.Xresources" ]]; then
+    backup .Xresources
+  fi
 fi
 
 echo "==> Prefer clean directory symlinks when possible"
@@ -103,43 +164,39 @@ echo "==> Prefer clean directory symlinks when possible"
 mkdir -p gtk/.config/gtk-3.0
 touch gtk/.config/gtk-3.0/bookmarks
 
-echo "==> Stow --adopt (merge live configs into repo, then symlink)"
+# Parse `stow -n` conflicts; print one target path (relative to $TARGET) per line.
+conflicts() {
+  stow -n -v -t "$TARGET" "$1" 2>&1 | sed -nE \
+    -e 's/.* over existing target (.*) since .*/\1/p' \
+    -e 's/.*existing target is not owned by stow: (.*)/\1/p' \
+    -e 's/.*existing target is neither a link nor a directory: (.*)/\1/p'
+}
+
+if [[ "$ADOPT" -eq 1 ]]; then
+  echo "==> Stow --adopt (merge live configs into repo, then symlink)"
+else
+  echo "==> Stow (conflicting live files are moved to $BACKUP)"
+fi
 for pkg in "${packages[@]}"; do
   if [[ ! -d "$pkg" ]]; then
     echo "  skip missing package: $pkg"
     continue
   fi
   echo "  stow $pkg"
-  if ! stow --adopt -v -t "$TARGET" "$pkg" 2>&1; then
-    if ! stow -R -v -t "$TARGET" "$pkg" 2>&1; then
-      echo "  WARN: stow $pkg failed (left as-is)"
-    fi
+  if [[ "$ADOPT" -eq 1 ]]; then
+    stow --adopt -v -t "$TARGET" "$pkg" 2>&1 \
+      || stow -R -v -t "$TARGET" "$pkg" 2>&1 \
+      || echo "  WARN: stow $pkg failed (left as-is)"
+    continue
   fi
+  # Two passes: moving a file aside can expose a conflict one level up.
+  for _ in 1 2; do
+    mapfile -t found < <(conflicts "$pkg")
+    [[ ${#found[@]} -eq 0 ]] && break
+    for rel in "${found[@]}"; do backup "$rel"; done
+  done
+  stow -R -v -t "$TARGET" "$pkg" 2>&1 || echo "  WARN: stow $pkg failed (left as-is)"
 done
-
-ok_link() {
-  local p="$1"
-  if [[ -L "$TARGET/$p" ]]; then
-    echo "  OK   $p -> $(readlink "$TARGET/$p")"
-  elif [[ -d "$TARGET/$p" ]]; then
-    # Folded stow: directory exists, files inside should be symlinks into the repo
-    local bad=0
-    while IFS= read -r -d '' f; do
-      if [[ ! -L "$f" ]]; then
-        # allow empty bookmarks etc only if tracked in package later
-        bad=1
-      fi
-    done < <(find "$TARGET/$p" -mindepth 1 -maxdepth 2 \( -type f -o -type l \) -print0 2>/dev/null)
-    if [[ "$bad" -eq 0 ]]; then
-      echo "  OK   $p (folded; contents -> dotfiles)"
-    else
-      echo "  WARN $p has non-symlink files"
-      find "$TARGET/$p" -mindepth 1 -maxdepth 2 ! -type l -printf '       %p\n' 2>/dev/null | head -10
-    fi
-  else
-    echo "  MISS $p"
-  fi
-}
 
 # mimeapps.list must be a regular file. GIO writes mimeapps.list.XXXX next to
 # it; a relative Stow symlink makes Nautilus "Always use for this type" fail.
@@ -160,40 +217,13 @@ if [[ -f "$mime_src" ]]; then
   fi
 fi
 
-echo "==> Verify"
-for p in \
-  .config/hypr \
-  .config/quickshell \
-  .config/entropy \
-  .config/matugen \
-  .config/waypaper \
-  .config/kitty \
-  .config/fish \
-  .config/waybar \
-  .config/wofi \
-  .config/vibepanel \
-  .config/nwg-look \
-  .config/xsettingsd \
-  .config/fastfetch \
-  .config/gtk-3.0 \
-  .config/gtk-4.0 \
-  .config/kanata \
-  .config/nvim \
-  .config/yazi \
-  .config/tmux \
-  .config/theme \
-  .config/obs-studio/global.ini \
-  .config/gromit-mpx/gromit-mpx.cfg \
-  .config/starship.toml \
-  .tmux.conf \
-  .local/bin/entropy \
-  .local/bin/obs-record-toggle \
-  .Xresources
-do
-  ok_link "$p"
-done
-
+verify
 echo
-echo "Done. Review git status — --adopt may have updated package files from live configs."
+if [[ "$ADOPT" -eq 1 ]]; then
+  echo "Done. Review git status — --adopt may have updated package files from live configs."
+elif [[ -d "$BACKUP" ]]; then
+  echo "Done. Replaced live files are in $BACKUP"
+else
+  echo "Done."
+fi
 echo "Note: sddm is system-level (sddm/install.sh / pkexec), not stowed into \$HOME."
-echo "Note: Hyprland .conf is deprecated in 0.57 — migrate to hyprland.lua before upgrading."
