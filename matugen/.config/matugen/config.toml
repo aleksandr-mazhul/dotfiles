@@ -1,5 +1,11 @@
 # Matugen — colors from wallpaper (Material You)
 # https://github.com/InioX/matugen
+#
+# Intentionally no [templates]: every themed config (hyprland/hyprlock/
+# hyprtoolkit colors, kitty, gtk-3.0/gtk-4.0, Quickshell Colors.qml, wofi,
+# sddm-adaptive/colors.conf, …) is rendered by the theme SSOT pipeline
+# (apply-wallpaper-theme → theme-render from ~/.config/theme/palette.toml).
+# A stray `matugen image …` must not clobber those files.
 
 [config]
 version_check = false
@@ -9,47 +15,3 @@ caching = true
 # Waypaper/swww already set the wallpaper; don't let matugen fight them
 set = false
 command = ""
-
-# Hyprland border colors
-[templates.hyprland]
-input_path = "~/.config/matugen/templates/hyprland-colors.lua"
-output_path = "~/.config/hypr/colors-matugen.lua"
-
-# Hyprlock adaptive lock colors
-[templates.hyprlock]
-input_path = "~/.config/matugen/templates/hyprlock-colors.conf"
-output_path = "~/.config/hypr/hyprlock-colors.conf"
-
-# SDDM login theme colors (copied into theme dir by apply-wallpaper-theme)
-[templates.sddm]
-input_path = "~/.config/matugen/templates/sddm-colors.conf"
-output_path = "~/.config/sddm-adaptive/colors.conf"
-
-# Kitty terminal colors
-[templates.kitty]
-input_path = "~/.config/matugen/templates/kitty-colors.conf"
-output_path = "~/.config/kitty/colors-matugen.conf"
-
-# GTK3/4 accent overrides (+ classic theme_* colors for Qt gtk3 / polkit)
-[templates.gtk3]
-input_path = "~/.config/matugen/templates/gtk.css"
-output_path = "~/.config/gtk-3.0/gtk.css"
-
-[templates.gtk4]
-input_path = "~/.config/matugen/templates/gtk.css"
-output_path = "~/.config/gtk-4.0/gtk.css"
-
-# hyprtoolkit palette (hyprpolkitagent when built on hyprtoolkit)
-[templates.hyprtoolkit]
-input_path = "~/.config/matugen/templates/hyprtoolkit-colors.conf"
-output_path = "~/.config/hypr/hyprtoolkit.conf"
-
-# Quickshell overlay shell (rice) colors
-[templates.quickshell]
-input_path = "~/.config/matugen/templates/quickshell-colors.qml"
-output_path = "~/.config/quickshell/rice/Colors.qml"
-
-# Wofi leftover menus (wallpaper / windscribe) stay in sync
-[templates.wofi]
-input_path = "~/.config/matugen/templates/wofi-colors.css"
-output_path = "~/.config/wofi/colors-matugen.css"
