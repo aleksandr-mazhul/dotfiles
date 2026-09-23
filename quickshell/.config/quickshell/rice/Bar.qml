@@ -1,7 +1,6 @@
 import QtQuick
 import QtQuick.Layouts
 import Quickshell
-import Quickshell.Io
 import Quickshell.Wayland
 import Quickshell.Hyprland
 
@@ -19,7 +18,7 @@ PanelWindow {
     readonly property var hyprMonitor: Hyprland.monitorFor(modelData)
     readonly property int monitorId: hyprMonitor ? hyprMonitor.id : -1
 
-    // Polled from hyprctl — reliable for Super+F (fullscreen: 2).
+    // Mirrors fsNative (see syncFullscreen) — reliable for Super+F (fullscreen: 2).
     property bool fsPolled: false
     readonly property bool fullscreenActive: root.fsPolled
 
@@ -158,44 +157,63 @@ PanelWindow {
             notifCenter.show()
     }
 
-    // Poll active workspace on this monitor for fullscreen (Super+F → mode 2).
-    // Pin mode is ignored while this is true; hover can still reveal the bar.
-    Process {
-        id: fsCheck
-        command: [
-            "bash", "-lc",
-            "mid='" + root.monitorId + "'; "
-            + "if [ \"$mid\" = \"-1\" ]; then echo 0; exit 0; fi; "
-            + "ws=$(hyprctl monitors -j 2>/dev/null | jq -r --argjson mid \"$mid\" "
-            + "'.[] | select(.id == $mid) | .activeWorkspace.id' 2>/dev/null); "
-            + "case \"$ws\" in ''|null) echo 0; exit 0 ;; esac; "
-            + "hyprctl clients -j 2>/dev/null | jq -r --argjson mid \"$mid\" --argjson ws \"$ws\" "
-            + "'[.[] | select(.monitor == $mid and .workspace.id == $ws "
-            + "and (((.fullscreen // 0) | tonumber) > 0))] "
-            + "| if length > 0 then 1 else 0 end' 2>/dev/null || echo 0"
-        ]
-        stdout: StdioCollector {
-            onStreamFinished: {
-                const v = text.trim() === "1"
-                if (v === root.fsPolled)
-                    return
-                root.fsPolled = v
-                if (v)
-                    root.forceHideForFullscreen()
-            }
+    // Fullscreen on this monitor's active workspace (Super+F → mode 2), read
+    // from Hyprland's own `hasfullscreen` flag. Quickshell does not update
+    // HyprlandWorkspace.hasFullscreen on the `fullscreen>>` event by itself, so
+    // re-query monitors/workspaces over IPC (no processes) whenever a relevant
+    // socket2 event arrives. Pin mode is ignored while this is true; hover can
+    // still reveal the bar.
+    readonly property bool fsNative: {
+        const ws = root.hyprMonitor ? root.hyprMonitor.activeWorkspace : null
+        return !!(ws && ws.hasFullscreen)
+    }
+    onFsNativeChanged: root.syncFullscreen()
+    Component.onCompleted: fsRefresh.restart()
+
+    function syncFullscreen() {
+        const v = root.monitorId >= 0 && root.fsNative
+        if (v === root.fsPolled)
+            return
+        root.fsPolled = v
+        if (v)
+            root.forceHideForFullscreen()
+    }
+
+    readonly property var fsEvents: ({
+        "fullscreen": true, "workspace": true, "workspacev2": true,
+        "activewindowv2": true, "focusedmon": true, "focusedmonv2": true,
+        "openwindow": true, "closewindow": true, "movewindow": true,
+        "movewindowv2": true, "moveworkspace": true, "moveworkspacev2": true,
+        "monitoradded": true, "monitoraddedv2": true, "monitorremoved": true,
+        "monitorremovedv2": true, "configreloaded": true
+    })
+
+    Connections {
+        target: Hyprland
+        function onRawEvent(event) {
+            if (root.fsEvents[event.name] === true)
+                fsRefresh.restart()
         }
     }
 
+    // Coalesce event bursts (a workspace switch emits several events).
     Timer {
-        interval: 250
+        id: fsRefresh
+        interval: 16
+        repeat: false
+        onTriggered: {
+            Hyprland.refreshMonitors()
+            Hyprland.refreshWorkspaces()
+            root.syncFullscreen()
+        }
+    }
+
+    // Safety net in case an event is missed (IPC-only, no process spawn).
+    Timer {
+        interval: 5000
         running: true
         repeat: true
-        triggeredOnStart: true
-        onTriggered: {
-            if (root.monitorId < 0 || fsCheck.running)
-                return
-            fsCheck.running = true
-        }
+        onTriggered: fsRefresh.restart()
     }
 
     onShowContentChanged: {

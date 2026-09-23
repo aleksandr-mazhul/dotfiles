@@ -141,7 +141,7 @@ M.catalog = {
         class_re = "^(zoom|Zoom)$",
         workspace = 14,
         classes = { "zoom", "Zoom" },
-        cmd = "/home/stranger/.config/hypr/scripts/zoom.sh",
+        cmd = os.getenv("HOME") .. "/.config/hypr/scripts/zoom.sh",
     },
     {
         id = "obs",

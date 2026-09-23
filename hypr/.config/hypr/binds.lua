@@ -140,26 +140,25 @@ hl.bind("CTRL + W", function()
     -- here; pass through when a file tab is actually open (or Agents window).
     if is_code_like(focused.class) then
         if editor_has_file_tab(focused.title) or is_cursor_agents_window(focused.title) then
-            hl.dispatch(hl.dsp.pass({ window = focused }))
-        else
-            hl.dispatch(hl.dsp.window.close({ window = focused }))
+            return { pass_event = true }
         end
+        hl.dispatch(hl.dsp.window.close({ window = focused }))
         return
     end
     -- WebStorm / JetBrains: pass Ctrl+W to close editor tab; if no tabs left
     -- (title is bare project name), close the window.
     if is_jetbrains(focused.class) then
         if jetbrains_has_editor_tab(focused.title) then
-            hl.dispatch(hl.dsp.pass({ window = focused }))
-        else
-            hl.dispatch(hl.dsp.window.close({ window = focused }))
+            return { pass_event = true }
         end
+        hl.dispatch(hl.dsp.window.close({ window = focused }))
         return
     end
-    -- Like macOS: apps with tabs handle Cmd/Ctrl+W themselves (close tab)
+    -- Like macOS: apps with tabs handle Cmd/Ctrl+W themselves (close tab).
+    -- Terminals are deliberately NOT here: macOS Cmd+W closes the terminal
+    -- window, so Ctrl+W falls through to window.close() below by design.
     if is_tabbed_app(focused.class) then
-        hl.dispatch(hl.dsp.pass({ window = focused }))
-        return
+        return { pass_event = true }
     end
     hl.dispatch(hl.dsp.window.close({ window = focused }))
 end, { dont_inhibit = true })
@@ -211,7 +210,7 @@ hl.bind("CTRL + K", function()
         hl.dispatch(hl.dsp.exec_cmd("wtype -k Escape"))
         return
     end
-    hl.dispatch(hl.dsp.pass({ window = focused }))
+    return { pass_event = true }
 end)
 
 -- Yandex Browser: Ctrl+Shift+C → copy current page URL (elsewhere: pass through).
@@ -226,7 +225,7 @@ hl.bind("CTRL + SHIFT + C", function()
         hl.dispatch(hl.dsp.exec_cmd("~/.config/hypr/scripts/copy-browser-url.sh"))
         return
     end
-    hl.dispatch(hl.dsp.pass({ window = focused }))
+    return { pass_event = true }
 end, { dont_inhibit = true })
 
 -- Google Chrome: Ctrl+S → collapse/expand the vertical tab strip (Chrome's own
@@ -237,10 +236,11 @@ hl.bind("CTRL + S", function()
         return
     end
     if string.lower(focused.class or "") == "google-chrome" then
+        -- send_shortcut sets releasePending, so its own release re-run fires: correct as is.
         hl.dispatch(hl.dsp.send_shortcut({ mods = "CTRL SHIFT", key = "L", window = focused }))
         return
     end
-    hl.dispatch(hl.dsp.pass({ window = focused }))
+    return { pass_event = true }
 end, { dont_inhibit = true })
 
 -- Zoom tabs (Meeting / shared screen), same muscle memory as Zen/Arc:
@@ -253,33 +253,42 @@ local function is_zoom(class)
     return class == "zoom" or class:find("zoom", 1, true) ~= nil
 end
 
+-- Zoom gets Ctrl+Tab via zoom-tab.sh and the real key is swallowed; everything
+-- else gets the real press back via `pass_event`. Callers must PROPAGATE the
+-- return value. (non_consuming was used before, but it forwarded the key to Zoom
+-- too, so Zoom saw Ctrl+Page_Up/Down on top of the wtyped Ctrl+Tab.)
+--
+-- Do NOT go back to `hl.dsp.pass` here. Hyprland 0.56.2 swallows the real press
+-- of a consuming bind, and `pass` injects a synthetic press into the client —
+-- but on release, KeybindManager only re-runs the callback when the bind's
+-- handler is "pass"/"global"/"sendshortcut", and every Lua bind's handler is
+-- "__lua". So the callback never fires on release, the real release stays
+-- swallowed, and the client is left holding a key that is never released.
+-- kitty then repeats it forever (25/s, and bare — it re-encodes each repeat
+-- against the live modifier state, so Ctrl is already gone): a flood of ^[[6~.
 local function zoom_tab_or_pass(dir)
     local focused = hl.get_active_window()
-    if not focused then
-        return
-    end
-    if is_zoom(focused.class) then
+    if focused and is_zoom(focused.class) then
         hl.dispatch(hl.dsp.exec_cmd("~/.config/hypr/scripts/zoom-tab.sh " .. dir))
         return
     end
-    -- One pass only — apps (Zen) / kitty handle Ctrl+PgUp themselves
-    hl.dispatch(hl.dsp.pass({ window = focused }))
+    return { pass_event = true }
 end
 
 -- After kanata: Super+Shift+[ ] arrives as Ctrl+Page_Up/Down
 hl.bind("CTRL + Page_Up", function()
-    zoom_tab_or_pass("prev")
+    return zoom_tab_or_pass("prev")
 end, { dont_inhibit = true })
 hl.bind("CTRL + Page_Down", function()
-    zoom_tab_or_pass("next")
+    return zoom_tab_or_pass("next")
 end, { dont_inhibit = true })
 
 -- Direct Ctrl+Shift+[ ] (keyboard, no kanata)
 hl.bind("CTRL + SHIFT + bracketleft", function()
-    zoom_tab_or_pass("prev")
+    return zoom_tab_or_pass("prev")
 end, { dont_inhibit = true })
 hl.bind("CTRL + SHIFT + bracketright", function()
-    zoom_tab_or_pass("next")
+    return zoom_tab_or_pass("next")
 end, { dont_inhibit = true })
 
 -- Do NOT bind SUPER+SHIFT+bracket*: kanata already remaps those to Ctrl+PgUp/Dn.
@@ -312,76 +321,45 @@ local function is_nautilus(win)
     return class:find("nautilus", 1, true) ~= nil
 end
 
+-- `return { pass_event = true }` must be PROPAGATED by every wrapper below
+-- (`return nautilus_or_pass(...)`, not a bare call), or the key is swallowed.
+-- These are terminal-critical: Ctrl+[ is ESC in vim, Ctrl+I is Tab, Ctrl+D is
+-- EOF, Ctrl+Backspace/Delete are kill-word.
 local function nautilus_or_pass(action)
-    local focused = hl.get_active_window()
-    if is_nautilus(focused) then
+    if is_nautilus(hl.get_active_window()) then
         hl.dispatch(hl.dsp.exec_cmd("~/.config/hypr/scripts/nautilus-mac.sh " .. action))
         return
     end
-    if focused then
-        hl.dispatch(hl.dsp.pass({ window = focused }))
-    end
+    return { pass_event = true }
 end
 
-hl.bind("CTRL + BACKSPACE", function()
-    nautilus_or_pass("trash")
-end)
+local function nautilus_bind(key, action)
+    hl.bind(key, function()
+        return nautilus_or_pass(action)
+    end)
+end
 
-hl.bind("CTRL + DELETE", function()
-    nautilus_or_pass("trash")
-end)
-
-hl.bind("CTRL + ALT + BACKSPACE", function()
-    nautilus_or_pass("purge")
-end)
-
-hl.bind("CTRL + ALT + DELETE", function()
-    nautilus_or_pass("purge")
-end)
-
-hl.bind("CTRL + D", function()
-    nautilus_or_pass("duplicate")
-end)
-
-hl.bind("CTRL + SHIFT + D", function()
-    nautilus_or_pass("bookmark")
-end)
-
-hl.bind("CTRL + UP", function()
-    nautilus_or_pass("up")
-end)
-
-hl.bind("CTRL + DOWN", function()
-    nautilus_or_pass("open")
-end)
-
-hl.bind("CTRL + bracketleft", function()
-    nautilus_or_pass("back")
-end)
-
-hl.bind("CTRL + bracketright", function()
-    nautilus_or_pass("forward")
-end)
-
-hl.bind("CTRL + SHIFT + G", function()
-    nautilus_or_pass("goto")
-end)
-
-hl.bind("CTRL + I", function()
-    nautilus_or_pass("info")
-end)
+nautilus_bind("CTRL + BACKSPACE", "trash")
+nautilus_bind("CTRL + DELETE", "trash")
+nautilus_bind("CTRL + ALT + BACKSPACE", "purge")
+nautilus_bind("CTRL + ALT + DELETE", "purge")
+nautilus_bind("CTRL + D", "duplicate")
+nautilus_bind("CTRL + SHIFT + D", "bookmark")
+nautilus_bind("CTRL + UP", "up")
+nautilus_bind("CTRL + DOWN", "open")
+nautilus_bind("CTRL + bracketleft", "back")
+nautilus_bind("CTRL + bracketright", "forward")
+nautilus_bind("CTRL + SHIFT + G", "goto")
+nautilus_bind("CTRL + I", "info")
 
 -- Nautilus: Ctrl+Shift+. toggles hidden files (native shortcut is Ctrl+H).
 -- Shift+. often arrives as `greater` (`>`), so bind both keysyms.
 local function nautilus_toggle_hidden()
-    local focused = hl.get_active_window()
-    if is_nautilus(focused) then
+    if is_nautilus(hl.get_active_window()) then
         hl.dispatch(hl.dsp.exec_cmd("~/.config/hypr/scripts/nautilus-toggle-hidden.sh"))
         return
     end
-    if focused then
-        hl.dispatch(hl.dsp.pass({ window = focused }))
-    end
+    return { pass_event = true }
 end
 
 hl.bind("CTRL + SHIFT + PERIOD", nautilus_toggle_hidden)
@@ -399,23 +377,17 @@ local function nautilus_zoom(dir)
 end
 
 hl.bind("CTRL + equal", function()
-    local focused = hl.get_active_window()
     if nautilus_zoom("in") then
         return
     end
-    if focused then
-        hl.dispatch(hl.dsp.pass({ window = focused }))
-    end
+    return { pass_event = true }
 end)
 
 hl.bind("CTRL + minus", function()
-    local focused = hl.get_active_window()
     if nautilus_zoom("out") then
         return
     end
-    if focused then
-        hl.dispatch(hl.dsp.pass({ window = focused }))
-    end
+    return { pass_event = true }
 end)
 
 -- Float: was Alt+V (taken by skhd workspace V) → Super+Shift+V; also service-mode `f`
@@ -504,16 +476,14 @@ end)
 hl.bind(secondMod .. " + TAB", function()
     local focused = hl.get_active_window()
     if focused and is_jetbrains(focused.class) then
-        hl.dispatch(hl.dsp.pass({ window = focused }))
-        return
+        return { pass_event = true }
     end
     hl.dispatch(hl.dsp.group.next())
 end)
 hl.bind(secondMod .. " + SHIFT + TAB", function()
     local focused = hl.get_active_window()
     if focused and is_jetbrains(focused.class) then
-        hl.dispatch(hl.dsp.pass({ window = focused }))
-        return
+        return { pass_event = true }
     end
     hl.dispatch(hl.dsp.group.prev())
 end)
@@ -589,10 +559,7 @@ local function clipboard_pane_or_pass(action)
             hl.dispatch(hl.dsp.exec_cmd("qs -c rice ipc call clipboard " .. action))
             return
         end
-        local focused = hl.get_active_window()
-        if focused then
-            hl.dispatch(hl.dsp.pass({ window = focused }))
-        end
+        return { pass_event = true }
     end
 end
 

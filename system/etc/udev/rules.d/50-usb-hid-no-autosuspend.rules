@@ -1,0 +1,4 @@
+# Keep keyboard/mouse receivers awake (idle/DPMS used to drop them).
+# Installed by system/install.sh.
+ACTION=="add", SUBSYSTEM=="usb", ATTR{bInterfaceClass}=="03", TEST=="power/control", ATTR{power/control}="on"
+ACTION=="add", SUBSYSTEM=="usb", ENV{ID_USB_INTERFACES}=="*:0301*:*", TEST=="power/control", ATTR{power/control}="on"

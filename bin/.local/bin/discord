@@ -1,0 +1,9 @@
+#!/bin/sh
+config_home=${XDG_CONFIG_HOME:-$HOME/.config}
+discord_host=$config_home/discord/Discord
+if [ ! -x "$discord_host" ]; then
+  bootstrap=$HOME/.local/share/discord-updater_bootstrap
+  app_dir=$("$bootstrap" --no-zenity "$config_home/discord" stable 'https://updates.discord.com/') || exit 2
+  ln -sfn "$app_dir/Discord" "$discord_host"
+fi
+exec "$discord_host" "$@"

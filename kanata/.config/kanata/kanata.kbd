@@ -33,13 +33,33 @@
   ;; HRM anti-roll: same finger sequence as Mac config (A S D F / J K L ;),
   ;; not remapped onto Linux Super-Alt-Ctrl-Shift key names.
   tap-hold-require-prior-idle 120
+  ;; Do NOT set override-release-on-activation here. It makes an override tap
+  ;; its output instead of holding it, which kills key repeat for EVERY override
+  ;; in this file — holding Alt+←/→ stopped running through words, and
+  ;; Alt+Backspace stopped deleting word after word.
+  ;;
+  ;; It was added to stop a ^[[6~ flood that kanata never caused: measured over
+  ;; a 3.5h session, kanata emitted 10 PageDown presses total, zero autorepeat
+  ;; events, and one activation produced exactly one press+release even while
+  ;; the chord was "held" (the mouse firmware sends a fixed ~4ms macro, so there
+  ;; is no hold to repeat). The flood was Hyprland swallowing the release of a
+  ;; Lua `pass` bind — fixed in hypr/binds.lua.
+  ;;
+  ;; Consequence of leaving it off: holding Super+Shift+[ ] ON THE KEYBOARD now
+  ;; cycles tabs while held. That is ordinary key repeat, not the old bug.
   ;; Exact kbd nodes only — name filters still match duplicate HID interfaces
   ;; (Ergohaven "… Keyboard", multiple Dragonfly nodes) and break Alt+arrows in Qt.
+  ;; kanata watches /dev/input (inotify IN_CREATE), so a device listed here is
+  ;; picked up on hotplug without a restart. A keyboard NOT listed still works
+  ;; — it just bypasses kanata entirely (no HRM, no Caps->Esc, no /map).
   linux-dev (
     /dev/input/by-id/usb-Ergohaven_K:03_v3_v4_vial:f64c2b3c-event-kbd
     /dev/input/by-id/usb-Compx_VGN_Dragonfly_4K_Receiver-event-kbd
-    /dev/input/by-id/usb-SEMICO_USB_Gaming_Keyboard-event-kbd
   )
+  ;; These are THIS machine's keyboards. Elsewhere none exist and kanata would
+  ;; exit and crash-loop under Restart=on-failure; keep running and wait for
+  ;; hotplug instead. Add the new machine's /dev/input/by-id/*-event-kbd above.
+  linux-continue-if-no-devs-found yes
 )
 
 (defvar
@@ -137,13 +157,18 @@
   (lalt del)  (lctl del)  (lctl rctl) ()
   (ralt del)  (lctl del)  (lctl rctl) ()
 
-  ;; Mac-like tab switch (mouse / Super+Shift+[ ]) → native Linux tab keys
-  (lsft lmet lbrc) (lctl pgup) () ()
-  (lsft lmet rbrc) (lctl pgdn) () ()
-  (rsft lmet lbrc) (lctl pgup) () ()
-  (rsft lmet rbrc) (lctl pgdn) () ()
-  (lsft rmet lbrc) (lctl pgup) () ()
-  (lsft rmet rbrc) (lctl pgdn) () ()
-  (rsft rmet lbrc) (lctl pgup) () ()
-  (rsft rmet rbrc) (lctl pgdn) () ()
+  ;; Mac-like tab switch (mouse / Super+Shift+[ ]) → native Linux tab keys.
+  ;; The override puppeteers the mods: it releases the real Super/Shift, injects
+  ;; lctl+pgup, then re-presses Shift. Excluding Ctrl keeps a real Ctrl out of
+  ;; that window, where it could desync the bookkeeping and leave a mod stuck.
+  ;; (Measured over a full session, every modifier's press/release count balances
+  ;; exactly, so the desync is a hazard guarded against, not one observed.)
+  (lsft lmet lbrc) (lctl pgup) (lctl rctl) ()
+  (lsft lmet rbrc) (lctl pgdn) (lctl rctl) ()
+  (rsft lmet lbrc) (lctl pgup) (lctl rctl) ()
+  (rsft lmet rbrc) (lctl pgdn) (lctl rctl) ()
+  (lsft rmet lbrc) (lctl pgup) (lctl rctl) ()
+  (lsft rmet rbrc) (lctl pgdn) (lctl rctl) ()
+  (rsft rmet lbrc) (lctl pgup) (lctl rctl) ()
+  (rsft rmet rbrc) (lctl pgdn) (lctl rctl) ()
 )

@@ -7,7 +7,7 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from _theme_core import ensure_theme_dir, match_harmony  # noqa: E402
+from _theme_core import atomic_write, ensure_theme_dir, match_harmony  # noqa: E402
 
 
 def main() -> int:
@@ -38,7 +38,7 @@ def main() -> int:
         },
     }
     path = theme / "match.json"
-    path.write_text(json.dumps(out, indent=2) + "\n")
+    atomic_write(path, json.dumps(out, indent=2) + "\n")
     print(f"theme-match: {hid} (shift {delta:.1f}°) → {path}")
     return 0
 

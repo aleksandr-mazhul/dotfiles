@@ -54,7 +54,7 @@
 	last = log -1 HEAD
 [credential "https://origin.cursor.com/git"]
 	helper = 
-	helper = !/home/stranger/.local/bin/origin credential-helper
+	helper = !~/.local/bin/origin credential-helper
 [credential "https://origin.cursor.com"]
 	helper = 
-	helper = !/home/stranger/.local/bin/origin credential-helper
+	helper = !~/.local/bin/origin credential-helper

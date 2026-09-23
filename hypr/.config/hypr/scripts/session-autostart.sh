@@ -191,9 +191,9 @@ if ((${#ws_has_right[@]})); then
   sleep 1.2
   local_ws=""
   for local_ws in "${!ws_has_right[@]}"; do
-    hyprctl dispatch focusworkspaceoncurrentmonitor "$local_ws" >/dev/null 2>&1 \
-      || hyprctl dispatch workspace "$local_ws" >/dev/null 2>&1 || true
-    hyprctl dispatch layoutmsg "preselect r" >/dev/null 2>&1 || true
+    # Lua config: `hyprctl dispatch` takes a Lua expression, not name + args.
+    hyprctl dispatch "hl.dsp.focus({ workspace = $local_ws, on_current_monitor = true })" >/dev/null 2>&1 || true
+    hyprctl dispatch 'hl.dsp.layout("preselect r")' >/dev/null 2>&1 || true
   done
   spawn_side R
 fi
@@ -279,8 +279,8 @@ for ws, sides in expected.items():
         rx, raddr = min(rights)
     if lx <= rx:
         continue
-    subprocess.run(["hyprctl", "dispatch", "focuswindow", f"address:{laddr}"], check=False)
-    subprocess.run(["hyprctl", "dispatch", "movewindow", "l"], check=False)
+    subprocess.run(["hyprctl", "dispatch", f'hl.dsp.focus({{ window = "address:{laddr}" }})'], check=False)
+    subprocess.run(["hyprctl", "dispatch", 'hl.dsp.window.move({ direction = "left" })'], check=False)
 PY
 }
 

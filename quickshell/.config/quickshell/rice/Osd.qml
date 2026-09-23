@@ -83,34 +83,21 @@ Scope {
     Process {
         id: brightMaxProc
         running: true
-        command: ["bash", "-lc", "~/.config/hypr/scripts/qs-brightness.sh max"]
+        command: ["bash", "-c", "~/.config/hypr/scripts/qs-brightness.sh max"]
         stdout: StdioCollector {
             onStreamFinished: root.brightMax = parseInt(text.trim() || "100", 10) || 100
         }
     }
 
-    // Watch brightness cache written by qs-brightness.sh (never poll ddcutil).
-    Process {
-        id: brightWatch
-        running: true
-        command: [
-            "bash", "-lc",
-            "while true; do "
-                + "for f in \"$XDG_RUNTIME_DIR/rice/brightness.pct\" \"$HOME/.cache/rice/brightness.pct\"; do "
-                + "if [ -f \"$f\" ]; then cat \"$f\"; break; fi; "
-                + "done || echo 0; "
-                + "sleep 0.5; "
-                + "done"
-        ]
-        stdout: SplitParser {
-            onRead: data => {
-                const v = parseInt(String(data).trim(), 10)
-                if (isNaN(v))
-                    return
-                if (root.brightLast >= 0 && v !== root.brightLast && root.brightMax > 0)
-                    root.showBrightness(v / root.brightMax)
-                root.brightLast = v
-            }
+    // qs-brightness.sh calls `qs ipc call brightness level <pct>` the moment a
+    // key or slider changes the target, before the slow DDC write. Watching its
+    // cache file lost updates (truncate + write fired two events; reloads were
+    // dropped), so the OSD often never appeared.
+    IpcHandler {
+        target: "brightness"
+        function level(pct: int): void {
+            root.brightLast = pct
+            root.showBrightness(pct / (root.brightMax > 0 ? root.brightMax : 100))
         }
     }
 

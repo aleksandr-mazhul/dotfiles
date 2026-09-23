@@ -1,0 +1,7 @@
+egl-wayland
+libva-nvidia-driver
+nvidia-open
+nvidia-settings
+nvidia-utils
+vulkan-nouveau
+xf86-video-nouveau

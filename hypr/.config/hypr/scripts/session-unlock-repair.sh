@@ -15,7 +15,7 @@ if ! flock -n 9; then
   exit 0
 fi
 
-hyprctl dispatch dpms on >/dev/null 2>&1 || true
+hyprctl dispatch 'hl.dsp.dpms({ action = "on" })' >/dev/null 2>&1 || true
 
 # Give USB receivers a moment to reappear after DPMS/sleep.
 sleep 0.8

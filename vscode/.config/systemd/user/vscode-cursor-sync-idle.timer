@@ -3,7 +3,7 @@ Description=Periodically apply pending Cursor SSOT state after quit
 
 [Timer]
 OnBootSec=2min
-OnUnitActiveSec=1min
+OnUnitActiveSec=5min
 AccuracySec=15s
 Persistent=false
 Unit=vscode-cursor-sync-idle.service

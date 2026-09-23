@@ -1,0 +1,12 @@
+[Desktop Entry]
+Name=Files
+Name[ru]=Файлы
+Comment=Access and organize files
+Exec=nautilus-dark --new-window %U
+Icon=org.gnome.Nautilus
+Terminal=false
+Type=Application
+StartupNotify=true
+Categories=Utility;Core;FileManager;
+Keywords=folder;manager;files;файлы;
+MimeType=inode/directory;

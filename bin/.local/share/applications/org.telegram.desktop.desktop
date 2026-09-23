@@ -1,7 +1,7 @@
 [Desktop Entry]
 Name=Telegram
 Comment=Official Telegram Desktop client
-Exec=/home/stranger/.local/bin/Telegram -- %u
+Exec=Telegram -- %u
 Icon=telegram
 Terminal=false
 StartupWMClass=TelegramDesktop

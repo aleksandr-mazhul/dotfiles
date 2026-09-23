@@ -17,17 +17,20 @@
 ## Быстрый старт
 
 ```bash
-git clone git@github.com:Aleksandr-Mazhul/dotfiles.git ~/dotfiles
+git clone https://github.com/aleksandr-mazhul/dotfiles.git ~/dotfiles   # HTTPS: SSH-ключи ещё не восстановлены
 cd ~/dotfiles
 ./bootstrap.sh
 ```
 
 | Команда | Что делает |
 | --- | --- |
-| `./bootstrap.sh` | Пакеты (`repo.txt` + `aur.txt`) → restow → kanata → fish → тема → SDDM |
+| `./bootstrap.sh` | Пакеты (`repo` + `aur` + `required` + `hw-*` по железу) → restow → kanata-setup / группы → tpm → сервисы → fish → тема → SDDM |
 | `./bootstrap.sh --rice` | Урезанный rice-набор (`rice-*.txt`) |
 | `./bootstrap.sh --configs` | Только конфиги / сервисы / тема (пакеты уже стоят) |
-| `./restow.sh` | Переустановить Stow-симлинки в `$HOME` |
+| `./restow.sh` | Stow-симлинки в `$HOME`; конфликтующие файлы → `~/.dotfiles-backup/<ts>/` |
+| `./restow.sh --check` / `--adopt` | Только проверить / забрать живые файлы в репо |
+
+После bootstrap — **перелогиниться** (группы `input`, `i2c`, `video` для kanata и ddcutil). Новые клавиатуры: добавить в `kanata.kbd` (`linux-dev`) и `hid-kbd-swallow.py` — см. [RESTORE.md](RESTORE.md).
 
 Обои при bootstrap (опционально):
 
@@ -187,8 +190,10 @@ exec fish   # обновить fish-обёртки (cbonsai, pipes, gum, …)
 | `packages/repo.txt` | Official (pacman) |
 | `packages/aur.txt` | AUR (без `*-debug`) |
 | `packages/rice-*.txt` | Курируемый rice-минимум |
-| `packages/install.sh` | Установка списков |
-| `packages/export.sh` | Обновить списки с текущей машины |
+| `packages/required.txt` | Runtime-зависимости скриптов репо (ставятся всегда, кроме `--aur`) |
+| `packages/hw-*.txt` | Драйверы/микрокод по вендору GPU/CPU (автодетект); `hw-boot.txt` — только с `--boot` |
+| `packages/install.sh` | Установка списков; несуществующие имена пропускает, сбои перечисляет в конце |
+| `packages/export.sh` | Обновить `repo.txt`/`aur.txt` с текущей машины (без `hw-*`/`required`) |
 
 После установки чего-то нового:
 

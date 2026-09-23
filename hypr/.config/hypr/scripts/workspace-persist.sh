@@ -24,7 +24,7 @@ save_current() {
   local id
   id="$(current_id)"
   # Only persist normal numbered workspaces (1–10 in this rice).
-  if [[ "$id" =~ ^(10|[1-9])$ ]]; then
+  if [[ "$id" =~ ^([1-9]|1[0-6])$ ]]; then
     printf '%s\n' "$id" >"$STATE_FILE"
   fi
 }
@@ -33,7 +33,7 @@ restore_saved() {
   [[ -r "$STATE_FILE" ]] || return 0
   local id
   id="$(<"$STATE_FILE")"
-  [[ "$id" =~ ^(10|[1-9])$ ]] || return 0
+  [[ "$id" =~ ^([1-9]|1[0-6])$ ]] || return 0
   # Let monitors / rename / silent autostart settle first.
   sleep 1.2
   focus_workspace "$id"
@@ -49,14 +49,27 @@ watch_and_save() {
     last="$(<"$STATE_FILE")"
   fi
 
-  while true; do
-    local id
-    id="$(current_id)"
-    if [[ "$id" =~ ^(10|[1-9])$ && "$id" != "$last" ]]; then
-      printf '%s\n' "$id" >"$STATE_FILE"
-      last="$id"
+  record() {
+    if [[ "$1" =~ ^([1-9]|1[0-6])$ && "$1" != "$last" ]]; then
+      printf '%s\n' "$1" >"$STATE_FILE"
+      last="$1"
     fi
-    sleep 0.8
+  }
+
+  # Event-driven: workspacev2>>ID,NAME and focusedmonv2>>MON,ID from socket2
+  # instead of polling hyprctl + jq every 0.8s. socat exits when Hyprland does;
+  # the loop reconnects (or ends with the session once the socket is gone).
+  local sock="${XDG_RUNTIME_DIR}/hypr/${HYPRLAND_INSTANCE_SIGNATURE:-}/.socket2.sock"
+  local line
+  while [[ -S "$sock" ]]; do
+    record "$(current_id)"
+    while IFS= read -r line; do
+      case "$line" in
+        workspacev2\>\>*) line="${line#*>>}"; record "${line%%,*}" ;;
+        focusedmonv2\>\>*) record "${line##*,}" ;;
+      esac
+    done < <(socat -U - "UNIX-CONNECT:$sock" 2>/dev/null)
+    sleep 1
   done
 }
 

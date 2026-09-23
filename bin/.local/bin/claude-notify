@@ -1,0 +1,31 @@
+#!/usr/bin/env bash
+# Claude Code hook -> desktop notification (Stop / Notification events).
+# Works from any terminal (kitty, tmux, herdr) because it talks to the session
+# notification daemon directly instead of relying on OSC 99 passthrough.
+# The Claude Desktop app has its own notifications, so it is skipped here.
+# Wired in ~/.claude/settings.json (see RESTORE.md).
+set -u
+
+[ "${CLAUDE_CODE_ENTRYPOINT:-cli}" = "cli" ] || exit 0
+command -v notify-send >/dev/null || exit 0
+
+input="$(cat)"
+field() { printf '%s' "$input" | python3 -c 'import json,sys
+try: print(json.load(sys.stdin).get(sys.argv[1], ""))
+except Exception: pass' "$1"; }
+
+event="$(field hook_event_name)"
+cwd="$(field cwd)"
+project="${cwd##*/}"
+[ -n "$project" ] || project="Claude Code"
+
+case "$event" in
+  Stop)         title="Claude finished"; body="$project"; urgency=normal ;;
+  Notification) title="Claude needs you"; body="$project: $(field message)"; urgency=critical ;;
+  *) exit 0 ;;
+esac
+
+notify-send -a "Claude Code" -u "$urgency" -i utilities-terminal \
+  -h "string:x-canonical-private-synchronous:claude-code-${project}" \
+  "$title" "$body"
+exit 0

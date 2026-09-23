@@ -2,6 +2,9 @@ return {
   {
     'akinsho/git-conflict.nvim',
     version = '*',
+    -- keys alone made it key-lazy: no conflict highlights or co/ct until a
+    -- <leader>gc* press. Load with the first real buffer instead.
+    event = { 'BufReadPre', 'BufNewFile' },
     opts = {
       default_mappings = true, -- co/ct/cb/c0, ]x/[x
       default_commands = true,

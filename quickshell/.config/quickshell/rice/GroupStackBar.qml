@@ -2,6 +2,7 @@ pragma ComponentBehavior: Bound
 import QtQuick
 import Quickshell
 import Quickshell.Wayland
+import Quickshell.Hyprland
 import Quickshell.Io
 
 // Quickshell stack strip: inset to window rounding, gap above frame, segmented.
@@ -31,14 +32,50 @@ Scope {
         }
     }
 
+    function reprobe() {
+        probe.running = false
+        probe.running = true
+    }
+
+    // Event-driven: re-run the probe when Hyprland reports focus / group /
+    // window / workspace changes, coalescing bursts into one run.
+    readonly property var probeEvents: ({
+        "activewindowv2": true, "changegroupactive": true,
+        "moveintogroup": true, "moveoutofgroup": true, "togglegroup": true,
+        "lockgroups": true, "ignoregrouplock": true,
+        "openwindow": true, "closewindow": true,
+        "movewindow": true, "movewindowv2": true,
+        "changefloatingmode": true, "fullscreen": true,
+        "workspace": true, "workspacev2": true,
+        "focusedmon": true, "focusedmonv2": true,
+        "moveworkspace": true, "moveworkspacev2": true,
+        "monitoradded": true, "monitoraddedv2": true,
+        "monitorremoved": true, "monitorremovedv2": true,
+        "configreloaded": true
+    })
+
+    Connections {
+        target: Hyprland
+        function onRawEvent(event) {
+            if (root.probeEvents[event.name] === true)
+                probeDebounce.restart()
+        }
+    }
+
     Timer {
-        interval: root.segments.length > 0 ? 50 : 150
+        id: probeDebounce
+        interval: 30
+        repeat: false
+        onTriggered: root.reprobe()
+    }
+
+    // Safety net: geometry changes without an IPC event (resize / drag of the
+    // grouped window) still get picked up while a strip is visible.
+    Timer {
+        interval: root.segments.length > 0 ? 500 : 5000
         running: true
         repeat: true
-        onTriggered: {
-            probe.running = false
-            probe.running = true
-        }
+        onTriggered: root.reprobe()
     }
 
     Variants {

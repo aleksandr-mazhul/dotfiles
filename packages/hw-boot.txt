@@ -1,0 +1,7 @@
+breeze-plymouth
+efibootmgr
+grub
+grub-theme-vimix
+linux
+linux-headers
+plymouth

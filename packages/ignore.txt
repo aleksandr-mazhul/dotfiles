@@ -1,0 +1,4 @@
+# Installed here, deliberately NOT in the restore lists. export.sh skips these.
+chatgpt-desktop-bin   # removed from the AUR; the local build keeps working
+electron42            # pulled in for devin-desktop only
+mariadb               # per-project dev database, not part of the rice
