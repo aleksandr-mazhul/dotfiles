@@ -71,26 +71,23 @@ fi
 
 log "User services"
 systemctl --user daemon-reload || true
-if [[ -f "$HOME/.config/systemd/user/kanata.service" ]]; then
-  systemctl --user enable --now kanata.service || {
-    echo "warn: kanata.service failed to start (user must be in 'input' group; re-login)" >&2
+# Every unit this repo ships that is enabled on the reference machine.
+# NOT hid-kbd-swallow.service: it grabs every "* Keyboard" not on its
+# allow-list, so on another PC it can swallow the only working keyboard.
+# Enable it by hand after checking the device list in hid-kbd-swallow.py.
+for unit in kanata.service tmux-save.service icloud-calendar-sync.timer \
+  vscode-cursor-sync.path vscode-cursor-sync-idle.timer cursor-update.timer; do
+  [[ -f "$HOME/.config/systemd/user/$unit" ]] || continue
+  systemctl --user enable --now "$unit" || {
+    case "$unit" in
+      kanata.service)
+        echo "warn: $unit failed to start (run kanata-setup.sh: uinput + input group; re-login)" >&2 ;;
+      *) echo "warn: $unit failed to enable" >&2 ;;
+    esac
   }
-fi
-if [[ -f "$HOME/.config/systemd/user/vscode-cursor-sync.path" ]]; then
-  systemctl --user enable --now vscode-cursor-sync.path || {
-    echo "warn: vscode-cursor-sync.path failed to enable" >&2
-  }
-fi
-if [[ -f "$HOME/.config/systemd/user/vscode-cursor-sync-idle.timer" ]]; then
-  systemctl --user enable --now vscode-cursor-sync-idle.timer || {
-    echo "warn: vscode-cursor-sync-idle.timer failed to enable" >&2
-  }
-fi
-if [[ -f "$HOME/.config/systemd/user/cursor-update.timer" ]]; then
-  systemctl --user enable --now cursor-update.timer || {
-    echo "warn: cursor-update.timer failed to enable" >&2
-  }
-fi
+done
+# QS draws notifications; swaync would steal the D-Bus name if activated.
+systemctl --user mask swaync.service 2>/dev/null || true
 
 if [[ "$(getent passwd "$USER" | cut -d: -f7)" != "$(command -v fish)" ]] \
   && command -v fish >/dev/null 2>&1; then
@@ -133,7 +130,7 @@ Bootstrap finished.
 Restored automatically:
   • packages (repo + AUR lists)
   • all stowed configs (Hypr, Kitty, Fish, Kanata, Tmux, nvim, QS, theme, Zen shortcuts, …)
-  • kanata user service (if permitted)
+  • user services: kanata, tmux-save (shutdown snapshot), calendar sync, …
   • SSOT colors (if a wallpaper was available)
   • VS Code/Cursor shared settings + extensions (`vscode-cursor-sync.path`, idle timer)
   • Cursor AppImage hourly updater (`cursor-update.timer`; binary via `cursor-update --apply`)
