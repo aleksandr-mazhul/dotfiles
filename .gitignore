@@ -29,3 +29,6 @@ obs/.config/obs-studio/profiler_data/
 
 # Claude Code local (per-machine) settings
 .claude/
+
+# fish rewrites this (universal vars); per-machine state
+fish/.config/fish/fish_variables
