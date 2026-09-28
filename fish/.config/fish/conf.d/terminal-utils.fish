@@ -26,6 +26,10 @@ if status is-interactive
 
         # --highlight-line keeps the selected entry readable; its fg+/bg+ come
         # from the theme-generated FZF_DEFAULT_OPTS (theme-fzf.fish).
+        # --ansi is required. history --show-time prepends a timestamp and
+        # then the command, so the trailing "set_color normal" (\e[m) is
+        # glued onto field 3. Without --ansi, fzf keeps that byte sequence
+        # and kitty draws it as "␛[m" in front of the recalled command.
         function fzf-history-widget -d "Show command history"
             set -l command_line (commandline)
             set -l current_line (commandline -L)
@@ -37,7 +41,7 @@ if status is-interactive
                 '--with-nth=2.. --nth=2..,.. --scheme=history --multi --no-multi-line' \
                 '--no-wrap --wrap-sign="\t\t\t↳ " --preview-wrap-sign="↳ " --freeze-left=1' \
                 '--bind="ctrl-r:toggle-sort,alt-r:toggle-raw" --highlight-line' \
-                '--accept-nth=3.. --delimiter="\t" --tabstop=4 --read0 --print0')
+                '--accept-nth=3.. --delimiter="\t" --tabstop=4 --ansi --read0 --print0')
             set -lx FZF_DEFAULT_OPTS_FILE
             test -z "$fish_private_mode"; and builtin history merge
             if set -l result (eval $FZF_DEFAULT_COMMAND \| (__fzfcmd) --query=$fzf_query | string split0)
