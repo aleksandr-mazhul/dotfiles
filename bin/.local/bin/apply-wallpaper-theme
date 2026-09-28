@@ -3,6 +3,14 @@
 #   extract → match → build (palette.toml) → render (all consumers) → reload
 set -euo pipefail
 
+# Tests and a manual resync can persist lock + desktop + waypaper state
+# without recoloring the whole rice.
+remember_only=0
+if [[ "${1:-}" == "--remember-only" ]]; then
+  remember_only=1
+  shift
+fi
+
 wallpaper="${1:-}"
 wallpaper="${wallpaper//\\/}"
 
@@ -23,8 +31,128 @@ render="${self_dir}/theme-render"
 
 mkdir -p "$sddm_cache" "$cfg/theme"
 
-# Keep hyprlock background in sync
-ln -sfn "$wallpaper" "$cfg/hypr/lock-wallpaper"
+# waypaper --restore (login) reads this path. Quickshell, wallpaper-random and
+# the wofi menu set swww themselves and never write it, so the next session
+# put the previous image back on the desktop while hyprlock followed the symlink.
+waypaper_store_path() {
+  local abs="$1"
+  if [[ "$abs" == "$HOME/"* ]]; then
+    printf '~/%s\n' "${abs#"$HOME"/}"
+  else
+    printf '%s\n' "$abs"
+  fi
+}
+
+ini_set_wallpaper() {
+  local file="$1" section="$2" value="$3" tmp
+  mkdir -p "$(dirname "$file")"
+  [[ -f "$file" ]] || : >"$file"
+  tmp="$(mktemp "${file}.XXXXXX")"
+  SECTION="$section" VALUE="$value" awk '
+    function emit_key() {
+      print "wallpaper = " value
+      replaced = 1
+    }
+    BEGIN {
+      section = ENVIRON["SECTION"]
+      value = ENVIRON["VALUE"]
+      header = "[" section "]"
+      in_section = 0
+      replaced = 0
+      skipping = 0
+    }
+    /^\[/ {
+      if (skipping) skipping = 0
+      if (in_section && !replaced) emit_key()
+      in_section = ($0 == header)
+      print
+      next
+    }
+    in_section && /^[[:space:]]*wallpaper[[:space:]]*=/ {
+      if (!replaced) emit_key()
+      skipping = 1
+      next
+    }
+    skipping {
+      if ($0 ~ /^[[:space:]]/ && $0 !~ /^[[:space:]]*[A-Za-z0-9_.-]+[[:space:]]*=/) next
+      skipping = 0
+    }
+    { print }
+    END {
+      if (!replaced) {
+        if (!in_section) print header
+        emit_key()
+      }
+    }
+  ' "$file" >"$tmp"
+  mv -f "$tmp" "$file"
+}
+
+persist_waypaper_choice() {
+  local stored ini use_state state
+  # Keep the path the user picked. readlink -f would follow symlinks out of
+  # ~/pictures/wallpapers (archbtw.png → /usr/share/backgrounds/...).
+  wallpaper_chosen="$(realpath -s "$wallpaper")"
+  stored="$(waypaper_store_path "$wallpaper_chosen")"
+  ini="$cfg/waypaper/config.ini"
+  mkdir -p "$(dirname "$ini")" "$cfg/hypr"
+  if [[ ! -f "$ini" ]]; then
+    printf '[Settings]\nbackend = swww\nmonitors = All\n' >"$ini"
+  fi
+  use_state=0
+  if grep -Eq '^[[:space:]]*use_xdg_state[[:space:]]*=[[:space:]]*(True|true|yes|1)[[:space:]]*$' "$ini"; then
+    use_state=1
+  fi
+  if ((use_state)); then
+    state="${XDG_STATE_HOME:-$HOME/.local/state}/waypaper/state.ini"
+    ini_set_wallpaper "$state" State "$stored"
+  else
+    ini_set_wallpaper "$ini" Settings "$stored"
+  fi
+}
+
+apply_home_screen() {
+  command -v swww >/dev/null 2>&1 || return 0
+  [[ -n "${WAYLAND_DISPLAY:-}" ]] || return 0
+  killall -q hyprpaper 2>/dev/null || true
+  if ! pgrep -x swww-daemon >/dev/null 2>&1; then
+    swww-daemon >/dev/null 2>&1 &
+    sleep 0.3
+  fi
+  local abs mismatch=0 line img query
+  abs="$(readlink -f "${wallpaper_chosen:-$wallpaper}")"
+  query="$(swww query 2>/dev/null || true)"
+  if [[ -z "$query" ]]; then
+    mismatch=1
+  else
+    while IFS= read -r line; do
+      [[ "$line" == *"image: "* ]] || continue
+      img="${line##*image: }"
+      img="${img%$'\r'}"
+      if [[ "$(readlink -f "$img" 2>/dev/null || printf '%s' "$img")" != "$abs" ]]; then
+        mismatch=1
+      fi
+    done <<<"$query"
+  fi
+  if ((mismatch == 0)); then
+    return 0
+  fi
+  local args
+  args="$(wallpaper-transition args 2>/dev/null || true)"
+  if [[ -n "$args" ]]; then
+    # shellcheck disable=SC2086
+    swww img "${wallpaper_chosen:-$abs}" $args
+  else
+    swww img "${wallpaper_chosen:-$abs}" --transition-type grow --transition-duration 1.4 --transition-fps 60
+  fi
+}
+
+persist_waypaper_choice
+ln -sfn "$wallpaper_chosen" "$cfg/hypr/lock-wallpaper"
+apply_home_screen
+if ((remember_only)); then
+  exit 0
+fi
 
 # Ensure harmonies.toml is available under ~/.config/theme
 # Prefer repo next to this script (stow symlink → …/dotfiles/bin/.local/bin)
