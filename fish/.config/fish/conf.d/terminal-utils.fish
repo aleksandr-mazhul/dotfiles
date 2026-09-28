@@ -26,15 +26,18 @@ if status is-interactive
 
         # --highlight-line keeps the selected entry readable; its fg+/bg+ come
         # from the theme-generated FZF_DEFAULT_OPTS (theme-fzf.fish).
-        # --ansi is required. history --show-time prepends a timestamp and
-        # then the command, so the trailing "set_color normal" (\e[m) is
-        # glued onto field 3. Without --ansi, fzf keeps that byte sequence
-        # and kitty draws it as "␛[m" in front of the recalled command.
+        # history --show-time glues set_color normal (\e[m) onto field 3.
+        # --ansi asks fzf to drop SGR on accept. The fish strip is the
+        # guarantee: a recalled command, and the next search query, never
+        # start with that reset (kitty would draw it as "␛[m").
         function fzf-history-widget -d "Show command history"
             set -l command_line (commandline)
             set -l current_line (commandline -L)
             set -l total_lines (count $command_line)
-            set -l fzf_query (string escape -- $command_line[$current_line])
+            set -l raw_query $command_line[$current_line]
+            set -l stripped_query (string replace -ra '\e\[[0-9;]*m' '' -- $raw_query)
+            and set raw_query $stripped_query
+            set -l fzf_query (string escape -- $raw_query)
             set -lx FZF_DEFAULT_COMMAND \
                 'builtin history -z --show-time=(set_color $fish_color_comment 2>/dev/null; or set_color normal)"%F %a %T%t%s%t"(set_color normal)'
             set -lx FZF_DEFAULT_OPTS (__fzf_defaults '' \
@@ -45,6 +48,8 @@ if status is-interactive
             set -lx FZF_DEFAULT_OPTS_FILE
             test -z "$fish_private_mode"; and builtin history merge
             if set -l result (eval $FZF_DEFAULT_COMMAND \| (__fzfcmd) --query=$fzf_query | string split0)
+                set -l stripped (string replace -ra '\e\[[0-9;]*m' '' -- $result)
+                and set result $stripped
                 if test "$total_lines" -eq 1
                     commandline -- $result
                 else
