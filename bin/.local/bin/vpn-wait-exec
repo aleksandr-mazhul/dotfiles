@@ -12,33 +12,43 @@ fi
 CLI="${WINDSCRIBE_CLI:-windscribe-cli}"
 deadline=$(( SECONDS + ${VPN_WAIT_SECS:-300} ))
 
-# A same-directory wrapper named `claude` or `devin-desktop` must not be
-# exec'd again. Look the command up further along PATH.
+# Stow links ~/.local/bin/claude at the package file vpn-wait-provider.
+# readlink -f "$0" is the package dir, not ~/.local/bin, so both must be
+# skipped or the lookup execs the wrapper again.
 resolve_cmd() {
   local cmd="$1"
   if [[ "$cmd" == */* ]]; then
     printf '%s' "$cmd"
-    return
+    return 0
   fi
-  local self_dir dir canon
-  self_dir="$(cd "$(dirname "$(readlink -f "$0")")" && pwd)"
+  local self_real self_dir invoked_dir provider_real dir canon cand cand_real
+  self_real="$(readlink -f "$0")"
+  self_dir="$(dirname "$self_real")"
+  invoked_dir="$(cd "$(dirname "$0")" && pwd)"
+  provider_real="$(readlink -f "$self_dir/vpn-wait-provider" 2>/dev/null || true)"
   local IFS=:
   for dir in $PATH; do
     [[ -n "$dir" ]] || continue
     canon="$(cd "$dir" 2>/dev/null && pwd)" || continue
-    [[ "$canon" == "$self_dir" ]] && continue
-    if [[ -x "$canon/$cmd" && ! -d "$canon/$cmd" ]]; then
-      printf '%s' "$canon/$cmd"
-      return
-    fi
+    [[ "$canon" == "$self_dir" || "$canon" == "$invoked_dir" ]] && continue
+    cand="$canon/$cmd"
+    [[ -x "$cand" && ! -d "$cand" ]] || continue
+    cand_real="$(readlink -f "$cand" 2>/dev/null || true)"
+    [[ -n "$provider_real" && "$cand_real" == "$provider_real" ]] && continue
+    [[ "$cand_real" == "$self_real" ]] && continue
+    printf '%s' "$cand_real"
+    return 0
   done
-  printf '%s' "$cmd"
+  return 1
 }
 
 while (( SECONDS < deadline )); do
   st="$("$CLI" status 2>/dev/null || true)"
   if [[ "${st,,}" == *"connect state: connected"* ]]; then
-    real="$(resolve_cmd "$1")"
+    real="$(resolve_cmd "$1")" || {
+      echo "vpn-wait-exec: not found: $1" >&2
+      exit 127
+    }
     shift
     exec "$real" "$@"
   fi
