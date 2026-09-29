@@ -1,0 +1,91 @@
+#!/usr/bin/env bash
+# Print the city with the lowest positive ping outside region Russia.
+# windscribe-cli "best" is not used: that token is the client's own node.
+set -euo pipefail
+
+locations=""
+pings=""
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --locations)
+      locations="${2:-}"
+      shift 2
+      ;;
+    --pings)
+      pings="${2:-}"
+      shift 2
+      ;;
+    *)
+      echo "usage: $0 --locations PATH --pings PATH" >&2
+      exit 2
+      ;;
+  esac
+done
+
+if [[ -z "$locations" || -z "$pings" || ! -f "$locations" || ! -f "$pings" ]]; then
+  echo "usage: $0 --locations PATH --pings PATH" >&2
+  exit 2
+fi
+
+LOCATIONS="$locations" PINGS="$pings" python3 - <<'PY'
+import os
+import sys
+
+locations = os.environ["LOCATIONS"]
+pings_path = os.environ["PINGS"]
+
+pings = {}
+with open(pings_path, encoding="utf-8", errors="ignore") as handle:
+    for line in handle:
+        parts = line.strip().split("|")
+        if len(parts) < 2:
+            continue
+        city = parts[0].strip()
+        raw = parts[1].strip()
+        if not city or not raw.isdigit():
+            continue
+        ms = int(raw)
+        if ms <= 0:
+            continue
+        pings[city.casefold()] = ms
+
+entries = []
+seen = set()
+with open(locations, encoding="utf-8", errors="ignore") as handle:
+    for line in handle:
+        line = line.strip()
+        if not line:
+            continue
+        # Bandwidth and disabled marks are not latency.
+        if line.endswith(")") and " (" in line:
+            head, tail = line.rsplit(" (", 1)
+            if tail[:1].isdigit():
+                line = head.strip()
+        parts = [part.strip() for part in line.split(" - ") if part.strip()]
+        if len(parts) < 2:
+            continue
+        region = parts[0]
+        if region.casefold() == "best location":
+            continue
+        city = parts[1]
+        key = city.casefold()
+        if not city or key in seen:
+            continue
+        seen.add(key)
+        entries.append((region, city))
+
+best = None
+for order, (region, city) in enumerate(entries):
+    if region.casefold() == "russia":
+        continue
+    ms = pings.get(city.casefold())
+    if ms is None:
+        continue
+    cand = (ms, order, city)
+    if best is None or cand < best:
+        best = cand
+
+if best is None:
+    sys.exit(1)
+print(best[2])
+PY
