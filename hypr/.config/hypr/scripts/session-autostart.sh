@@ -29,6 +29,7 @@ launch_cmd() {
     nautilus) printf '%s\n' "$HOME/.local/bin/nautilus-dark --new-window" ;;
     chatgpt) printf '%s\n' chatgpt ;;
     claude) printf '%s\n' claude-desktop ;;
+    devin) printf '%s\n' "$HOME/.local/bin/devin-desktop" ;;
     spotify) printf '%s\n' "spotify-launcher --skip-update" ;;
     obsidian) printf '%s\n' obsidian ;;
     code) printf '%s\n' code ;;
@@ -89,12 +90,14 @@ spawn() {
     echo "session-autostart: skip $id (missing $cmd)" >&2
     return 0
   }
-  # Claude needs the VPN: launch detached, only after Windscribe is connected.
-  if [[ "$id" == "claude" ]]; then
-    echo "session-autostart: defer $id ws=$ws until VPN is up" >&2
-    setsid -f "$HOME/.config/hypr/scripts/after-vpn-launch.sh" "$ws" "$cmd" >/dev/null 2>&1
-    return 0
-  fi
+  # AI clients must not open on the real address.
+  case "$id" in
+    claude|cursor|chatgpt|devin)
+      echo "session-autostart: defer $id ws=$ws until VPN is up" >&2
+      setsid -f "$HOME/.config/hypr/scripts/after-vpn-launch.sh" "$ws" "$cmd" >/dev/null 2>&1
+      return 0
+      ;;
+  esac
   # Theme reload SIGUSR1 races the first kitty; give wallpaper post_command time.
   if [[ "$id" == "kitty" && -z "$skip_delay" ]]; then
     sleep 2.5
@@ -240,6 +243,7 @@ catalog = {
     "nautilus": ("org.gnome.nautilus", "nautilus"),
     "telegram": ("org.telegram.desktop", "telegramdesktop"),
     "chatgpt": ("chatgpt",),
+    "devin": ("devin", "devin-desktop"),
     "discord": ("discord",),
     "firefox": ("firefox",),
     "chrome": ("google-chrome", "google-chrome-stable", "chromium"),

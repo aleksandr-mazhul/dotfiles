@@ -1,0 +1,49 @@
+#!/usr/bin/env bash
+# Block until Windscribe is connected, then replace this process with
+# the given command. Used by tmux/zellij session restore so a resumed
+# `claude` pane does not talk to the network before the VPN is up.
+set -uo pipefail
+
+if [[ $# -lt 1 ]]; then
+  echo "usage: vpn-wait-exec COMMAND [ARG...]" >&2
+  exit 2
+fi
+
+CLI="${WINDSCRIBE_CLI:-windscribe-cli}"
+deadline=$(( SECONDS + ${VPN_WAIT_SECS:-300} ))
+
+# A same-directory wrapper named `claude` or `devin-desktop` must not be
+# exec'd again. Look the command up further along PATH.
+resolve_cmd() {
+  local cmd="$1"
+  if [[ "$cmd" == */* ]]; then
+    printf '%s' "$cmd"
+    return
+  fi
+  local self_dir dir canon
+  self_dir="$(cd "$(dirname "$(readlink -f "$0")")" && pwd)"
+  local IFS=:
+  for dir in $PATH; do
+    [[ -n "$dir" ]] || continue
+    canon="$(cd "$dir" 2>/dev/null && pwd)" || continue
+    [[ "$canon" == "$self_dir" ]] && continue
+    if [[ -x "$canon/$cmd" && ! -d "$canon/$cmd" ]]; then
+      printf '%s' "$canon/$cmd"
+      return
+    fi
+  done
+  printf '%s' "$cmd"
+}
+
+while (( SECONDS < deadline )); do
+  st="$("$CLI" status 2>/dev/null || true)"
+  if [[ "${st,,}" == *"connect state: connected"* ]]; then
+    real="$(resolve_cmd "$1")"
+    shift
+    exec "$real" "$@"
+  fi
+  sleep 1
+done
+
+echo "vpn-wait-exec: VPN did not connect, not starting: $*" >&2
+exit 1

@@ -2,7 +2,7 @@
 Name=Devin - URL Handler
 Comment=Open Devin auth / deep links
 GenericName=Text Editor
-Exec=/usr/bin/devin-desktop --open-url %U
+Exec=devin-desktop --open-url %U
 Icon=devin-desktop
 Type=Application
 NoDisplay=true

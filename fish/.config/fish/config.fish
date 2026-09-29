@@ -35,7 +35,7 @@ end
 set -g fish_greeting
 
 
-# User-local bins (theme-*, zen-browser, …)
-fish_add_path -g "$HOME/.local/bin"
-# npm global prefix (claude — the native updater gets 403, so it is installed via npm)
+# npm global prefix (claude — the native updater gets 403, so it is installed via npm).
+# ~/.local/bin is prepended after it so the VPN-gated claude wrapper wins.
 fish_add_path -g "$HOME/.npm-global/bin"
+fish_add_path -g "$HOME/.local/bin"

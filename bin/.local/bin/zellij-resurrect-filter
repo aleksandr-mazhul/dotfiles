@@ -1,0 +1,251 @@
+#!/usr/bin/env python3
+"""Rewrite a zellij session-layout.kdl so a resurrected session runs safely.
+
+zellij captures every pane's foreground command with `start_suspended true`,
+so a resurrected shell/editor pane needs an Enter press before it does
+anything (fine) -- but an unattended `npm run dev` or `claude` pane would
+just sit there waiting forever unless something drives it. This filter:
+
+  - keeps `npm run ...` panes as-is (drops start_suspended so they run right away)
+  - rewrites any `claude` pane to `vpn-wait-exec <claude> --continue`
+    (drops any prior args; the wrapper blocks until the VPN is up)
+  - turns every other command pane into a plain shell pane (drops command/
+    args/start_suspended, keeps cwd/size/name/focus/split_direction)
+
+Idempotent: filtering an already-filtered layout is a no-op.
+
+Usage:
+    zellij-resurrect-filter FILE   # rewrite FILE in place
+    zellij-resurrect-filter -      # filter stdin to stdout
+"""
+import os
+import re
+import sys
+
+# One KDL token: a quoted string (with escapes) or a bare word.
+TOKEN_RE = re.compile(r'"(?:[^"\\]|\\.)*"|\S+')
+QSTR_RE = re.compile(r'"((?:[^"\\]|\\.)*)"')
+PANE_HEADER_RE = re.compile(r'^(?P<indent>[ \t]*)pane\b(?P<attrs>.*)$')
+
+
+def _strip_trailing_brace(attrs):
+    """Split a header's attribute string from its opening '{', if present."""
+    stripped = attrs.rstrip()
+    if stripped.endswith('{'):
+        return stripped[:-1].rstrip(), True
+    return stripped, False
+
+
+def _command_value(attrs):
+    m = re.search(r'(?:^|\s)command\s*=\s*"((?:[^"\\]|\\.)*)"', attrs)
+    return m.group(1) if m else None
+
+
+COMMAND_ATTR_RE = re.compile(r'(?:^|(?<=\s))command\s*=\s*"(?:[^"\\]|\\.)*"\s*')
+
+
+def _remove_command_attr(attrs):
+    # Quote-aware: a plain \S+ tokenizer splits inside command="a b" (the
+    # value's inner space breaks the quoted token), leaving a dangling
+    # quote/word behind as invalid KDL. Match the whole attribute -- value
+    # and all -- as one unit instead.
+    return COMMAND_ATTR_RE.sub('', attrs).strip()
+
+
+def _replace_command_attr(attrs, value):
+    return COMMAND_ATTR_RE.sub('command="%s" ' % value, attrs, count=1).strip()
+
+
+def _line_kind(line):
+    s = line.strip()
+    if s.startswith('args') and (len(s) == 4 or s[4] in ' \t"'):
+        return 'args'
+    if s.startswith('start_suspended') and (len(s) == 15 or s[15] in ' \t'):
+        return 'start_suspended'
+    return 'other'
+
+
+def _args_values(line):
+    return QSTR_RE.findall(line.strip()[4:])
+
+
+def _find_block_end(lines, start_idx):
+    """Index of the `}` closing the block opened at start_idx (brace-depth walk)."""
+    depth = 1
+    j = start_idx + 1
+    while j < len(lines):
+        depth += lines[j].count('{') - lines[j].count('}')
+        if depth == 0:
+            return j
+        j += 1
+    return len(lines) - 1
+
+
+def _indent_of(line, fallback):
+    m = re.match(r'^([ \t]*)', line)
+    return m.group(1) if m else fallback
+
+
+def _transform_pane_block(lines, i, indent, attrs, has_block):
+    command = _command_value(attrs)
+    if command is None:
+        return [lines[i]], i + 1
+
+    if not has_block:
+        block_end, inner, args = i, [], []
+    else:
+        block_end = _find_block_end(lines, i)
+        inner = lines[i + 1:block_end]
+        args = []
+        for ln in inner:
+            if _line_kind(ln) == 'args':
+                args = _args_values(ln)
+
+    # Match on the program's basename: zellij records argv[0] as the process
+    # set it, which may be a bare name or an absolute path.
+    cmd_words = command.split()
+    prog = os.path.basename(cmd_words[0]) if cmd_words else ''
+    # A previous pass already rewrote `claude` to `vpn-wait-exec`. Leave that
+    # pane alone (aside from dropping start_suspended) so the filter is stable.
+    already_wrapped = (
+        prog == 'vpn-wait-exec'
+        and bool(args)
+        and os.path.basename(args[0]) == 'claude'
+    )
+    keep_claude = prog == 'claude' and len(cmd_words) == 1
+    # Real npm retitles its process, so zellij serializes it as ONE string
+    # ("npm run dev", no args node); a non-title-mangling command="npm" pane
+    # still carries "run" as a separate arg. Either way, the first word after
+    # "npm" must be "run".
+    keep_npm = prog == 'npm' and (args[:1] == ['run'] or cmd_words[1:2] == ['run'])
+
+    if already_wrapped:
+        return _keep_command_pane(lines, i, block_end, indent, inner, has_block, False)
+    if keep_claude:
+        return _rewrite_claude_pane(
+            lines, i, block_end, indent, attrs, inner, has_block, command)
+    if keep_npm:
+        return _keep_command_pane(lines, i, block_end, indent, inner, has_block, False)
+
+    # Anything else becomes a plain shell pane: drop command/args/start_suspended.
+    new_attrs = _remove_command_attr(attrs)
+    nl = '\n' if lines[i].endswith('\n') else ''
+    header = 'pane%s' % ((' ' + new_attrs) if new_attrs else '')
+    new_header = '%s%s {%s' % (indent, header, nl) if has_block else '%s%s%s' % (indent, header, nl)
+    if not has_block:
+        return [new_header], i + 1
+    new_inner = [ln for ln in inner if _line_kind(ln) not in ('args', 'start_suspended')]
+    return [new_header] + new_inner + [lines[block_end]], block_end + 1
+
+
+def _rewrite_claude_pane(lines, i, block_end, indent, attrs, inner, has_block, command):
+    """Run the original claude binary only after the VPN is up."""
+    new_attrs = _replace_command_attr(attrs, 'vpn-wait-exec')
+    nl = '\n' if lines[i].endswith('\n') else ''
+    header = 'pane' + ((' ' + new_attrs) if new_attrs else '')
+    new_header = '%s%s {%s' % (indent, header, nl) if has_block else '%s%s%s' % (indent, header, nl)
+    arg_indent = indent + '    '
+    arg_nl = nl
+    new_inner = []
+    inserted = False
+    for ln in inner:
+        kind = _line_kind(ln)
+        if kind == 'start_suspended':
+            if not inserted:
+                ci = _indent_of(ln, arg_indent)
+                arg_nl = '\n' if ln.endswith('\n') else ''
+                new_inner.append('%sargs "%s" "--continue"%s' % (ci, command, arg_nl))
+                inserted = True
+            continue
+        if kind == 'args':
+            if not inserted:
+                ci = _indent_of(ln, arg_indent)
+                arg_nl = '\n' if ln.endswith('\n') else ''
+                new_inner.append('%sargs "%s" "--continue"%s' % (ci, command, arg_nl))
+                inserted = True
+            continue
+        new_inner.append(ln)
+    if not inserted:
+        new_inner.append('%sargs "%s" "--continue"%s' % (arg_indent, command, arg_nl))
+    if not has_block:
+        return [new_header], i + 1
+    return [new_header] + new_inner + [lines[block_end]], block_end + 1
+
+
+def _keep_command_pane(lines, i, block_end, indent, inner, has_block, keep_claude):
+    """npm/claude panes are kept but drop start_suspended; claude also gets
+    its args rewritten to exactly `--continue` (replacing the args line if
+    one exists, inserting one otherwise, in whichever position start_suspended
+    or the original args line held)."""
+    new_inner, inserted = [], False
+    for ln in inner:
+        kind = _line_kind(ln)
+        if kind == 'start_suspended':
+            if keep_claude and not inserted:
+                ci = _indent_of(ln, indent + '    ')
+                nl = '\n' if ln.endswith('\n') else ''
+                new_inner.append('%sargs "--continue"%s' % (ci, nl))
+                inserted = True
+            continue
+        if kind == 'args':
+            if keep_claude:
+                ci = _indent_of(ln, indent + '    ')
+                nl = '\n' if ln.endswith('\n') else ''
+                new_inner.append('%sargs "--continue"%s' % (ci, nl))
+                inserted = True
+            else:
+                new_inner.append(ln)
+            continue
+        new_inner.append(ln)
+    if keep_claude and not inserted:
+        nl = '\n' if (new_inner and new_inner[-1].endswith('\n')) or \
+            (not new_inner and lines[i].endswith('\n')) else ''
+        new_inner.append('%s    args "--continue"%s' % (indent, nl))
+    if not has_block:
+        return [lines[i]], i + 1
+    return [lines[i]] + new_inner + [lines[block_end]], block_end + 1
+
+
+def filter_text(text):
+    had_nl = text.endswith('\n')
+    lines = text.splitlines(keepends=True)
+    out, i, n = [], 0, len(lines)
+    while i < n:
+        m = PANE_HEADER_RE.match(lines[i].rstrip('\n'))
+        if not m:
+            out.append(lines[i])
+            i += 1
+            continue
+        indent, raw_attrs = m.group('indent'), m.group('attrs')
+        attrs, has_block = _strip_trailing_brace(raw_attrs)
+        if 'command' not in attrs:
+            out.append(lines[i])
+            i += 1
+            continue
+        repl, i = _transform_pane_block(lines, i, indent, attrs, has_block)
+        out.extend(repl)
+    result = ''.join(out)
+    if had_nl and not result.endswith('\n'):
+        result += '\n'
+    return result
+
+
+def main(argv):
+    if len(argv) != 2:
+        print('usage: zellij-resurrect-filter FILE|-', file=sys.stderr)
+        return 2
+    target = argv[1]
+    if target == '-':
+        sys.stdout.write(filter_text(sys.stdin.read()))
+        return 0
+    with open(target, encoding='utf-8') as f:
+        text = f.read()
+    tmp = '%s.tmp.%d' % (target, os.getpid())
+    with open(tmp, 'w', encoding='utf-8') as f:
+        f.write(filter_text(text))
+    os.replace(tmp, target)
+    return 0
+
+
+if __name__ == '__main__':
+    sys.exit(main(sys.argv))

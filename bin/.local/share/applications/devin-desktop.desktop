@@ -2,7 +2,7 @@
 Name=Devin
 Comment=AI agent IDE — Devin Desktop
 GenericName=Text Editor
-Exec=/usr/bin/devin-desktop %F
+Exec=devin-desktop %F
 Icon=devin-desktop
 Type=Application
 Terminal=false
@@ -16,5 +16,5 @@ Keywords=devin;windsurf;vscode;code;editor;ide;agent;
 [Desktop Action new-empty-window]
 Name=New Empty Window
 Name[ru]=Новое пустое окно
-Exec=/usr/bin/devin-desktop --new-window %F
+Exec=devin-desktop --new-window %F
 Icon=devin-desktop

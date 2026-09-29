@@ -21,6 +21,8 @@ export APPIMAGE_EXTRACT_AND_RUN="${APPIMAGE_EXTRACT_AND_RUN:-1}"
 
 # Nautilus/GIO pass file:// URIs. Electron accepts them, but normalize to
 # paths so a second instance reliably hands the file to the running Cursor.
+wait_exec="$(cd "$(dirname "$(readlink -f "$0")")" && pwd)/vpn-wait-exec"
+
 if (( $# )); then
   mapfile -d '' -t args < <(python3 -c '
 import sys, urllib.parse
@@ -29,7 +31,7 @@ for a in sys.argv[1:]:
         a = urllib.parse.unquote(urllib.parse.urlparse(a).path)
     sys.stdout.buffer.write(a.encode() + b"\0")
 ' "$@")
-  exec "$APP" "${args[@]}"
+  exec "$wait_exec" "$APP" "${args[@]}"
 fi
 
-exec "$APP"
+exec "$wait_exec" "$APP"
