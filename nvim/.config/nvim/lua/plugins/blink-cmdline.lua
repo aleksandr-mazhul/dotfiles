@@ -13,6 +13,11 @@ return {
   "saghen/blink.cmp",
   optional = true,
   opts = {
+    completion = {
+      -- LSP / buffer / path suggestions stay in the menu under the cursor.
+      -- Inline ghost text is Copilot's only, so the two previews don't stack.
+      ghost_text = { enabled = false },
+    },
     cmdline = {
       keymap = {
         ["<Up>"] = { menu_or_history("select_prev"), "fallback" },
