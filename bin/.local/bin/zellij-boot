@@ -1,0 +1,57 @@
+#!/usr/bin/env bash
+# Ensure a zellij session exists: attach the newest live session, or
+# resurrect+attach the newest exited one, or start `main`. flock serialises
+# concurrent Kitty windows racing this on startup (mirrors tmux's boot.sh).
+set -uo pipefail
+
+RUNTIME_DIR="${XDG_RUNTIME_DIR:-/tmp}"
+LOCK="$RUNTIME_DIR/zellij-boot.lock"
+FILTER="$(dirname "$(readlink -f "$0")")/zellij-resurrect-filter"
+
+exec 9>"$LOCK"
+flock 9
+
+# --reverse sorts newest-first (list-sessions is oldest-first by default), so
+# the first live/exited line seen below is the most recently created session.
+listing="$(zellij list-sessions --no-formatting --reverse 2>/dev/null)"
+live_name="" exited_name=""
+while IFS= read -r line; do
+  [ -n "$line" ] || continue
+  # Name may contain spaces (e.g. "two words [Created ...]"); everything up
+  # to " [Created" is the name, not just the first word.
+  name="${line%% \[Created*}"
+  if [[ "$line" == *"(EXITED"* ]]; then
+    [ -n "$exited_name" ] || exited_name="$name"
+  else
+    [ -n "$live_name" ] || live_name="$name"
+  fi
+done <<<"$listing"
+
+# run CMD...: exec it, unless ZELLIJ_BOOT_DRY_RUN=1 (tests print instead of
+# exec'ing so the driver pane stays alive to inspect).
+# 9>&- : the attached client must not hold the lock past this process; a
+# daemonised zellij server run this way would otherwise inherit and keep it.
+run() {
+  if [ "${ZELLIJ_BOOT_DRY_RUN:-}" = "1" ]; then
+    printf '%q ' "$@"
+    printf '\n'
+  else
+    flock -u 9 2>/dev/null || true
+    exec "$@" 9>&-
+  fi
+}
+
+if [ -n "$live_name" ]; then
+  run zellij attach "$live_name"
+elif [ -n "$exited_name" ]; then
+  # session_info's path segment is a serialization contract version (verified
+  # "contract_version_1" on 0.45.1), NOT the zellij release version -- glob on
+  # depth instead of hardcoding either string so a future contract bump still
+  # resolves.
+  layout="$(find "${XDG_CACHE_HOME:-$HOME/.cache}/zellij" -mindepth 4 -maxdepth 4 \
+             -path "*/session_info/$exited_name/session-layout.kdl" -print -quit 2>/dev/null)"
+  [ -n "$layout" ] && [ -f "$layout" ] && "$FILTER" "$layout"
+  run zellij attach "$exited_name" --force-run-commands
+else
+  run zellij attach -c main
+fi

@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # Claude Code hook -> desktop notification (Stop / Notification events).
-# Works from any terminal (kitty, tmux, herdr) because it talks to the session
-# notification daemon directly instead of relying on OSC 99 passthrough.
+# Works from any terminal (kitty, tmux, zellij, herdr) because it talks to the
+# session notification daemon directly instead of relying on OSC 99 passthrough
+# (zellij doesn't forward OSC 99 at all — see docs/zellij-migration/01-audit.md A7).
 # The Claude Desktop app has its own notifications, so it is skipped here.
 # Wired in ~/.claude/settings.json (see RESTORE.md).
 set -u

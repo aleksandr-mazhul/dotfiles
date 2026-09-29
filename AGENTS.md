@@ -3,6 +3,11 @@
 You are working in a GNU Stow–based Arch/Hyprland rice. Prefer small, reversible
 changes. Never commit secrets (tokens, passwords, browser profiles, SSH keys).
 
+tmux is mid-migration to zellij (`feat/zellij-herdr`, see
+`docs/zellij-migration/`); both coexist behind `MUX=zellij|tmux` until the
+cut-over — don't remove tmux files on your own initiative. `zellij-plugins-fetch`
+pins the wasm plugins (zjstatus, vim-zellij-navigator).
+
 ## One-command restore (humans)
 
 ```bash

@@ -25,7 +25,7 @@ function cbonsai --wraps cbonsai --description 'cbonsai with SSOT 256-colors'
     if contains -- -k $argv; or contains -- --color $argv
         command cbonsai $argv
     else
-        command cbonsai -k 96,187,223,187 $argv
+        command cbonsai -k 102,187,223,187 $argv
     end
 end
 

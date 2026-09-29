@@ -26,10 +26,18 @@ if status is-interactive
 
         # --highlight-line keeps the selected entry readable; its fg+/bg+ come
         # from the theme-generated FZF_DEFAULT_OPTS (theme-fzf.fish).
-        # history --show-time glues set_color normal (\e[m) onto field 3.
+        # The frozen column is the command time (%F %T), not the raw epoch.
+        # A fixed hue cannot be readable on both the dark row and the peach
+        # current line, and fzf will not replace an explicit SGR foreground
+        # there (fish_color_comment stayed salmon on peach). Instead the time
+        # is the non-nth part: fg:dim quiets it, nth:regular keeps the command
+        # at full fg, and fg+:regular drops that dim on the current line so
+        # the time becomes the same dark ink as the command. --nth is only the
+        # command; including the whole line would clear the dim. The epoch
+        # remains the hidden middle field, so accept-nth=3.. is still the command.
         # --ansi asks fzf to drop SGR on accept. The fish strip is the
         # guarantee: a recalled command, and the next search query, never
-        # start with that reset (kitty would draw it as "␛[m").
+        # start with a reset (kitty would draw it as "␛[m").
         function fzf-history-widget -d "Show command history"
             set -l command_line (commandline)
             set -l current_line (commandline -L)
@@ -39,9 +47,10 @@ if status is-interactive
             and set raw_query $stripped_query
             set -l fzf_query (string escape -- $raw_query)
             set -lx FZF_DEFAULT_COMMAND \
-                'builtin history -z --show-time=(set_color $fish_color_comment 2>/dev/null; or set_color normal)"%F %a %T%t%s%t"(set_color normal)'
+                'builtin history -z --show-time="%F %T%t%s%t"'
             set -lx FZF_DEFAULT_OPTS (__fzf_defaults '' \
-                '--with-nth=2.. --nth=2..,.. --scheme=history --multi --no-multi-line' \
+                '--with-nth=1,3.. --nth=2.. --scheme=history --multi --no-multi-line' \
+                '--color=fg:dim,nth:regular,fg+:regular' \
                 '--no-wrap --wrap-sign="\t\t\t↳ " --preview-wrap-sign="↳ " --freeze-left=1' \
                 '--bind="ctrl-r:toggle-sort,alt-r:toggle-raw" --highlight-line' \
                 '--accept-nth=3.. --delimiter="\t" --tabstop=4 --ansi --read0 --print0')

@@ -54,6 +54,7 @@ packages=(
   theme
   tmux
   vibepanel
+  voxtype
   vscode
   waybar
   waypaper
@@ -61,6 +62,7 @@ packages=(
   x11
   xsettingsd
   yazi
+  zellij
   zen
 )
 

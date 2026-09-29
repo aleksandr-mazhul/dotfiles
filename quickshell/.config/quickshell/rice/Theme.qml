@@ -60,7 +60,7 @@ QtObject {
     readonly property int clipboardWidth: panelWidth // alias — same overlay width everywhere
     readonly property int clipboardHeight: 560
     readonly property int rowHeight: 52
-    // Chrome SSOT — highlight / panel / muted (same language as tmux + starship)
+    // Chrome SSOT — highlight / panel / muted (same language as tmux/zellij + starship)
     readonly property color chromeHighlightBg: Colors.chrome_highlight_bg
     readonly property color chromeHighlightFg: Colors.chrome_highlight_fg
     readonly property color chromePanelBg: Colors.chrome_panel_bg

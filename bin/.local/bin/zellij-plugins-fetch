@@ -1,0 +1,77 @@
+#!/usr/bin/env bash
+# Fetch + pin the wasm plugins zellij's config.kdl loads (zjstatus, zjframes,
+# the vim navigator), and pre-seed their permission grants so the wasm's first-load
+# prompt never has to be answered by a human (or a test).
+#
+# Usage:
+#   zellij-plugins-fetch          # download missing/mismatched plugins, seed grants
+#   zellij-plugins-fetch --check  # exit 0 only if both plugins are present with
+#                                  # the pinned sha256; downloads nothing
+#
+# Do not run this against the real HOME without --check unless you mean to
+# fetch — it writes into $XDG_DATA_HOME/zellij/plugins and
+# $XDG_CACHE_HOME/zellij/permissions.kdl.
+set -euo pipefail
+
+DATA_HOME="${XDG_DATA_HOME:-$HOME/.local/share}"
+CACHE_HOME="${XDG_CACHE_HOME:-$HOME/.cache}"
+PLUGIN_DIR="$DATA_HOME/zellij/plugins"
+PERMS_FILE="$CACHE_HOME/zellij/permissions.kdl"
+
+# name  url  sha256 — versions pinned to what's in the audit / lib.sh.
+PLUGINS=(
+  "zjstatus.wasm https://github.com/dj95/zjstatus/releases/download/v0.25.0/zjstatus.wasm 282ceab219e56e1908c9fac33907241fe6c3e1ef7d85faab3e5f438cef87b8fe"
+  "vim-zellij-navigator.wasm https://github.com/hiasr/vim-zellij-navigator/releases/download/0.3.0/vim-zellij-navigator.wasm 77e5a2f62f7c1a698caf2574493d5d75587e0fd877cfba34c48caf731c24c58d"
+  "zjframes.wasm https://github.com/dj95/zjstatus/releases/download/v0.25.0/zjframes.wasm 9d4a2aaf927fbb350dd3217b67d831390de36a7a367a42fd9b9ee3165b8256bf"
+)
+
+sha256_of() { sha256sum "$1" 2>/dev/null | awk '{print $1}'; }
+
+check_only=0
+[ "${1:-}" = "--check" ] && check_only=1
+
+all_ok=1
+for spec in "${PLUGINS[@]}"; do
+  read -r name _url want <<<"$spec"
+  [ -f "$PLUGIN_DIR/$name" ] && [ "$(sha256_of "$PLUGIN_DIR/$name")" = "$want" ] || all_ok=0
+done
+if [ "$check_only" -eq 1 ]; then
+  [ "$all_ok" -eq 1 ]
+  exit $?
+fi
+
+mkdir -p "$PLUGIN_DIR"
+for spec in "${PLUGINS[@]}"; do
+  read -r name url want <<<"$spec"
+  path="$PLUGIN_DIR/$name"
+  # Already correct — skip the download.
+  [ -f "$path" ] && [ "$(sha256_of "$path")" = "$want" ] && continue
+  tmp="$path.tmp.$$"
+  # set -e aborts on a failed curl; the trap keeps a partial file from lingering.
+  trap 'rm -f "$tmp"' EXIT
+  curl -fsSL -o "$tmp" "$url"
+  got="$(sha256_of "$tmp")"
+  if [ "$got" != "$want" ]; then
+    rm -f "$tmp"
+    echo "zellij-plugins-fetch: $name: sha256 mismatch (got $got, want $want)" >&2
+    exit 1
+  fi
+  mv "$tmp" "$path"
+done
+
+# zellij 0.45 keys wasm permission grants by the plugin's ABSOLUTE path
+# (file:/~ keys are ignored — verified empirically, see docs/zellij-migration).
+# Append only; never rewrite existing entries so other plugins' grants survive.
+mkdir -p "$(dirname "$PERMS_FILE")"
+touch "$PERMS_FILE"
+GRANTS="ReadApplicationState ChangeApplicationState OpenFiles RunCommands OpenTerminalsOrPlugins WriteToStdin MessageAndLaunchOtherPlugins ReadCliPipes Reconfigure"
+for spec in "${PLUGINS[@]}"; do
+  read -r name _url _want <<<"$spec"
+  abspath="$PLUGIN_DIR/$name"
+  grep -qF "\"$abspath\"" "$PERMS_FILE" && continue
+  {
+    printf '"%s" {\n' "$abspath"
+    for g in $GRANTS; do printf '    %s\n' "$g"; done
+    printf '}\n'
+  } >>"$PERMS_FILE"
+done

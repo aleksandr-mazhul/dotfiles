@@ -1,0 +1,16 @@
+# Voxtype — push-to-talk dictation. Only overrides of /etc/voxtype/config.toml
+# live here; everything else keeps the packaged default.
+# Hold the Hyprland bind (binds.lua) → speak → release → text at the cursor.
+
+[hotkey]
+# Hyprland binds call `voxtype record start|stop`; no evdev listener needed.
+enabled = false
+
+[whisper]
+# RTX 3070: turbo is large-v3 accuracy at a fraction of the latency.
+model = "large-v3-turbo"
+# Detect only between the two languages actually spoken — full auto-detect
+# misreads short Russian phrases as Ukrainian/Bulgarian.
+language = ["ru", "en"]
+# Hints keep jargon spelled the way it is written in code.
+initial_prompt = "Hyprland, zellij, tmux, nvim, kitty, Claude, Codex, git, commit, TypeScript."

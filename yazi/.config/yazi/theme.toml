@@ -9,7 +9,7 @@ marker_copied = { fg = "#cac993", bg = "#cac993", bold = true }
 marker_cut = { fg = "#ffb4ab", bg = "#ffb4ab", bold = true }
 marker_selected = { fg = "#ffb688", bg = "#ffb688", bold = true }
 tab_active = { fg = "#1a1008", bg = "#ffb688", bold = true }
-tab_inactive = { fg = "#d1c5b4", bg = "#292126" }
+tab_inactive = { fg = "#d1c5b4", bg = "#343332" }
 border_symbol = "│"
 border_style = { fg = "#c4a882" }
 
@@ -21,8 +21,8 @@ mode_normal = { fg = "#1a1008", bg = "#ffb688", bold = true }
 mode_select = { fg = "#1a1008", bg = "#e5bfa9", bold = true }
 mode_unset = { fg = "#1a1008", bg = "#cac993", bold = true }
 progress_label = { fg = "#ebe1d4", bold = true }
-progress_normal = { fg = "#181316", bg = "#ffb688" }
-progress_error = { fg = "#181316", bg = "#ffb4ab" }
+progress_normal = { fg = "#242423", bg = "#ffb688" }
+progress_error = { fg = "#242423", bg = "#ffb4ab" }
 permissions_t = { fg = "#cac993", bold = true }
 permissions_r = { fg = "#ffb688", bold = true }
 permissions_w = { fg = "#e5bfa9", bold = true }

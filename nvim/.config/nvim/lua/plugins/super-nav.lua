@@ -1,6 +1,6 @@
--- Super+hjkl window nav: kitty sends them as <M-hjkl> through tmux (see keymaps.lua).
--- Super+H/L are also code↔tree when nvim runs directly in kitty.
-local NAV_CMD = { h = "TmuxNavigateLeft", j = "TmuxNavigateDown", k = "TmuxNavigateUp", l = "TmuxNavigateRight" }
+-- Super+hjkl window nav: kitty sends them as <M-hjkl> through tmux/zellij (see
+-- keymaps.lua's mux_nav). Super+H/L are also code↔tree when nvim runs directly
+-- in kitty.
 
 return {
   {
@@ -16,7 +16,7 @@ return {
             return "<m-" .. dir .. ">"
           end
           return vim.schedule(function()
-            vim.cmd(NAV_CMD[dir])
+            _G.MuxNav(dir)
           end)
         end
       end

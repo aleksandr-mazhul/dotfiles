@@ -60,9 +60,38 @@ local function focus_code()
 end
 
 -- The snacks explorer is a float over a "layout box" split, so `wincmd h/j/k` from
--- the tree lands in the code window. Step from the box instead; at the edge, leave to tmux.
+-- the tree lands in the code window. Step from the box instead; at the edge, leave
+-- to tmux/zellij.
 local TMUX_DIR = { h = "L", j = "D", k = "U", l = "R" }
 local NAV_CMD = { h = "TmuxNavigateLeft", j = "TmuxNavigateDown", k = "TmuxNavigateUp", l = "TmuxNavigateRight" }
+local ZELLIJ_DIR = { h = "left", j = "down", k = "up", l = "right" }
+
+-- Async, fire-and-forget zellij focus move. Shared by mux_nav below and by
+-- tree_escape's own edge-of-explorer branch, which must dispatch directly
+-- (not through mux_nav's wincmd step) since the current window there is the
+-- tree float itself, and wincmd from the float lands in the code window
+-- (see comment above) rather than leaving nvim.
+local function zellij_move_focus(dir)
+  vim.fn.jobstart({ "zellij", "action", "move-focus", ZELLIJ_DIR[dir] }, { detach = true })
+end
+
+-- Move to the nvim window in `dir` (hjkl); if the window didn't change, hand
+-- off to the multiplexer: zellij (`$ZELLIJ` set) gets an async move-focus
+-- action, tmux (or nothing) keeps using vim-tmux-navigator's TmuxNavigate*
+-- exactly as before.
+local function mux_nav(dir)
+  local cur = vim.api.nvim_get_current_win()
+  vim.cmd("wincmd " .. dir)
+  if vim.api.nvim_get_current_win() ~= cur then
+    return
+  end
+  if vim.env.ZELLIJ then
+    zellij_move_focus(dir)
+  else
+    vim.cmd(NAV_CMD[dir])
+  end
+end
+
 local function tree_escape(dir)
   vim.cmd("stopinsert")
   for _, win in ipairs(vim.api.nvim_tabpage_list_wins(0)) do
@@ -72,6 +101,8 @@ local function tree_escape(dir)
       end)
       if next ~= win then
         vim.api.nvim_set_current_win(next)
+      elseif vim.env.ZELLIJ then
+        zellij_move_focus(dir)
       elseif vim.env.TMUX then
         vim.fn.system({ "tmux", "select-pane", "-" .. TMUX_DIR[dir] })
       end
@@ -85,17 +116,18 @@ end
 _G.FocusFileTree = focus_tree
 _G.FocusCodeWindow = focus_code
 _G.TreeEscape = tree_escape
+_G.MuxNav = mux_nav
 
--- Super+hjkl arrive as <M-hjkl> (kitty → tmux vim-tmux-navigator): move between splits,
--- and past the edge into the next tmux pane. Overrides LazyVim's Alt+j/k line moves.
--- Ctrl+hjkl go back to plain Vim keys.
+-- Super+hjkl arrive as <M-hjkl> (kitty → tmux/zellij): move between splits,
+-- and past the edge into the next tmux pane or zellij pane (mux_nav above).
+-- Overrides LazyVim's Alt+j/k line moves. Ctrl+hjkl go back to plain Vim keys.
 for _, lhs in ipairs({ "<C-h>", "<C-j>", "<C-k>", "<C-l>" }) do
   pcall(vim.keymap.del, "n", lhs)
 end
-map({ "n", "i", "v" }, "<M-h>", "<cmd>TmuxNavigateLeft<cr>", { desc = "Go to Left Window / tmux pane" })
-map({ "n", "i", "v" }, "<M-j>", "<cmd>TmuxNavigateDown<cr>", { desc = "Go to Lower Window / tmux pane" })
-map({ "n", "i", "v" }, "<M-k>", "<cmd>TmuxNavigateUp<cr>", { desc = "Go to Upper Window / tmux pane" })
-map({ "n", "i", "v" }, "<M-l>", "<cmd>TmuxNavigateRight<cr>", { desc = "Go to Right Window / tmux pane" })
+map({ "n", "i", "v" }, "<M-h>", function() mux_nav("h") end, { desc = "Go to Left Window / tmux/zellij pane" })
+map({ "n", "i", "v" }, "<M-j>", function() mux_nav("j") end, { desc = "Go to Lower Window / tmux/zellij pane" })
+map({ "n", "i", "v" }, "<M-k>", function() mux_nav("k") end, { desc = "Go to Upper Window / tmux/zellij pane" })
+map({ "n", "i", "v" }, "<M-l>", function() mux_nav("l") end, { desc = "Go to Right Window / tmux/zellij pane" })
 
 map("n", "<C-Up>", "<cmd>resize +2<cr>", { desc = "Increase Window Height" })
 map("n", "<C-Down>", "<cmd>resize -2<cr>", { desc = "Decrease Window Height" })
@@ -103,7 +135,7 @@ map("n", "<C-Left>", "<cmd>vertical resize -2<cr>", { desc = "Decrease Window Wi
 map("n", "<C-Right>", "<cmd>vertical resize +2<cr>", { desc = "Increase Window Width" })
 
 -- Super+H/L: D- (GUI / kitty protocol) + F13/F14 (kitty send_key bridge on Linux)
--- Chain into tmux pane navigation once there is nothing left to move to inside Neovim.
+-- Chain into tmux/zellij pane navigation once there is nothing left to move to inside Neovim.
 for _, lhs in ipairs({ "<D-h>", "<F13>" }) do
   map({ "n", "i", "v", "t" }, lhs, function()
     vim.cmd("stopinsert")
@@ -112,7 +144,7 @@ for _, lhs in ipairs({ "<D-h>", "<F13>" }) do
     else
       focus_tree()
     end
-  end, { desc = "Focus file tree, or escape left to tmux" })
+  end, { desc = "Focus file tree, or escape left to tmux/zellij" })
 end
 for _, lhs in ipairs({ "<D-l>", "<F14>" }) do
   map({ "n", "i", "v", "t" }, lhs, function()
@@ -120,9 +152,9 @@ for _, lhs in ipairs({ "<D-l>", "<F14>" }) do
     if is_tree_buf(vim.api.nvim_get_current_buf()) then
       focus_code()
     else
-      vim.cmd("TmuxNavigateRight")
+      mux_nav("l")
     end
-  end, { desc = "Focus code, or escape right to tmux" })
+  end, { desc = "Focus code, or escape right to tmux/zellij" })
 end
 
 map({ "n", "x" }, "<D-v>", "<C-v>", { desc = "Visual block", remap = true })

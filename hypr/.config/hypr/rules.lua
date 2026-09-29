@@ -122,6 +122,25 @@ hl.window_rule({
     border_size = 0,
 })
 
+-- Dictation recording pills (Vibe Typer, Spokenly): each app draws its own dark capsule on a transparent
+-- window, so Hypr's border + blur turn it into a frosted box with an orange
+-- outline. Pin it bottom-centre on every workspace, and never let it take focus —
+-- dictated text must land in the app you were typing in, not in the pill.
+-- Their settings windows map tiled, so float = true only matches the pill.
+hl.window_rule({
+    name = "dictation-pill",
+    match = { class = "^(vibe-typer|Spokenly)$", float = true },
+    decorate = false,
+    border_size = 0,
+    no_blur = true,
+    no_shadow = true,
+    no_focus = true,
+    no_initial_focus = true,
+    no_anim = true,
+    pin = true,
+    move = "(monitor_w*0.5-window_w*0.5) (monitor_h-window_h-48)",
+})
+
 -- Kitty glass: leave Hyprland window opacity at 1 — kitty owns alpha via
 -- background_opacity; decoration.blur (hyprland.lua) frosts the wallpaper behind it.
 

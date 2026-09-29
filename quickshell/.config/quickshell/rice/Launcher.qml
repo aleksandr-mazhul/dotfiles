@@ -1122,7 +1122,8 @@ DS.SearchListPopup {
             filtered = out
         } else {
             const scored = []
-            const pool = commands.concat(apps, audioSinks, audioSources)
+            // Sinks and sources stay inside Audio Output / Audio Input.
+            const pool = commands.concat(apps)
             for (let i = 0; i < pool.length; i++) {
                 const entry = pool[i]
                 const s = entryScore(entry, q)

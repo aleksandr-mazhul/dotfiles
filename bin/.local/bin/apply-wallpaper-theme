@@ -262,6 +262,9 @@ if command -v tmux >/dev/null 2>&1 && tmux list-sessions >/dev/null 2>&1; then
         "${XDG_CACHE_HOME:-$HOME/.cache}/tmux-powerkit/data/current_theme" 2>/dev/null || true
   tmux source-file "$HOME/.tmux.conf" >/dev/null 2>&1 || true
 fi
+# zellij: nothing to reload here — zjstatus watches its theme/layout files and
+# zellij hot-reloads config.kdl on save, so a re-theme just needs the render above.
+
 # Rebuild bat theme cache
 if command -v bat >/dev/null 2>&1; then
   bat cache --build >/dev/null 2>&1 || true

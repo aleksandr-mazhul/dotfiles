@@ -6,6 +6,7 @@
 bierner.markdown-mermaid
 coolbear.systemd-unit-file
 davidanson.vscode-markdownlint
+drblury.protobuf-vsc
 eamodio.gitlens
 editorconfig.editorconfig
 foxundermoon.shell-format

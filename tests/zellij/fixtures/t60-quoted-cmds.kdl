@@ -1,0 +1,16 @@
+layout {
+    cwd "/home/stranger"
+    tab name="quoted" focus=true {
+        pane split_direction="vertical" {
+            pane command="yarn dev" size="31%" {
+                start_suspended true
+            }
+            pane command="python3 manage.py runserver" size="32%" {
+                start_suspended true
+            }
+            pane command="sh -c \"echo hi\"" focus=true size="33%" {
+                start_suspended true
+            }
+        }
+    }
+}
