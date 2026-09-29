@@ -58,12 +58,14 @@ else
   assert_contains 'B4/H4-npm: "npm run dev" kept as-is (args unchanged)' "$npm_block" 'args "run" "dev"'
   assert_not_contains 'B4/H4-npm: start_suspended dropped from the kept npm pane' "$npm_block" "start_suspended"
 
-  claude1_block="$(t60_pane_block claude 1 "$WORK")"
+  # The filter rewrites command="claude" to command="vpn-wait-exec", so the
+  # pane is no longer findable under the original program name.
+  claude1_block="$(t60_pane_block vpn-wait-exec 1 "$WORK")"
   assert_contains 'H4-claude (no orig args): waits for VPN then --continue' "$claude1_block" 'args "claude" "--continue"'
   assert_contains 'H4-claude (no orig args): command is the VPN waiter' "$claude1_block" 'command="vpn-wait-exec"'
   assert_not_contains 'H4-claude (no orig args): start_suspended dropped' "$claude1_block" "start_suspended"
 
-  claude2_block="$(t60_pane_block claude 2 "$WORK")"
+  claude2_block="$(t60_pane_block vpn-wait-exec 2 "$WORK")"
   assert_contains 'H4-claude (orig --resume x): waits for VPN then --continue' "$claude2_block" 'args "claude" "--continue"'
   assert_not_contains 'H4-claude (orig --resume x): start_suspended dropped' "$claude2_block" "start_suspended"
 
@@ -200,6 +202,12 @@ if [ "$t60_have_fakebin" -eq 1 ]; then
   mkdir -p "$HOME/bin" "$T_ROOT/logs"
   cp "$T_ROOT/fakebin" "$HOME/bin/claude"
   cp "$T_ROOT/fakebin" "$HOME/bin/npm"
+  # Resurrection must not depend on whether Windscribe is up on this machine.
+  cat >"$HOME/bin/windscribe-cli" <<'EOF'
+#!/bin/sh
+echo "Connect state: Connected"
+EOF
+  chmod +x "$HOME/bin/windscribe-cli"
   export T60_LOG_DIR="$T_ROOT/logs"
   export PATH="$HOME/bin:$PATH"
 
@@ -243,12 +251,15 @@ EOF
 
     TM new-window -t drv -n boot "'$BOOT'; echo T60_BOOT_EXITED \$?; sleep 30" >/dev/null 2>&1
 
-    if wait_for 15 sh -c "[ \"\$(wc -l <'$T_ROOT/logs/claude.log')\" -gt $claude_before ]"; then
+    # vpn-wait-exec resolves `claude` to an absolute path before exec, and the
+    # two panes do not log in a fixed order. Wait for both new lines, then
+    # compare basenames.
+    if wait_for 15 sh -c "[ \"\$(wc -l <'$T_ROOT/logs/claude.log')\" -ge $((claude_before + 2)) ]"; then
       t_ok "B18/H4 both claude panes are running again after resurrection"
     else
       t_fail "B18/H4 both claude panes are running again after resurrection" "$(cat "$T_ROOT/logs/claude.log")"
     fi
-    claude_tail="$(tail -n 2 "$T_ROOT/logs/claude.log")"
+    claude_tail="$(tail -n 2 "$T_ROOT/logs/claude.log" | awk '{ n=split($1,a,"/"); $1=a[n]; print }' | sort)"
     assert_eq "H4 both resurrected claude panes ran with exactly --continue" \
       "$claude_tail" "$(printf 'claude --continue\nclaude --continue')"
 
