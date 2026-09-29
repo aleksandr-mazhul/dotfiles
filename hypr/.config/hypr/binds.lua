@@ -292,7 +292,7 @@ hl.bind("CTRL + SHIFT + bracketright", function()
 end, { dont_inhibit = true })
 
 -- Do NOT bind SUPER+SHIFT+bracket*: kanata already remaps those to Ctrl+PgUp/Dn.
--- Binding both caused a second pass → skipped tabs in Zen and windows in tmux.
+-- Binding both caused a second pass → skipped tabs in Zen and windows in tmux/zellij.
 -- Do NOT bind CTRL+TAB here: Firefox/Zen uses MRU order (feels like "skipping").
 -- Zoom gets Ctrl+Tab via zoom-tab.sh wtype, not via these binds.
 
@@ -588,6 +588,9 @@ hl.bind(secondMod .. " + SHIFT + ALT + D", hl.dsp.exec_cmd("~/.config/hypr/scrip
 hl.bind(secondMod .. " + SHIFT + ALT + C", hl.dsp.exec_cmd("~/.config/hypr/scripts/gromit-ctl.sh clear"))
 hl.bind(secondMod .. " + SHIFT + ALT + U", hl.dsp.exec_cmd("~/.config/hypr/scripts/gromit-ctl.sh undo"))
 hl.bind(secondMod .. " + SHIFT + ALT + V", hl.dsp.exec_cmd("~/.config/hypr/scripts/gromit-ctl.sh visibility"))
+
+-- Dictation (voxtype daemon, user service): press to start, press again to type at the cursor
+hl.bind("CTRL + ALT + D", hl.dsp.exec_cmd("voxtype record toggle"))
 
 -- Focus windows (skhd alt - hjkl)
 hl.bind(mainMod .. " + H", hl.dsp.focus({ direction = "left" }))

@@ -440,7 +440,7 @@ def build_chrome(
     accents: dict[str, str],
     text: dict[str, str],
 ) -> dict[str, str]:
-    """Widget/bar chrome tokens shared by tmux, starship, QS, etc."""
+    """Widget/bar chrome tokens shared by tmux, zellij (zjstatus), starship, QS, etc."""
     return {
         # Highlight pill — path / active session / active window
         "highlight_bg": accents["primary"],

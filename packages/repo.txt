@@ -191,6 +191,7 @@ xh
 xorg-server
 xorg-xinit
 yazi
+zellij
 zip
 zoxide
 zram-generator

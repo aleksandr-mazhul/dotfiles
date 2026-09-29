@@ -19,6 +19,7 @@ spokenly
 tty-clock
 vibepanel-bin
 visual-studio-code-bin
+voxtype-bin
 windscribe-cli-v2-bin
 yandex-browser
 yay

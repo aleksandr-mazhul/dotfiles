@@ -114,6 +114,11 @@ if command -v tmux >/dev/null 2>&1; then
   fi
 fi
 
+if [[ -x "$HOME/.local/bin/zellij-plugins-fetch" ]] && command -v zellij >/dev/null 2>&1; then
+  log "zellij plugins (zjstatus, vim-zellij-navigator)"
+  "$HOME/.local/bin/zellij-plugins-fetch" || echo "warn: zellij-plugins-fetch failed" >&2
+fi
+
 if [[ -x "$HOME/.config/hypr/scripts/ocr-install.sh" ]]; then
   log "Screen OCR (RapidOCR en+ru)"
   "$HOME/.config/hypr/scripts/ocr-install.sh" || echo "warn: OCR venv install failed" >&2
@@ -179,7 +184,8 @@ Bootstrap finished.
 Restored automatically:
   • packages (repo + AUR + required lists, hw-*.txt for the detected GPU/CPU)
   • uinput/udev + input, i2c, video groups; tmux plugins via tpm
-  • all stowed configs (Hypr, Kitty, Fish, Kanata, Tmux, nvim, QS, theme, Zen shortcuts, …)
+  • all stowed configs (Hypr, Kitty, Fish, Kanata, Tmux, Zellij, nvim, QS, theme, Zen shortcuts, …)
+  • zellij plugins (zjstatus, vim-zellij-navigator; MUX=zellij to try it)
   • user services: kanata, tmux-save (shutdown snapshot), calendar sync, …
   • SSOT colors (if a wallpaper was available)
   • VS Code/Cursor shared settings + extensions (`vscode-cursor-sync.path`, idle timer)

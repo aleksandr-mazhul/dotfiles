@@ -1,0 +1,25 @@
+layout {
+    cwd "/home/stranger"
+    tab name="dev" focus=true hide_floating_panes=true {
+        pane split_direction="vertical" {
+            pane command="npm run dev" size="50%" {
+                start_suspended true
+            }
+            pane size="50%" {
+                pane command="/usr/bin/npm run build" size="10%" {
+                    start_suspended true
+                }
+                pane command="/home/stranger/.local/bin/claude" size="10%" {
+                    start_suspended true
+                }
+                pane command="python3" cwd="/srv/app" size="50%" {
+                    args "-m" "http.server"
+                    start_suspended true
+                }
+                pane command="claude" focus=true size="50%" {
+                    start_suspended true
+                }
+            }
+        }
+    }
+}

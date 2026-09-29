@@ -97,6 +97,8 @@ def main() -> int:
         "glow.yml.tmpl": CFG / "glow/glow.yml",
         "bottom.toml.tmpl": CFG / "bottom/bottom.toml",
         "theme-rice.fish.tmpl": CFG / "fish/conf.d/theme-rice.fish",
+        "zellij-theme.kdl.tmpl": CFG / "zellij/themes/ssot.kdl",
+        "zellij-layout.kdl.tmpl": CFG / "zellij/layouts/rice.kdl",
     }
 
     rendered = 0

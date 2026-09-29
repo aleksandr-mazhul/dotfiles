@@ -69,4 +69,5 @@ wofi
 xdg-desktop-portal-hyprland
 xh
 yazi
+zellij
 zip

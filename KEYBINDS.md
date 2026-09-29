@@ -2,11 +2,11 @@
 
 Sources: `hypr/.../binds.lua`, `kitty.conf`, `nvim/.../keymaps.lua`, `kanata.kbd`, `gloview.lua`.
 
-**Modifiers:** Alt = `mainMod` (skhd-style), Super = `secondMod`.  
-Kitty also keeps default **Ctrl+Shift** (`kitty_mod`) shortcuts unless overridden below.  
+**Modifiers:** Alt = `mainMod` (skhd-style), Super = `secondMod`.
+Kitty also keeps default **Ctrl+Shift** (`kitty_mod`) shortcuts unless overridden below.
 VPN has no hotkey — use launcher (`vpn`) or QuickSettings.
 
-> **Hide / show top bar:** `Super+B` (also `Super+Shift+B`)  
+> **Hide / show top bar:** `Super+B` (also `Super+Shift+B`)
 > Hidden = autohide; hover the top edge to peek (same as fullscreen). State is saved across reboots.
 
 ---
@@ -92,10 +92,11 @@ VPN has no hotkey — use launcher (`vpn`) or QuickSettings.
 | Super+T | OCR region | |
 | Super+Shift+R | OBS record toggle |
 | Super+Alt+R | Open OBS |
-| Super+D | Gromit draw toggle |
-| Super+Shift+D | Gromit clear |
-| Super+Ctrl+D | Gromit undo |
-| Super+Alt+D | Gromit visibility |
+| Super+Shift+Alt+D | Gromit draw toggle |
+| Super+Shift+Alt+C | Gromit clear |
+| Super+Shift+Alt+U | Gromit undo |
+| Super+Shift+Alt+V | Gromit visibility |
+| Ctrl+Alt+D | Dictation (voxtype): press to record, press again to type the text |
 | Super+Shift+L | Lock (hyprlock) |
 
 ## App tabs / Zoom
@@ -150,9 +151,9 @@ VPN has no hotkey — use launcher (`vpn`) or QuickSettings.
 | Ctrl+V | Paste |
 | Super+C | Interrupt (SIGINT) |
 | Ctrl+L | Clear terminal screen (shell); nvim window-right |
-| Ctrl+PgUp / PgDn | tmux prev/next window |
-| Ctrl+Shift+[ / ] | tmux prev/next window |
-| Ctrl+Shift+H / L | tmux swap window left/right |
+| Ctrl+PgUp / PgDn | tmux/zellij prev/next window |
+| Ctrl+Shift+[ / ] | tmux/zellij prev/next window |
+| Ctrl+Shift+H / L | tmux/zellij swap window left/right |
 | Ctrl+= / - | Font zoom ± |
 | Ctrl+Shift+C / V | Copy / paste (kitty_mod default) |
 
@@ -160,7 +161,7 @@ VPN has no hotkey — use launcher (`vpn`) or QuickSettings.
 
 | Keys | Action | Note |
 | --- | --- | --- |
-| Ctrl+H/J/K/L | Window focus (+ tmux navigate) | |
+| Ctrl+H/J/K/L | Window focus (+ tmux/zellij navigate) | |
 | Super+H | Focus file tree (open if needed) | kitty send_text → FocusFileTree() |
 | Super+L | Focus code (leave tree) | kitty send_text → FocusCodeWindow() |
 | Ctrl+arrows | Resize splits | |
@@ -171,7 +172,37 @@ VPN has no hotkey — use launcher (`vpn`) or QuickSettings.
 | leader+gc o/t/b/0/n/p/l | Same + next/prev/list | git-conflict.nvim |
 | leader+bd | Delete buffer | |
 | leader+Tab+d | Close tab | |
-| leader+sF | Substitute in this file | Whole word or substring; all (`g`) or confirm each (`c`: y/n/a/q/l). Project replace stays leader+sr |
+| leader+sF | Substitute in this file | Whole word or substring. The buffer previews the replacement as you type. Confirm: y/n/a/q/l (`a` = the rest). Project: leader+sr |
+
+## Zellij
+
+Coexists with tmux behind `MUX=zellij|tmux` (fish, `00-mux-auto.fish`) until
+the cut-over. Prefix model matches tmux: **Ctrl+b** (or **Ctrl+a**) enters
+tmux-mode, then the same letters as `tmux/.tmux.conf`: `|` / `-` split right /
+down, `h/j/k/l` select pane, `H/L` move tab, `c` new tab, `$` rename tab,
+`f`/`z` zoom, `x` close pane, `d` detach, `v` scrollback in nvim (copy with
+`v…y`), `[` scroll mode, `w`/`s`/`C` sessions, `Ctrl+r` resurrect list, plus
+tmux's stock `o ; { } ! Space & t ? PgUp`. Tabs switch with Ctrl+PgUp/Dn
+(kitty sends Ctrl+Shift+Left/Right); prefix `n/p/1-9/,` are unbound. Any other key cancels the prefix, like tmux. **`Ctrl+b ?` opens the
+full cheatsheet** (`zellij/.config/zellij/cheatsheet.md`). Everything else below
+is a global bind, no prefix.
+
+| Keys | Action |
+| --- | --- |
+| Ctrl+b / Ctrl+a | Enter tmux-mode (same letters as tmux, see above) |
+| Ctrl+b Ctrl+b | Send a literal Ctrl+b to the program |
+| Ctrl+b ← → ↑ ↓ | Resize; more arrows keep resizing, Esc leaves |
+| Super+H/J/K/L | Pane ↔ nvim split navigation (kitty sends Alt+hjkl → vim-zellij-navigator) |
+| Ctrl+PgUp / PgDn | Prev/next tab |
+| Ctrl+Shift+[ / ] | Prev/next tab |
+| Ctrl+Shift+H / L | Swap tab left/right |
+| Ctrl+b v (or `[`) | Scroll mode: `j/k`, `Ctrl+d/u`, `g/G`, `/` search (`n/N`), `e` open scrollback in nvim, `Esc`/`q` leave |
+
+Enable: `set -Ux MUX zellij`, then open a new kitty window (`set -e MUX` goes back
+to tmux). Copy from history: mouse drag (copies on select) or `e` and yank in
+nvim — zellij has no keyboard `v`/`y` selection like tmux copy-mode-vi. Tab names
+follow the running command (`nvim`, `claude`, `fish`) like tmux's automatic-rename;
+a tab you renamed by hand keeps its name.
 
 ## Kanata (hardware remap)
 

@@ -77,7 +77,7 @@ BOOTSTRAP_WALLPAPER=~/pictures/wallpapers/old/nature-01.jpg ./bootstrap.sh
 | --- | --- |
 | Package inventory | `packages/repo.txt`, `aur.txt`, `required.txt`, `hw-*.txt`, curated `rice-*.txt` |
 | Hyprland / scripts | `hypr/` |
-| Kitty, Fish, Tmux, Starship | `kitty/`, `fish/`, `tmux/`, `starship/` |
+| Kitty, Fish, Tmux, Zellij, Starship | `kitty/`, `fish/`, `tmux/`, `zellij/`, `starship/` |
 | Kanata + systemd unit | `kanata/` |
 | Theme SSOT templates + pipeline | `theme/`, `bin/.local/bin/theme-*` |
 | VS Code + Cursor (shared settings, keybindings, extension lists) | `vscode/` → `vscode-cursor-sync` + `vscode-cursor-sync.path` + idle timer |
@@ -173,5 +173,23 @@ Two settings are load-order sensitive and fail silently if moved:
 it on load) and **via run-shell** (continuum calls it quoted, so a literal `~`
 never expands). `status-right` must keep continuum's `#()` hook, or the periodic
 save stops.
+
+## Zellij (in progress, coexists with tmux)
+
+Migration in progress on `feat/zellij-herdr` — see `docs/zellij-migration/`.
+tmux stays the default until the cut-over; set `MUX=zellij` (fish) to try
+zellij instead on the next shell/kitty window. Bootstrap runs
+`zellij-plugins-fetch` (next to the tpm block) to download and pin `zjstatus`
+and `vim-zellij-navigator`, and to seed their permission grants so the wasm
+plugins don't prompt on first load. By hand:
+
+```bash
+zellij-plugins-fetch          # fetch + pin, seed permissions.kdl
+zellij-plugins-fetch --check  # verify only, no download
+```
+
+Zellij serializes sessions itself (no tpm-equivalent to install); resurrected
+`claude`/`npm run …` panes are rewritten by `zellij-resurrect-filter` so they
+restart without waiting for an Enter press.
 
 Debug a save with `TMUX_SAVE_LOG=/tmp/save.log ~/.config/tmux/tmux-save.sh worker-now`.

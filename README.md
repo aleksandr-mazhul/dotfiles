@@ -100,6 +100,7 @@ exec fish   # обновить fish-обёртки (cbonsai, pipes, gum, …)
 | [`kitty/`](kitty/) | Основной терминал; SSOT colors/tabs; Mac-like clipboard (`Ctrl+C/V`, `Super+C` = interrupt) |
 | [`fish/`](fish/) | Login shell, fzf/rice theme snippets |
 | [`tmux/`](tmux/) | Resurrect + continuum, status из SSOT |
+| [`zellij/`](zellij/) | Замена tmux в процессе миграции; `MUX=zellij` переключает, оба живут рядом |
 | [`starship/`](starship/) | Prompt из той же палитры |
 | [`nvim/`](nvim/) | LazyVim + `palette.lua` / SSOT colors |
 | [`yazi/`](yazi/) | Файловый TUI + theme + плагины |
@@ -151,7 +152,7 @@ exec fish   # обновить fish-обёртки (cbonsai, pipes, gum, …)
 - **`Alt`** (`mainMod`) — окна и workspace (skhd-style с Mac)
 - **`Super`** (`secondMod`) — система, бар, утилиты, lock
 - В приложениях **Ctrl ≈ Cmd** (закрыть вкладку, quit app, Finder-like Nautilus)
-- Kanata: home-row mods; `Super+Shift+[ ]` → `Ctrl+PgUp/Dn` (вкладки / tmux)
+- Kanata: home-row mods; `Super+Shift+[ ]` → `Ctrl+PgUp/Dn` (вкладки / tmux/zellij)
 
 Полный список: **[KEYBINDS.md](KEYBINDS.md)**. Быстрые якоря:
 
@@ -171,7 +172,7 @@ exec fish   # обновить fish-обёртки (cbonsai, pipes, gum, …)
 ### Theme SSOT
 
 Единый источник: `~/.config/theme/palette.toml`.  
-Рендерится в Hypr, lock, Kitty, GTK3/4, Quickshell, Wofi, Starship, Tmux, Yazi, fzf, bat, lazygit, nvim, Herdr, Vimium, btop, cava, peaclock, glow, bottom и fish-обёртки rice-утилит.
+Рендерится в Hypr, lock, Kitty, GTK3/4, Quickshell, Wofi, Starship, Tmux, Zellij, Yazi, fzf, bat, lazygit, nvim, Herdr, Vimium, btop, cava, peaclock, glow, bottom и fish-обёртки rice-утилит.
 
 ### Zen Browser
 

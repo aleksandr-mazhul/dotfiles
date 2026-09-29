@@ -21,7 +21,7 @@
 ;;
 ;; Mouse tab buttons (firmware → Super+Shift+[ / ]):
 ;;   remapped here to Ctrl+Page_Up/Down for browsers & tabbed apps.
-;;   kitty also binds Ctrl+Page_Up/Down → tmux prev/next window.
+;;   kitty also binds Ctrl+Page_Up/Down → tmux/zellij prev/next window.
 ;;
 ;; Tip: disable HRM in Vial on this machine — let kanata own the holds.
 ;;

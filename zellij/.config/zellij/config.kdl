@@ -1,0 +1,316 @@
+// Zellij config — tmux -> zellij migration (docs/zellij-migration/01-audit.md).
+// Ported 1:1 from tmux/.tmux.conf where possible; deviations noted inline.
+// Q1: default_mode "locked" + keybinds clear-defaults=true, because zellij's
+// stock keybinds (Ctrl+p/t/n/s/o/g/h/q, ...) steal keys fish and nvim already
+// own. Everything below is opt-in, entered only via the tmux-mode prefix.
+
+// -- A: core options (audit A1-A10) --------------------------------------
+
+mouse_mode true                          // A3: tmux `mouse on`
+scroll_buffer_size 50000                 // A4: tmux `history-limit 50000`
+copy_command "wl-copy"                   // A6: tmux copy-pipe wl-copy
+copy_on_select true                      // A6: tmux `set-clipboard on`
+support_kitty_keyboard_protocol true     // A8: Shift+Enter -> CSI 13;2u reaches Claude Code
+scrollback_editor "nvim"                 // A5: vi-style scroll/search, edit in nvim
+
+// C4/H3: built-in serialization replaces tmux-resurrect + tmux-continuum.
+session_serialization true
+serialize_pane_viewport true             // capture pane contents, not just cwd/cmd
+scrollback_lines_to_serialize 10000
+serialization_interval 10                // H3: keep the "last known good" window short
+
+default_mode "locked"                    // Q1
+theme "ssot"                             // G1: theme SSOT template
+default_layout "rice"                    // C3: zjstatus top bar, PowerKit look
+// Frames on, rounded: the focused pane is the one drawn in the accent color
+// (frame_selected), like tmux's pane-border-active; with frames off zellij
+// draws a single uncolored rule and focus is invisible.
+pane_frames true
+pane_frame_style "full"                  // 0.45 default "titles" draws only a title row
+
+// zjframes hides the frame while a tab holds a single pane (nothing to tell
+// apart, and the border would eat a row and two columns) and brings frames
+// back as soon as there is a second one. Its own pane_frame_style defaults
+// to "titles" and overrides ours whenever it re-shows frames.
+load_plugins {
+    "file:~/.local/share/zellij/plugins/zjframes.wasm" {
+        hide_frame_for_single_pane "true"
+        hide_frame_except_for_search "false"
+        hide_frame_except_for_scroll "false"
+        hide_frame_except_for_fullscreen "false"
+        pane_frame_style "full"
+    }
+}
+ui {
+    pane_frames {
+        rounded_corners true
+        hide_session_name true           // the bar already names everything
+    }
+}
+show_startup_tips false                  // first-run popups would steal focus (and break tests)
+show_release_notes false
+
+// -- B/D/E: keybinds (audit groups B, D, E) ------------------------------
+//
+// Zellij 0.45 ships a built-in "Tmux" InputMode (see `zellij setup
+// --dump-config`) — reused here instead of inventing a new mode name, with
+// the SAME letters tmux/.tmux.conf already binds under its C-b/C-a prefix.
+
+keybinds clear-defaults=true {
+    locked {
+        // B1: Ctrl+b (mouse macro pad) and Ctrl+a (legacy Mac prefix2) both
+        // enter tmux-mode, exactly like tmux's `prefix`/`prefix2`.
+        bind "Ctrl b" "Ctrl a" { SwitchToMode "Tmux"; }
+
+        // D1: Alt+hjkl navigation, routed through vim-zellij-navigator so a
+        // focused nvim pane gets the key (nvim's own <M-hjkl> maps handle
+        // split navigation there) and any other pane falls back to
+        // MoveFocus. move_mod is "alt" (the plugin defaults to "ctrl")
+        // because the repo's nvim keymaps.lua binds <M-h/j/k/l>, not Ctrl.
+        bind "Alt h" {
+            MessagePlugin "file:~/.local/share/zellij/plugins/vim-zellij-navigator.wasm" {
+                name "move_focus"
+                payload "left"
+                move_mod "alt"
+            }
+        }
+        bind "Alt j" {
+            MessagePlugin "file:~/.local/share/zellij/plugins/vim-zellij-navigator.wasm" {
+                name "move_focus"
+                payload "down"
+                move_mod "alt"
+            }
+        }
+        bind "Alt k" {
+            MessagePlugin "file:~/.local/share/zellij/plugins/vim-zellij-navigator.wasm" {
+                name "move_focus"
+                payload "up"
+                move_mod "alt"
+            }
+        }
+        bind "Alt l" {
+            MessagePlugin "file:~/.local/share/zellij/plugins/vim-zellij-navigator.wasm" {
+                name "move_focus"
+                payload "right"
+                move_mod "alt"
+            }
+        }
+
+        // B8/E2: Alt+Shift+h/l (kitty's ESC H / ESC L, see kitty.conf
+        // ctrl+shift+h/l) swaps the active tab left/right, like tmux's
+        // `bind -n M-H/M-L swap-window`.
+        bind "Alt H" { MoveTab "Left"; }
+        bind "Alt L" { MoveTab "Right"; }
+
+        // B9/B10: Ctrl+Shift+Left/Right step exactly one tab, with wrap (tmux
+        // `bind -n C-S-Left/Right`). kitty's Ctrl+PgUp/Dn and Ctrl+Shift+[ ]
+        // send these same bytes (CSI 1;6D / 1;6C), so they land here too.
+        bind "Ctrl Shift Left" { GoToPreviousTab; }
+        bind "Ctrl Shift Right" { GoToNextTab; }
+    }
+
+    tmux {
+        // B2: | / - split right / down (tmux unbinds the stock % / " first).
+        bind "|" { NewPane "Right"; SwitchToMode "Locked"; }
+        bind "-" { NewPane "Down"; SwitchToMode "Locked"; }
+
+        // B5: c = new window/tab. B3 (prefix+r reload) is [D]ropped: zellij
+        // hot-reloads config.kdl on save, no bind needed.
+        bind "c" { NewTab; SwitchToMode "Locked"; }
+
+        // B6/B18: C (new session prompt), w (choose tree), s (sessions) all
+        // land on zellij's built-in session-manager plugin — one floating
+        // pane covers "new session" and "switch session" alike. Referenced
+        // by its default plugin alias ("session-manager"), not a wasm path.
+        bind "C" "w" "s" {
+            LaunchOrFocusPlugin "session-manager" {
+                floating true
+            };
+            SwitchToMode "Locked";
+        }
+
+        // B7: h/j/k/l select pane (tmux's own `bind h select-pane -L` etc).
+        bind "h" { MoveFocus "Left"; SwitchToMode "Locked"; }
+        bind "j" { MoveFocus "Down"; SwitchToMode "Locked"; }
+        bind "k" { MoveFocus "Up"; SwitchToMode "Locked"; }
+        bind "l" { MoveFocus "Right"; SwitchToMode "Locked"; }
+
+        // B8: H/L swap the active tab left/right (tmux `swap-window -t -1/+1`).
+        bind "H" { MoveTab "Left"; SwitchToMode "Locked"; }
+        bind "L" { MoveTab "Right"; SwitchToMode "Locked"; }
+
+        // B10: prefix+p/n dropped on purpose: Ctrl+PgUp/Dn and
+        // Ctrl+Shift+[ ] / Left / Right switch tabs without a prefix.
+
+        // B12: f and z both toggle pane fullscreen (tmux `resize-pane -Z`
+        // plus stock tmux `z`) — kept as two independent binds to the same
+        // action rather than picking one, so both muscle memories survive.
+        bind "f" "z" { ToggleFocusFullscreen; SwitchToMode "Locked"; }
+
+        // B18: x closes the focused pane (tmux stock `kill-pane`).
+        bind "x" { CloseFocus; SwitchToMode "Locked"; }
+
+        // B18: d detaches the client; the session (and its panes) keep
+        // running. Deliberately no SwitchToMode afterwards — there is no
+        // mode to return to once the client detaches.
+        bind "d" { Detach; }
+
+        // B15: prefix+C-s was tmux-resurrect's manual save. zellij serializes
+        // every serialization_interval on its own, so it only has to leave
+        // tmux-mode cleanly instead of stranding the next keystrokes there.
+        bind "Ctrl s" { SwitchToMode "Locked"; }
+        // B16: prefix+C-r was the manual restore; the session-manager lists
+        // exited sessions and resurrects them.
+        bind "Ctrl r" {
+            LaunchOrFocusPlugin "session-manager" {
+                floating true
+            };
+            SwitchToMode "Locked";
+        }
+
+        // $ renames the active tab (owner's choice over tmux's `,`; sessions
+        // are renamed in the session-manager, Ctrl+b s then Ctrl+r).
+        bind "$" { SwitchToMode "RenameTab"; }
+
+        // B13: v = tmux copy-mode-vi. zellij has no keyboard selection, so v
+        // opens the scrollback in nvim, where v…y copies (clipboard=unnamedplus).
+        // [ keeps the plain scroll mode (stock tmux `[`).
+        bind "v" { EditScrollback; SwitchToMode "Locked"; }
+        bind "[" { SwitchToMode "Scroll"; }
+
+        // B11: arrows resize by increments (tmux `-r` repeatable resize).
+        // No SwitchToMode here on purpose: staying in tmux-mode is what
+        // makes a second bare arrow (no prefix) keep resizing, mirroring
+        // tmux's `-r` repeat window. Esc below is the way out.
+        bind "Left" { Resize "Increase Left"; }
+        bind "Right" { Resize "Increase Right"; }
+        bind "Up" { Resize "Increase Up"; }
+        bind "Down" { Resize "Increase Down"; }
+
+        // Esc/Enter with no pending action are a plain "never mind", back
+        // to locked with no side effect.
+        bind "Esc" "Enter" { SwitchToMode "Locked"; }
+
+        // B1: a second Ctrl+b/Ctrl+a while already in tmux-mode writes the
+        // literal control byte through to the pane (tmux's `send-prefix`),
+        // instead of re-triggering entry.
+        bind "Ctrl b" { Write 2; SwitchToMode "Locked"; }
+        bind "Ctrl a" { Write 1; SwitchToMode "Locked"; }
+
+        // -- tmux's stock prefix table (round 2 of the parity work) ---------
+        bind "o" { FocusNextPane; SwitchToMode "Locked"; }        // select-pane -t :.+
+        bind ";" { FocusLastPane; SwitchToMode "Locked"; }        // last-pane
+        bind "{" { MovePaneBackwards; SwitchToMode "Locked"; }    // swap-pane -U
+        bind "}" { MovePane; SwitchToMode "Locked"; }             // swap-pane -D
+        bind "!" { BreakPane; SwitchToMode "Locked"; }            // break-pane
+        bind "Space" { NextSwapLayout; SwitchToMode "Locked"; }   // next-layout
+        bind "PageUp" { SwitchToMode "Scroll"; PageScrollUp; }    // copy-mode -u
+        // & = kill-window, and like tmux it asks first. The prompt runs in a
+        // floating pane of the same tab, so close-tab closes that tab.
+        bind "&" {
+            Run "bash" "-c" "read -r -n1 -p 'Close this tab and all its panes? [y/N] ' a; [ \"$a\" = y ] && zellij action close-tab" {
+                floating true
+                close_on_exit true
+                name "close-tab?"
+                width "52"
+                height "3"
+                x "30%"
+                y "40%"
+            };
+            SwitchToMode "Locked";
+        }
+        // t = clock-mode; the rice already themes peaclock (q quits).
+        bind "t" {
+            Run "peaclock" {
+                floating true
+                close_on_exit true
+                name "clock"
+            };
+            SwitchToMode "Locked";
+        }
+        // ? = list-keys: the cheatsheet next to this file, in glow (q quits).
+        bind "?" {
+            Run "sh" "-c" "exec glow -p \"$HOME/.config/zellij/cheatsheet.md\"" {
+                floating true
+                close_on_exit true
+                name "cheatsheet"
+                width "90%"
+                height "90%"
+                x "5%"
+                y "5%"
+            };
+            SwitchToMode "Locked";
+        }
+
+        // -- zellij-only extras, on letters tmux leaves unbound -------------
+        bind "Tab" { ToggleTab; SwitchToMode "Locked"; }                // last tab
+        bind "g" { ToggleFloatingPanes; SwitchToMode "Locked"; }        // floating layer
+        bind "e" { TogglePaneEmbedOrFloating; SwitchToMode "Locked"; }  // float/pin back
+        bind "S" { ToggleActiveSyncTab; SwitchToMode "Locked"; }        // synchronize-panes
+        bind "y" { CopyLastCommandOutput; SwitchToMode "Locked"; }      // needs OSC 133 (fish 4 sends it)
+
+        // In tmux any key without a binding just cancels the prefix. zellij
+        // keeps tmux-mode armed instead, so a stray letter would fire the NEXT
+        // key as a command — every remaining printable key cancels explicitly.
+        // B4: that includes D (prefix+D = kill-window was dropped in tmux,
+        // commit d1aec2a, after an accidental kill) — it must never gain an action.
+        // 1-9, n/p (tab switching) and , (rename moved to $) were dropped on
+        // purpose: Ctrl+PgUp/Dn cover tab switching.
+        bind "1" "2" "3" "4" "5" "6" "7" "8" "9" "n" "p" "," "a" "b" "i" "m" "q" "r" "u" "A" "B" "D" "E" "F" "G" "I" "J" "K" "M" "N" "O" "P" "Q" "R" "T" "U" "V" "W" "X" "Y" "Z" "0" "`" "~" "@" "#" "%" "^" "*" "(" ")" "_" "=" "+" "]" "\\" ":" "'" "\"" "<" ">" "." "/" "Ctrl d" "Ctrl c" { SwitchToMode "Locked"; }
+    }
+
+    renametab {
+        bind "Enter" { SwitchToMode "Locked"; }
+        // Esc cancels the rename in progress (tmux has no direct analogue;
+        // stock zellij's own RenameTab mode already does this).
+        bind "Esc" { UndoRenameTab; SwitchToMode "Locked"; }
+    }
+
+    // A5/B13: tmux copy-mode-vi. clear-defaults leaves scroll mode empty, so
+    // every motion is spelled out. zellij has no keyboard selection: yank
+    // from history with e (scrollback in nvim) or a mouse drag (copy_on_select).
+    scroll {
+        bind "j" "Down" { ScrollDown; }
+        bind "k" "Up" { ScrollUp; }
+        bind "Ctrl d" { HalfPageScrollDown; }
+        bind "Ctrl u" { HalfPageScrollUp; }
+        bind "Ctrl e" { ScrollDown; }
+        bind "Ctrl y" { ScrollUp; }
+        bind "Ctrl f" "PageDown" { PageScrollDown; }
+        bind "PageUp" { PageScrollUp; }
+        // Not vi's C-b page-up: the prefix must work here like it does in
+        // tmux copy-mode (kitty's Ctrl+PgUp/Dn are prefix+p/n).
+        bind "Ctrl b" "Ctrl a" { SwitchToMode "Tmux"; }
+        bind "g" { ScrollToTop; }
+        bind "G" { ScrollToBottom; }
+        bind "/" "?" { SwitchToMode "EnterSearch"; SearchInput 0; }
+        // { } jump between shell prompts (fish 4 marks them with OSC 133).
+        bind "{" { ScrollToPreviousPrompt; }
+        bind "}" { ScrollToNextPrompt; }
+        // y copies a mouse selection, like copy-mode-vi's y.
+        bind "y" { Copy; }
+        bind "e" { EditScrollback; SwitchToMode "Locked"; }
+        // kitty's Ctrl+PgUp/Dn (CSI 1;6D / 1;6C) switch tabs from here too.
+        bind "Ctrl Shift Left" { GoToPreviousTab; SwitchToMode "Locked"; }
+        bind "Ctrl Shift Right" { GoToNextTab; SwitchToMode "Locked"; }
+        bind "Esc" "q" "Enter" { ScrollToBottom; SwitchToMode "Locked"; }
+    }
+
+    entersearch {
+        bind "Enter" { SwitchToMode "Search"; }
+        bind "Esc" { SwitchToMode "Scroll"; }
+    }
+
+    search {
+        bind "Ctrl b" "Ctrl a" { SwitchToMode "Tmux"; }
+        bind "n" { Search "up"; }
+        bind "N" { Search "down"; }
+        bind "Ctrl Shift Left" { GoToPreviousTab; SwitchToMode "Locked"; }
+        bind "Ctrl Shift Right" { GoToNextTab; SwitchToMode "Locked"; }
+        bind "j" "Down" { ScrollDown; }
+        bind "k" "Up" { ScrollUp; }
+        bind "Ctrl d" { HalfPageScrollDown; }
+        bind "Ctrl u" { HalfPageScrollUp; }
+        bind "Esc" "q" { ScrollToBottom; SwitchToMode "Locked"; }
+    }
+}
