@@ -1,0 +1,14 @@
+[Desktop Entry]
+Name=ChatGPT
+Comment=ChatGPT Desktop by OpenAI (Codex)
+GenericName=AI assistant
+Exec=chatgpt %U
+TryExec=/usr/bin/chatgpt
+Icon=chatgpt
+Type=Application
+StartupNotify=true
+StartupWMClass=Chatgpt
+Terminal=false
+Categories=Utility;Development;
+Keywords=chatgpt;openai;codex;gpt;ai;
+MimeType=x-scheme-handler/codex;

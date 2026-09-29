@@ -497,7 +497,7 @@ DS.SearchListChrome {
                 const base = listLabel || currentKey || currentLabel
                 list.push({
                     kind: "location",
-                    label: onBest ? (base + " (best location)") : base,
+                    label: base,
                     detail: pingText(curPing),
                     action: "disconnect",
                     target: currentKey,
@@ -505,23 +505,6 @@ DS.SearchListChrome {
                     ping: curPing,
                     favorite: isFavorite(currentKey),
                     current: true
-                })
-            }
-
-            const bestBusy = rowIsBusy("best", "best")
-            const bestIsActive = onBest && connected && !busy
-            if (!bestIsActive) {
-                list.push({
-                    kind: "location",
-                    label: bestBusy ? "Connecting…" : bestLabel,
-                    action: busy ? "noop" : "best",
-                    detail: bestBusy ? "" : pingText(bestPing),
-                    target: "best",
-                    key: "best",
-                    ping: bestPing,
-                    favorite: false,
-                    current: false,
-                    busy: bestBusy
                 })
             }
 

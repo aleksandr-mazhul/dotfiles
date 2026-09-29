@@ -3,6 +3,32 @@ return {
     "zbirenbaum/copilot.lua",
     cmd = "Copilot",
     event = "InsertEnter",
+    config = function(_, opts)
+      local function start()
+        require("copilot").setup(opts)
+      end
+      local function vpn_up()
+        local out = vim.fn.system({ "windscribe-cli", "status" })
+        return type(out) == "string" and out:lower():find("connect state: connected", 1, true) ~= nil
+      end
+      if vpn_up() then
+        start()
+        return
+      end
+      local tries = 0
+      local timer = vim.uv.new_timer()
+      timer:start(1000, 1000, vim.schedule_wrap(function()
+        tries = tries + 1
+        if vpn_up() then
+          timer:stop()
+          timer:close()
+          start()
+        elseif tries >= 300 then
+          timer:stop()
+          timer:close()
+        end
+      end))
+    end,
     opts = {
       suggestion = {
         enabled = true,
