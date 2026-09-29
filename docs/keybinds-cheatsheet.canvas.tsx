@@ -208,6 +208,11 @@ const SECTIONS: Section[] = [
       { keys: "leader+gg", action: "Lazygit (toggleterm)" },
       { keys: "leader+bd", action: "Delete buffer" },
       { keys: "leader+Tab+d", action: "Close tab" },
+      {
+        keys: "leader+sF",
+        action: "Substitute in this file",
+        note: "Word or substring; all or confirm (y/n/a/q/l). Project: leader+sr",
+      },
     ],
   },
   {
