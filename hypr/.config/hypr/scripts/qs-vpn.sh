@@ -360,6 +360,30 @@ do_connect() {
   return 1
 }
 
+# Lowest positive ping outside region Russia. Never the CLI token "best".
+pick_connect_city() {
+  local pick loc ping tmp="" city=""
+  pick="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/vpn-pick-location"
+  if [[ -n "${VPN_LOCATIONS_FILE:-}" && -n "${VPN_PINGS_FILE:-}" ]]; then
+    loc="$VPN_LOCATIONS_FILE"
+    ping="$VPN_PINGS_FILE"
+  else
+    tmp="$(mktemp)"
+    loc="$tmp"
+    timeout "$LOCATIONS_TIMEOUT" "$CLI" locations >"$loc" 2>/dev/null || true
+    if [[ ! -s "$PING_CACHE" ]]; then
+      refresh_pings || true
+    fi
+    ping="$PING_CACHE"
+  fi
+  if [[ -f "$loc" && -f "$ping" ]]; then
+    city="$("$pick" --locations "$loc" --pings "$ping" 2>/dev/null)" || city=""
+  fi
+  [[ -n "$tmp" ]] && rm -f "$tmp"
+  printf '%s' "$city"
+  [[ -n "$city" ]]
+}
+
 case "$cmd" in
   status)
     status_line
@@ -434,16 +458,22 @@ case "$cmd" in
     ;;
   best)
     track_job
-    set_pending best best "Best location"
-    notify "Connecting…" "Best location"
-    if do_connect best; then
+    city="$(pick_connect_city)" || city=""
+    if [[ -z "$city" ]]; then
+      clear_job
+      notify "Failed" "No non-Russian location"
+      exit 1
+    fi
+    set_pending best "$city" "$city"
+    notify "Connecting…" "$city"
+    if do_connect "$city"; then
       clear_pending
       clear_job
-      notify "Connected" "Best location"
+      notify "Connected" "$city"
     else
       clear_pending
       clear_job
-      notify "Failed" "Best location"
+      notify "Failed" "$city"
       exit 1
     fi
     ;;
