@@ -143,3 +143,13 @@ map("n", "<leader>bd", function()
 end, { desc = "Delete Buffer" })
 
 map("n", "<leader><tab>d", "<cmd>tabclose<cr>", { desc = "Close Tab" })
+
+-- :substitute in this file. <leader>sr stays grug-far (project).
+-- Visual mode is already over when a Lua mapping runs, so the two modes
+-- pass the origin explicitly instead of checking mode().
+map("n", "<leader>sF", function()
+  require("config.substitute").start(false)
+end, { desc = "Substitute in file" })
+map("x", "<leader>sF", function()
+  require("config.substitute").start(true)
+end, { desc = "Substitute in file" })

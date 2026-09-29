@@ -171,6 +171,7 @@ VPN has no hotkey — use launcher (`vpn`) or QuickSettings.
 | leader+gc o/t/b/0/n/p/l | Same + next/prev/list | git-conflict.nvim |
 | leader+bd | Delete buffer | |
 | leader+Tab+d | Close tab | |
+| leader+sF | Substitute in this file | Whole word or substring; all (`g`) or confirm each (`c`: y/n/a/q/l). Project replace stays leader+sr |
 
 ## Kanata (hardware remap)
 
