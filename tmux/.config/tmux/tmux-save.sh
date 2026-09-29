@@ -44,6 +44,25 @@ command -v tmux >/dev/null || exit 0
 log() { [ -n "${TMUX_SAVE_LOG:-}" ] && printf '%s %s\n' "$(date +%H:%M:%S)" "$*" >>"$TMUX_SAVE_LOG"; return 0; }
 mtime() { stat -c %Y "$1" 2>/dev/null || echo 0; }
 
+# client-detached saves run with no client, so resurrect writes `state\t\t`.
+# Put the session we recorded on detach back into that line.
+repair_empty_client_session() {
+  local remember name last file tmp
+  remember="${TMUX_LAST_SESSION_FILE:-${XDG_STATE_HOME:-$HOME/.local/state}/tmux/last-session}"
+  [[ -r "$remember" ]] || return 0
+  name="$(head -n 1 "$remember" | tr -d '\r')"
+  [[ -n "$name" ]] || return 0
+  last="$(resurrect_dir)/last"
+  [[ -f "$last" ]] || return 0
+  file="$(readlink -f "$last" 2>/dev/null || true)"
+  [[ -n "$file" && -f "$file" ]] || return 0
+  tmp="${file}.repair.$$"
+  awk -v name="$name" -F'\t' 'BEGIN { OFS = "\t" }
+    $1 == "state" && $2 == "" { $2 = name }
+    { print }
+  ' "$file" >"$tmp" && mv -f "$tmp" "$file"
+}
+
 inhibited() {
   [ -e "$INHIBIT" ] || return 1
   if [ $(( $(date +%s) - $(mtime "$INHIBIT") )) -gt "$INHIBIT_TTL" ]; then
@@ -80,6 +99,7 @@ do_save() {
   "$SAVE" quiet >/dev/null 2>&1
   date +%s >"$LASTRUN"
   log "saved ($panes panes)"
+  repair_empty_client_session
 
   # Self-heal: if `last` is dangling anyway, redo it a second later.
   local last
@@ -89,6 +109,7 @@ do_save() {
     sleep 1
     "$SAVE" quiet >/dev/null 2>&1
     date +%s >"$LASTRUN"
+    repair_empty_client_session
   fi
 }
 
