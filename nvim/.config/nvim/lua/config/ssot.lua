@@ -31,7 +31,70 @@ function M.apply()
   hl("Pmenu", { fg = pal.on_surface, bg = pal.surface_container })
   hl("PmenuSel", { fg = pal.on_primary, bg = pal.primary })
   hl("TelescopeSelection", { fg = pal.on_primary, bg = pal.primary })
-  hl("TelescopeBorder", { fg = pal.outline })
+  hl("TelescopeBorder", { fg = pal.outline, bg = pal.surface_container })
+
+  -- Floating chrome. which-key's side menu (operator "Change", leader
+  -- groups) draws WhichKeyBorder, and noice/snacks "Saved" toasts draw
+  -- SnacksNotifier* — both otherwise keep Tokyo Night cyan.
+  local float_bg = pal.surface_container
+  hl("NormalFloat", { fg = pal.on_surface, bg = float_bg })
+  hl("FloatBorder", { fg = pal.outline, bg = float_bg })
+  hl("FloatTitle", { fg = pal.primary, bg = float_bg })
+  hl("WhichKey", { fg = pal.primary })
+  hl("WhichKeyGroup", { fg = pal.secondary })
+  hl("WhichKeyDesc", { fg = pal.on_surface })
+  hl("WhichKeySeparator", { fg = pal.outline })
+  hl("WhichKeyValue", { fg = pal.on_surface_variant })
+  hl("WhichKeyNormal", { fg = pal.on_surface, bg = float_bg })
+  hl("WhichKeyBorder", { fg = pal.outline, bg = float_bg })
+  hl("WhichKeyTitle", { fg = pal.primary, bg = float_bg })
+
+  local icon_fg = {
+    Grey = pal.on_surface_variant,
+    Purple = pal.secondary,
+    Blue = pal.primary,
+    Azure = pal.secondary,
+    Cyan = pal.secondary,
+    Green = pal.tertiary,
+    Yellow = pal.tertiary,
+    Orange = pal.primary,
+    Red = pal.error,
+  }
+  for name, fg in pairs(icon_fg) do
+    hl("MiniIcons" .. name, { fg = fg })
+    hl("WhichKeyIcon" .. name, { fg = fg })
+  end
+  hl("WhichKeyIcon", { fg = pal.primary })
+
+  local function notifier(level, accent)
+    hl("SnacksNotifier" .. level, { fg = pal.on_surface, bg = float_bg })
+    hl("SnacksNotifierBorder" .. level, { fg = accent, bg = float_bg })
+    hl("SnacksNotifierIcon" .. level, { fg = accent })
+    hl("SnacksNotifierTitle" .. level, { fg = accent })
+    hl("SnacksNotifierFooter" .. level, { fg = accent })
+  end
+  notifier("Info", pal.secondary)
+  notifier("Warn", pal.primary)
+  notifier("Error", pal.error)
+  notifier("Debug", pal.on_surface_variant)
+  notifier("Trace", pal.tertiary)
+
+  -- noice confirm / cmdline / mini views link at these.
+  hl("DiagnosticVirtualTextInfo", { fg = pal.secondary, bg = float_bg })
+  hl("DiagnosticVirtualTextWarn", { fg = pal.primary, bg = float_bg })
+  hl("DiagnosticVirtualTextError", { fg = pal.error, bg = float_bg })
+  hl("DiagnosticVirtualTextHint", { fg = pal.tertiary, bg = float_bg })
+  hl("DiagnosticSignInfo", { fg = pal.secondary })
+  hl("DiagnosticSignWarn", { fg = pal.primary })
+  hl("DiagnosticSignError", { fg = pal.error })
+  hl("DiagnosticSignHint", { fg = pal.tertiary })
+  hl("DiagnosticSignOk", { fg = pal.tertiary })
+
+  -- copilot.lua links these to Comment, which is the muted gray and
+  -- disappears on the cursor line. Primary is the accent every harmony
+  -- already contrasts against the background.
+  hl("CopilotSuggestion", { fg = pal.primary, italic = true })
+  hl("CopilotAnnotation", { fg = pal.secondary, italic = true })
 end
 
 function M.setup()
@@ -50,7 +113,14 @@ function M.setup()
       {},
       vim.schedule_wrap(function()
         package.loaded["config.palette"] = nil
-        M.apply()
+        local name = vim.g.colors_name
+        if type(name) == "string" and name ~= "" then
+          -- Rebuild every tokyonight group from the new palette, then
+          -- ColorScheme runs M.apply() for the float/which-key/toast groups.
+          pcall(vim.cmd.colorscheme, name)
+        else
+          M.apply()
+        end
       end)
     )
   end
