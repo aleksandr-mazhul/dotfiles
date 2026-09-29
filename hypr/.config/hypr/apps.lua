@@ -86,6 +86,13 @@ M.catalog = {
         cmd = "chatgpt",
     },
     {
+        id = "devin",
+        class_re = "^(Devin|devin|devin-desktop)$",
+        workspace = 2,
+        classes = { "Devin", "devin", "devin-desktop" },
+        cmd = home .. "/.local/bin/devin-desktop",
+    },
+    {
         id = "kitty",
         class_re = "^kitty$",
         workspace = 7,

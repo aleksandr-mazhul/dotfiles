@@ -1,0 +1,24 @@
+#!/usr/bin/env bash
+# PATH name for an AI client. Waits for the VPN, then runs the real binary.
+# Symlink this file as claude, claude-desktop, chatgpt, devin-desktop, codex,
+# gemini, or copilot (`gh copilot` execs whatever `copilot` is on PATH).
+set -uo pipefail
+
+here="$(cd "$(dirname "$(readlink -f "$0")")" && pwd)"
+name="$(basename "$0")"
+case "$name" in
+  vpn-wait-provider)
+    echo "usage: invoke via a provider name (claude, copilot, devin-desktop, …)" >&2
+    exit 2
+    ;;
+  copilot)
+    real="${COPILOT_BIN:-$HOME/.local/libexec/copilot}"
+    if [[ ! -x "$real" ]]; then
+      echo "copilot binary not found: $real" >&2
+      exit 127
+    fi
+    exec "$here/vpn-wait-exec" "$real" "$@"
+    ;;
+esac
+
+exec "$here/vpn-wait-exec" "$name" "$@"
