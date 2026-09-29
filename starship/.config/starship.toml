@@ -23,7 +23,7 @@ command_timeout = 1000
 
 [directory]
 style = "fg:#1a1008 bg:#ffb688"
-format = "[](fg:#ffb688)[ $path ]($style)[](fg:#ffb688 bg:#3f3d3c)"
+format = "[](fg:#ffb688)[ $path ]($style)[](fg:#ffb688 bg:#3f3d3c)"
 truncation_length = 0
 truncate_to_repo = false
 fish_style_pwd_dir_length = 0
@@ -176,7 +176,7 @@ symbol = " "
 [time]
 disabled = false
 style = "fg:#cac993 bg:#343332"
-format = "[](fg:#3f3d3c bg:#343332)[ $time ]($style)[](fg:#343332)"
+format = "[](fg:#3f3d3c bg:#343332)[ $time ]($style)[](fg:#343332)"
 time_format = "%H:%M"
 
 [character]
