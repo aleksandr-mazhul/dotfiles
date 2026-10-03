@@ -12,4 +12,3 @@ vibepanel-bin
 yandex-browser
 yay
 zen-browser-bin
-zoom

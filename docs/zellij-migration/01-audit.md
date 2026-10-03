@@ -1,9 +1,12 @@
 # Zellij migration — stage 1: tmux audit
 
-Branch `feat/zellij-herdr`. Source of truth: everything in the repo that
-touches tmux (`grep -ril tmux`, 31 files, all reviewed). Target: zellij 0.45.x
-(`extra/zellij`, not installed yet). tmux stays working in parallel until the
-cut-over.
+> Historical. Zellij is on `main` and coexists with tmux (`MUX=zellij|tmux`,
+> tmux is still the default). "Not installed yet" below is this audit, not
+> the tree. The fish entry is `fish/.config/fish/conf.d/00-mux-auto.fish`.
+
+Branch `feat/zellij-herdr` (merged). Source of truth at the time: everything
+in the repo that touched tmux. Target was zellij 0.45.x. tmux stays the
+default until an explicit cut-over.
 
 Legend: **[P]** port to zellij · **[R]** re-wire a consumer · **[D]** drop /
 not needed · **[?]** open question for the user.

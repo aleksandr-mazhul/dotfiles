@@ -83,7 +83,7 @@ PanelWindow {
             const key = String(d)
             const raw = root.eventDays ? root.eventDays[key] : null
             // Cap at the number of calendars we actually have, so a busy day
-            // never silently drops a marker (Уник used to fall off at 3).
+            // never silently drops a marker (one calendar used to fall off at 3).
             const cap = Object.keys(root.calColors || {}).length || 7
             const cals = Array.isArray(raw) ? raw.slice(0, cap) : []
             cells.push({

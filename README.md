@@ -6,6 +6,18 @@ Personal environment on **Arch + Hyprland**: Mac-like input (Kanata), a dynamic 
 
 Managed through **[GNU Stow](https://www.gnu.org/software/stow/)**. Secrets are not included in the repository.
 
+One command on a fresh Arch user: `./bootstrap.sh`. That installs the package lists, links these configs into `$HOME`, and enables the greeter, sound, and network. `--rice` is a smaller package set for a machine that already has a session — it does not install SDDM, PipeWire, or NetworkManager.
+
+What you get:
+
+- Hyprland, with Kanata home-row mods so the keyboard feels like a Mac
+- Quickshell bar, launcher, clipboard, wallpaper picker, and notifications
+- A palette taken from the wallpaper and rendered through the rest of the desktop
+- Kitty, Fish, and tmux — Zellij is one variable away (`MUX=zellij`)
+- Zen Browser shortcuts only; the profile stays on the machine
+
+Screenshots of the desktop, the bar, and the launcher are not in the tree yet. When you have a clean frame, put `desktop.png`, `bar.png`, and `launcher.png` in `docs/screenshots/` and they belong at the top of this page.
+
 | Document | Why open it |
 | --- | --- |
 | **[KEYBINDS.md](KEYBINDS.md)** | All hotkeys: Hyprland, kitty, nvim, kanata |
@@ -26,8 +38,8 @@ cd ~/dotfiles
 
 | Command | What it does |
 | --- | --- |
-| `./bootstrap.sh` | Packages (`repo` + `aur` + `required` + `hw-*` by hardware) → restow → kanata-setup / groups → tpm → services → fish → theme → SDDM |
-| `./bootstrap.sh --rice` | Trimmed rice set (`rice-*.txt`) |
+| `./bootstrap.sh` | Packages (`repo` + `aur` + `required` + `hw-*` by hardware) → restow → groups → `/etc` → tpm and zellij plugins → user services → fish → theme → SDDM (enabled) |
+| `./bootstrap.sh --rice` | Curated packages only (`rice-*.txt` + `required`). No display manager, PipeWire, or NetworkManager |
 | `./bootstrap.sh --configs` | Configs / services / theme only (packages already installed) |
 | `./restow.sh` | Stow symlinks into `$HOME`; conflicting files → `~/.dotfiles-backup/<ts>/` |
 | `./restow.sh --check` / `--adopt` | Only check / adopt live files into the repo |
@@ -81,7 +93,7 @@ Just re-render consumers from the current `palette.toml`: `theme-render`.
 
 ## Repository map
 
-Each directory below (except service ones) is a **Stow package**:
+Each directory below is a **Stow package**, except where the row says otherwise:
 `<pkg>/.config/...` → `~/.config/...`, `<pkg>/.local/...` → `~/.local/...`.
 
 ### Desktop core
@@ -91,9 +103,9 @@ Each directory below (except service ones) is a **Stow package**:
 | [`hypr/`](hypr/) | Hyprland **Lua**: windows, binds, rules, monitors, hyprlock, scripts (screenshot, OCR, clipboard, Nautilus Mac binds, Zoom tabs) |
 | [`kanata/`](kanata/) | Home-row mods + remaps; user systemd unit |
 | [`quickshell/`](quickshell/) | Rice UI: bar, launcher, clipboard, wallpaper, VPN, calendar, notifications, design system (`ds/`), vim-engine |
-| [`sddm/`](sddm/) | Adaptive login theme (`sddm/install.sh`) |
-| [`waybar/`](waybar/) | Legacy/fallback bar config (the main bar is Quickshell) |
-| [`vibepanel/`](vibepanel/) | Legacy panel config (historical; UI moved to Quickshell) |
+| [`sddm/`](sddm/) | Adaptive login theme. **Not Stow** — `sddm/install.sh` copies it to `/usr` and enables `sddm.service` |
+| [`waybar/`](waybar/) | Fallback bar config (the main bar is Quickshell) |
+| [`vibepanel/`](vibepanel/) | Old panel config, kept beside Quickshell |
 
 ### Terminal and shell
 
@@ -102,7 +114,7 @@ Each directory below (except service ones) is a **Stow package**:
 | [`kitty/`](kitty/) | Main terminal; SSOT colors/tabs; Mac-like clipboard (`Ctrl+C/V`, `Super+C` = interrupt) |
 | [`fish/`](fish/) | Login shell, fzf/rice theme snippets |
 | [`tmux/`](tmux/) | Resurrect + continuum, status from SSOT |
-| [`zellij/`](zellij/) | Replacing tmux, migration in progress; `MUX=zellij` switches, both live side by side |
+| [`zellij/`](zellij/) | Optional mux beside tmux. tmux stays the default; `MUX=zellij` switches the next kitty window |
 | [`starship/`](starship/) | Prompt from the same palette |
 | [`nvim/`](nvim/) | LazyVim + `palette.lua` / SSOT colors |
 | [`yazi/`](yazi/) | File-manager TUI + theme + plugins |
@@ -131,19 +143,23 @@ Each directory below (except service ones) is a **Stow package**:
 | [`obs/`](obs/) | Recording scenes/profiles (without the websocket password) |
 | [`herdr/`](herdr/) | Additional theming consumer |
 | [`entropy/`](entropy/) | Entropy GUI settings (autostart off — hangs on Hypr; use `eh-layout-sync`) |
-| [`misc/`](misc/) | mimeapps, gromit-mpx (+ `gromit-mpx.ini` without the intro), ergohaven notes |
+| [`misc/`](misc/) | mimeapps (a real file, not a symlink — GIO cannot save next to one), gromit-mpx, ergohaven notes |
+| [`voxtype/`](voxtype/) | Dictation |
+| [`vscode/`](vscode/) | VS Code / Cursor shared settings (`vscode-cursor-sync`). The Cursor AppImage is not in git |
 
 ### Documentation and meta
 
 | Path | Purpose |
 | --- | --- |
 | [`KEYBINDS.md`](KEYBINDS.md) | Hotkey cheatsheet |
-| [`docs/`](docs/) | Extra artifacts (incl. a Cursor canvas mirror of the cheatsheet) |
-| [`packages/`](packages/) | `repo.txt` / `aur.txt` / `rice-*.txt`, install & export |
-| [`AGENTS.md`](AGENTS.md) / [`.cursor/rules/`](.cursor/rules/) | Rules for agents |
+| [`docs/`](docs/) | Extra notes. `docs/zellij-migration/` is a historical audit |
+| [`packages/`](packages/) | `repo.txt` / `aur.txt` / `rice-*.txt` / `ignore.txt`, install and export |
+| [`system/`](system/) | **Not Stow.** `/etc` udev rules, zram, docker socket, NetworkManager, Bluetooth (`system/install.sh`) |
+| [`AGENTS.md`](AGENTS.md) | Maintainer checklist for adding an app. Not part of the desktop |
 | `bootstrap.sh` / `restow.sh` | Restore and Stow |
+| [`tests/`](tests/) | Shell checks for zellij, wallpaper, vpn, fish |
 
-Not in Stow / not for everyday rice use: `chromium-ffmpeg/` (ignored, a separate nested tree).
+Not in Stow: `chromium-ffmpeg/` (ignored, a separate nested tree).
 
 ---
 
@@ -196,7 +212,8 @@ Only shortcuts / `user.js` / Vimium mirror are in git. The `zen-browser` launche
 | `packages/required.txt` | Runtime dependencies of the repo's scripts (always installed, except with `--aur`) |
 | `packages/hw-*.txt` | Drivers/microcode by GPU/CPU vendor (autodetected); `hw-boot.txt` — only with `--boot` |
 | `packages/install.sh` | Installs the lists; skips nonexistent names, lists failures at the end |
-| `packages/export.sh` | Update `repo.txt`/`aur.txt` from the current machine (without `hw-*`/`required`) |
+| `packages/ignore.txt` | Installed on this machine, deliberately not restored |
+| `packages/export.sh` | Update `repo.txt`/`aur.txt` from the current machine (skips `hw-*`, `required`, `ignore`) |
 
 After installing something new:
 
@@ -239,6 +256,8 @@ Useful rice commands (after `exec fish`): `cava`, `btop`, `btm`, `peaclock`, `cb
 | Discord, Spotify, JetBrains, VS Code data | heavy and machine-local |
 | OBS websocket password | gitignored |
 | Wallpaper library | `wallpapers-fetch` (or copy into `~/pictures/wallpapers`) |
+| Cursor AppImage | `cursor-update --apply` after restore |
+| vdirsyncer / khal tokens and account names | machine-local; see `RESTORE.md` |
 | `chromium-ffmpeg/` | nested / ignored |
 
 ---
@@ -254,7 +273,7 @@ Useful rice commands (after `exec fish`): `cava`, `btop`, `btm`, `peaclock`, `cb
 
 ## License / use
 
-Personal rice. Feel free to fork and adapt.
+Personal rice. See [LICENSE](LICENSE). Fork it and adapt it; there is no warranty.
 
 Most paths are tied to `$HOME` / `~` / `Path.home()`. When migrating, still check:
 

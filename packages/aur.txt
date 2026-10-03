@@ -24,4 +24,3 @@ windscribe-cli-v2-bin
 yandex-browser
 yay
 zen-browser-bin
-zoom

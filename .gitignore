@@ -32,3 +32,6 @@ obs/.config/obs-studio/profiler_data/
 
 # fish rewrites this (universal vars); per-machine state
 fish/.config/fish/fish_variables
+
+# Calendar account names. Recreate on a new machine; do not commit.
+docs/calendar.local.md

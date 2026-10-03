@@ -6,6 +6,18 @@
 
 Управляется через **[GNU Stow](https://www.gnu.org/software/stow/)**. Секреты в репозиторий не входят.
 
+Одна команда на свежем пользователе Arch: `./bootstrap.sh`. Она ставит списки пакетов, раскладывает конфиги в `$HOME` и включает экран входа, звук и сеть. `--rice` — урезанный набор для машины, где сессия уже есть: SDDM, PipeWire и NetworkManager он не ставит.
+
+Что получается:
+
+- Hyprland и Kanata: home-row mods, клавиатура ощущается как Mac
+- Quickshell: бар, лаунчер, буфер обмена, обои, уведомления
+- Палитра с обоев, которую скрипт раскладывает по всему столу
+- Kitty, Fish и tmux; Zellij — одна переменная (`MUX=zellij`)
+- У Zen в git только шорткаты; профиль остаётся на машине
+
+Скриншотов рабочего стола, бара и лаунчера в дереве пока нет. Когда будет чистый кадр, положи `desktop.png`, `bar.png` и `launcher.png` в `docs/screenshots/` — им место в начале этой страницы.
+
 | Документ | Зачем открыть |
 | --- | --- |
 | **[KEYBINDS.md](KEYBINDS.md)** | Все хоткеи: Hyprland, kitty, nvim, kanata |
@@ -26,8 +38,8 @@ cd ~/dotfiles
 
 | Команда | Что делает |
 | --- | --- |
-| `./bootstrap.sh` | Пакеты (`repo` + `aur` + `required` + `hw-*` по железу) → restow → kanata-setup / группы → tpm → сервисы → fish → тема → SDDM |
-| `./bootstrap.sh --rice` | Урезанный rice-набор (`rice-*.txt`) |
+| `./bootstrap.sh` | Пакеты (`repo` + `aur` + `required` + `hw-*` по железу) → restow → группы → `/etc` → tpm и плагины zellij → user-сервисы → fish → тема → SDDM (enable) |
+| `./bootstrap.sh --rice` | Только курируемые пакеты (`rice-*.txt` + `required`). Без экранного менеджера, PipeWire и NetworkManager |
 | `./bootstrap.sh --configs` | Только конфиги / сервисы / тема (пакеты уже стоят) |
 | `./restow.sh` | Stow-симлинки в `$HOME`; конфликтующие файлы → `~/.dotfiles-backup/<ts>/` |
 | `./restow.sh --check` / `--adopt` | Только проверить / забрать живые файлы в репо |
@@ -81,7 +93,7 @@ exec fish   # обновить fish-обёртки (cbonsai, pipes, gum, …)
 
 ## Карта репозитория
 
-Каждый каталог ниже (кроме служебных) — **Stow-пакет**:  
+Каждый каталог ниже — **Stow-пакет**, кроме строк, где сказано иначе:
 `<pkg>/.config/...` → `~/.config/...`, `<pkg>/.local/...` → `~/.local/...`.
 
 ### Ядро рабочего стола
@@ -91,9 +103,9 @@ exec fish   # обновить fish-обёртки (cbonsai, pipes, gum, …)
 | [`hypr/`](hypr/) | Hyprland **Lua**: окна, binds, rules, monitors, hyprlock, скрипты (screenshot, OCR, clipboard, Nautilus Mac-binds, Zoom tabs) |
 | [`kanata/`](kanata/) | Home-row mods + remaps; user systemd unit |
 | [`quickshell/`](quickshell/) | Rice UI: бар, launcher, clipboard, wallpaper, VPN, calendar, notifications, design-system (`ds/`), vim-engine |
-| [`sddm/`](sddm/) | Adaptive login theme (`sddm/install.sh`) |
-| [`waybar/`](waybar/) | Legacy/fallback bar config (основной бар — Quickshell) |
-| [`vibepanel/`](vibepanel/) | Legacy panel config (исторический; UI ушёл в Quickshell) |
+| [`sddm/`](sddm/) | Тема входа. **Не Stow** — `sddm/install.sh` копирует её в `/usr` и включает `sddm.service` |
+| [`waybar/`](waybar/) | Запасной бар (основной — Quickshell) |
+| [`vibepanel/`](vibepanel/) | Старая панель, лежит рядом с Quickshell |
 
 ### Терминал и shell
 
@@ -102,7 +114,7 @@ exec fish   # обновить fish-обёртки (cbonsai, pipes, gum, …)
 | [`kitty/`](kitty/) | Основной терминал; SSOT colors/tabs; Mac-like clipboard (`Ctrl+C/V`, `Super+C` = interrupt) |
 | [`fish/`](fish/) | Login shell, fzf/rice theme snippets |
 | [`tmux/`](tmux/) | Resurrect + continuum, status из SSOT |
-| [`zellij/`](zellij/) | Замена tmux в процессе миграции; `MUX=zellij` переключает, оба живут рядом |
+| [`zellij/`](zellij/) | Второй мультиплексор рядом с tmux. По умолчанию tmux; `MUX=zellij` переключает следующее окно kitty |
 | [`starship/`](starship/) | Prompt из той же палитры |
 | [`nvim/`](nvim/) | LazyVim + `palette.lua` / SSOT colors |
 | [`yazi/`](yazi/) | Файловый TUI + theme + плагины |
@@ -131,19 +143,23 @@ exec fish   # обновить fish-обёртки (cbonsai, pipes, gum, …)
 | [`obs/`](obs/) | Сцены/профили записи (без websocket password) |
 | [`herdr/`](herdr/) | Доп. theming consumer |
 | [`entropy/`](entropy/) | Entropy GUI settings (autostart off — hangs on Hypr; use `eh-layout-sync`) |
-| [`misc/`](misc/) | mimeapps, gromit-mpx (+ `gromit-mpx.ini` без intro), ergohaven notes |
+| [`misc/`](misc/) | mimeapps (обычный файл, не симлинк — GIO не умеет сохранять рядом со ссылкой), gromit-mpx, заметки ergohaven |
+| [`voxtype/`](voxtype/) | Диктовка |
+| [`vscode/`](vscode/) | Общие настройки VS Code / Cursor (`vscode-cursor-sync`). AppImage Cursor в git нет |
 
 ### Документация и мета
 
 | Путь | Назначение |
 | --- | --- |
 | [`KEYBINDS.md`](KEYBINDS.md) | Cheatsheet хоткеев |
-| [`docs/`](docs/) | Доп. артефакты (в т.ч. Cursor canvas-зеркало cheatsheet) |
-| [`packages/`](packages/) | `repo.txt` / `aur.txt` / `rice-*.txt`, install & export |
-| [`AGENTS.md`](AGENTS.md) / [`.cursor/rules/`](.cursor/rules/) | Правила для агентов |
+| [`docs/`](docs/) | Заметки. `docs/zellij-migration/` — исторический аудит, не план работ |
+| [`packages/`](packages/) | `repo.txt` / `aur.txt` / `rice-*.txt` / `ignore.txt`, install и export |
+| [`system/`](system/) | **Не Stow.** Правила udev, zram, сокет Docker, NetworkManager, Bluetooth (`system/install.sh`) |
+| [`AGENTS.md`](AGENTS.md) | Чеклист, как добавлять приложение. К рабочему столу не относится |
 | `bootstrap.sh` / `restow.sh` | Restore и Stow |
+| [`tests/`](tests/) | Проверки zellij, обоев, vpn, fish |
 
-Не в Stow / не для повседневного rice: `chromium-ffmpeg/` (игнорируется, отдельный nested tree).
+Не в Stow: `chromium-ffmpeg/` (игнорируется, отдельное вложенное дерево).
 
 ---
 
@@ -196,7 +212,8 @@ exec fish   # обновить fish-обёртки (cbonsai, pipes, gum, …)
 | `packages/required.txt` | Runtime-зависимости скриптов репо (ставятся всегда, кроме `--aur`) |
 | `packages/hw-*.txt` | Драйверы/микрокод по вендору GPU/CPU (автодетект); `hw-boot.txt` — только с `--boot` |
 | `packages/install.sh` | Установка списков; несуществующие имена пропускает, сбои перечисляет в конце |
-| `packages/export.sh` | Обновить `repo.txt`/`aur.txt` с текущей машины (без `hw-*`/`required`) |
+| `packages/ignore.txt` | Стоит на этой машине и в восстановление не входит |
+| `packages/export.sh` | Обновить `repo.txt`/`aur.txt` с текущей машины (без `hw-*`, `required`, `ignore`) |
 
 После установки чего-то нового:
 
@@ -239,6 +256,8 @@ theme-vimium
 | Discord, Spotify, JetBrains, VS Code data | тяжёлые и machine-local |
 | Пароль OBS websocket | gitignored |
 | Библиотека обоев | `wallpapers-fetch` (или копировать в `~/pictures/wallpapers`) |
+| Cursor AppImage | после restore: `cursor-update --apply` |
+| Токены и адреса vdirsyncer / khal | только на машине; см. `RESTORE.md` |
 | `chromium-ffmpeg/` | nested / ignored |
 
 ---
@@ -254,7 +273,7 @@ theme-vimium
 
 ## Лицензия / использование
 
-Личный rice. Можно форкать и адаптировать.
+Личный rice. Текст: [LICENSE](LICENSE). Можно форкать и адаптировать; гарантии нет.
 
 Большинство путей завязаны на `$HOME` / `~` / `Path.home()`. При переносе всё ещё проверьте:
 
