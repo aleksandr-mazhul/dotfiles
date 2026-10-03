@@ -196,9 +196,10 @@ is a global bind, no prefix.
 | Ctrl+PgUp / PgDn | Prev/next tab |
 | Ctrl+Shift+[ / ] | Prev/next tab |
 | Ctrl+Shift+H / L | Swap tab left/right |
-| Ctrl+b v (or `[`) | Scroll mode: `j/k`, `Ctrl+d/u`, `g/G`, `/` search (`n/N`), `e` open scrollback in nvim, `Esc`/`q` leave |
+| Ctrl+b v | Open the pane scrollback in nvim (`v`…`y` copies, `:q` returns) |
+| Ctrl+b [ | Scroll mode: `j/k`, `Ctrl+d/u`, `g/G`, `/` search (`n/N`), `e` open scrollback in nvim, `Esc`/`q` leave |
 
-Enable: `set -Ux MUX zellij`, then open a new kitty window (`set -e MUX` goes back
+Enable: `set -Ux MUX zellij`, then open a new kitty window (`set -Ue MUX` goes back
 to tmux). Copy from history: mouse drag (copies on select) or `e` and yank in
 nvim — zellij has no keyboard `v`/`y` selection like tmux copy-mode-vi. Tab names
 follow the running command (`nvim`, `claude`, `fish`) like tmux's automatic-rename;

@@ -1,4 +1,6 @@
-# 💤 LazyVim
+# nvim
 
-A starter template for [LazyVim](https://github.com/LazyVim/LazyVim).
-Refer to the [documentation](https://lazyvim.github.io/installation) to get started.
+LazyVim config for this rice. Colors come from the theme SSOT (`palette.lua`,
+rendered by `theme-render`).
+
+Hotkeys: [KEYBINDS.md](../../../KEYBINDS.md) at the repo root.

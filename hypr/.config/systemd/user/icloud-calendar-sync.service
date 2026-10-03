@@ -1,5 +1,5 @@
 [Unit]
-Description=Sync iCloud, Уник and Google calendars via qs-calendar.sh
+Description=Sync iCloud and Google calendars via qs-calendar.sh
 
 [Service]
 Type=oneshot

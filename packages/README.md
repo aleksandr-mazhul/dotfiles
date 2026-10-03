@@ -22,9 +22,13 @@ git add packages/repo.txt packages/aur.txt && git commit -m "chore: refresh pack
 | `hw-nvidia.txt`, `hw-intel-gpu.txt`, `hw-amd-gpu.txt` | GPU drivers — auto-picked from PCI class `03xx` vendor |
 | `hw-intel-cpu.txt`, `hw-amd-cpu.txt` | Microcode — auto-picked from `/proc/cpuinfo` |
 | `hw-boot.txt` | Kernel, headers, GRUB, efibootmgr, plymouth — **opt-in** (`--boot`) |
+| `ignore.txt` | Installed here on purpose, and left out of every restore list |
 
-`export.sh` never writes names that are in `hw-*.txt` or `required.txt`; keep
-those, and the `rice-*` lists, by hand.
+`export.sh` never writes names that are in `hw-*.txt`, `required.txt`, or
+`ignore.txt`; keep those, and the `rice-*` lists, by hand.
+
+`./bootstrap.sh` (no flag) is the new-machine command. `--rice` is the curated
+subset: it does not install SDDM, PipeWire, NetworkManager, or uwsm.
 
 ## Restore
 

@@ -115,10 +115,14 @@ After bootstrap, copy secrets/media yourself, then `exec fish`.
 
 ## Google calendars (`gmap`, `gapm`)
 
-Both Gmail accounts sync through vdirsyncer's `google_calendar` storage, each in
-its own pair and its own vdir root, so either can fail without touching iCloud or
-«Уник». Consent needs a browser, so the first login is manual — until the token
+Both Google accounts sync through vdirsyncer's `google_calendar` storage, each
+in its own pair and its own vdir root, so either can fail without touching
+iCloud. Consent needs a browser, so the first login is manual — until the token
 exists `qs-calendar.sh sync` skips the pair entirely and the panel is unaffected.
+
+Addresses and the calendar titles you pin are machine-local. On this machine
+they live in `docs/calendar.local.md`, which is gitignored. On a new clone,
+write that file yourself and use those addresses in step 4.
 
 1. Install the OAuth extra once: `uv tool install --force 'vdirsyncer[google]'`.
 2. Google Cloud console → new project → enable the **CalDAV API** → create an
@@ -129,12 +133,12 @@ exists `qs-calendar.sh sync` skips the pair entirely and the panel is unaffected
 
    One client serves both accounts; only the tokens differ.
 4. Authorise each account once — this opens a browser and writes the token:
-   - `vdirsyncer discover gmap` → sign in as **map07102007@gmail.com**
-   - `vdirsyncer discover gapm` → sign in as **apm07102007@gmail.com**
+   - `vdirsyncer discover gmap` → sign in as the first Google account
+   - `vdirsyncer discover gapm` → sign in as the second Google account
 5. `vdirsyncer sync gmap gapm && vdirsyncer metasync gmap gapm`
 
-Each pair pins one remote calendar (the account's primary, where «Др отца» lives)
-and renames it locally, so the vdirs stay at a fixed
+Each pair pins one remote calendar (that account's primary) and renames it
+locally, so the vdirs stay at a fixed
 `~/.local/share/calendars-g{map,apm}/g{map,apm}/` that `khal` and `qs-calendar.sh`
 can hardcode. To follow a different Google calendar, change the third element of
 that pair's `collections` entry to the calendar's id.
@@ -174,11 +178,11 @@ it on load) and **via run-shell** (continuum calls it quoted, so a literal `~`
 never expands). `status-right` must keep continuum's `#()` hook, or the periodic
 save stops.
 
-## Zellij (in progress, coexists with tmux)
+## Zellij (coexists with tmux)
 
-Migration in progress on `feat/zellij-herdr` — see `docs/zellij-migration/`.
-tmux stays the default until the cut-over; set `MUX=zellij` (fish) to try
-zellij instead on the next shell/kitty window. Bootstrap runs
+Both are on `main`. tmux stays the default; set `MUX=zellij` (fish) to try
+zellij on the next shell/kitty window. `docs/zellij-migration/` is the
+historical audit, not a pending branch. Bootstrap runs
 `zellij-plugins-fetch` (next to the tpm block) to download and pin `zjstatus`
 and `vim-zellij-navigator`, and to seed their permission grants so the wasm
 plugins don't prompt on first load. By hand:

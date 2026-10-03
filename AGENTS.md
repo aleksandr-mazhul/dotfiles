@@ -3,10 +3,10 @@
 You are working in a GNU Stow–based Arch/Hyprland rice. Prefer small, reversible
 changes. Never commit secrets (tokens, passwords, browser profiles, SSH keys).
 
-tmux is mid-migration to zellij (`feat/zellij-herdr`, see
-`docs/zellij-migration/`); both coexist behind `MUX=zellij|tmux` until the
-cut-over — don't remove tmux files on your own initiative. `zellij-plugins-fetch`
-pins the wasm plugins (zjstatus, vim-zellij-navigator).
+tmux and zellij both live on `main`. tmux stays the default; `MUX=zellij|tmux`
+switches the next shell. Don't remove tmux files on your own initiative.
+`docs/zellij-migration/` is a historical audit, not the current map.
+`zellij-plugins-fetch` pins the wasm plugins (zjstatus, vim-zellij-navigator).
 
 ## One-command restore (humans)
 
@@ -29,7 +29,7 @@ Do all of the following in one session (or explain what you blocked on):
    ```bash
    ./packages/export.sh
    # or for a single known package:
-   ~/.local/bin/dotfiles-register-app <pkg> [--aur]
+   ~/.local/bin/dotfiles-register-app <pkg> [--aur] [--rice]
    ```
    Commit updates to `packages/repo.txt` and/or `packages/aur.txt`.
    If it is part of the rice baseline, also add it to `packages/rice-repo.txt` or `packages/rice-aur.txt`.
