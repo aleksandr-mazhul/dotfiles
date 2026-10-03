@@ -55,7 +55,10 @@ install_yay_if_needed() {
 if [[ "$DO_PKGS" -eq 1 ]]; then
   need_cmd sudo
   need_cmd pacman
-  install_yay_if_needed
+  # A failed yay build must not skip restow. Official packages still install.
+  if ! install_yay_if_needed; then
+    echo "warn: yay is not available; AUR packages will be skipped" >&2
+  fi
   log "Installing packages"
   # install.sh skips unknown names and reports failed builds (exit 1) instead
   # of aborting midway; carry on to restow either way.
@@ -140,6 +143,16 @@ for unit in kanata.service hid-kbd-swallow.service tmux-save.service icloud-cale
     esac
   }
 done
+# Distro units, not files in this repo. A fresh user session installs them
+# disabled, so the desktop comes up muted until somebody enables them.
+for unit in pipewire.socket pipewire-pulse.socket wireplumber.service; do
+  systemctl --user cat "$unit" >/dev/null 2>&1 || continue
+  systemctl --user enable --now "$unit" || echo "warn: $unit failed to enable" >&2
+done
+if systemctl --user cat windscribe.service >/dev/null 2>&1; then
+  systemctl --user enable windscribe.service \
+    || echo "warn: windscribe.service failed to enable" >&2
+fi
 # QS draws notifications; swaync would steal the D-Bus name if activated.
 systemctl --user mask swaync.service 2>/dev/null || true
 
@@ -190,6 +203,8 @@ Restored automatically:
   • SSOT colors (if a wallpaper was available)
   • VS Code/Cursor shared settings + extensions (`vscode-cursor-sync.path`, idle timer)
   • Cursor AppImage hourly updater (`cursor-update.timer`; binary via `cursor-update --apply`)
+  • SDDM enabled (a fresh machine still needs one reboot to leave the TTY)
+  • PipeWire and WirePlumber; NetworkManager and Bluetooth when installed
 
 NOT restored (by design — secrets / machine-local):
   • Browser profiles (Zen cookies/logins) — only shortcuts + user.js
@@ -205,5 +220,6 @@ Manual follow-ups:
   4. Re-login so the input / i2c / video groups apply (kanata, ddcutil)
   5. New keyboards: add their /dev/input/by-id/*-event-kbd to kanata.kbd linux-dev
      and their names to KANATA_OWNED in hid-kbd-swallow.py
+  6. Reboot once on a fresh install so SDDM replaces the TTY greeter
 ============================================================
 EOF

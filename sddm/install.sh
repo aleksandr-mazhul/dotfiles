@@ -60,6 +60,32 @@ if [[ -f "$CACHE/colors.conf" ]]; then
   cp -f "$CACHE/colors.conf" "$DST/colors.conf"
 fi
 
+# The theme drop-in does nothing while sddm.service stays disabled.
+# enable only: --now would tear down the session this script is running in.
+sddm_was_enabled=0
+if systemctl is-enabled -q sddm.service 2>/dev/null; then
+  sddm_was_enabled=1
+fi
+if systemctl cat sddm.service >/dev/null 2>&1; then
+  sudo systemctl enable sddm.service
+fi
+
+# First boot has no remembered session, and two Hyprland entries exist.
+# Preselect the stock one (start-hyprland). It does not need uwsm, which
+# --rice does not install. Never overwrite a session the user already picked,
+# and do not invent one on a machine where SDDM was already the greeter —
+# a missing state file there is not the same as a fresh install.
+sddm_home="$(getent passwd sddm | cut -d: -f6)"
+sddm_home="${sddm_home:-/var/lib/sddm}"
+sddm_state="$sddm_home/state.conf"
+if [[ "$sddm_was_enabled" -eq 0 && ! -e "$sddm_state" ]]; then
+  sudo install -d -o sddm -g sddm -m 755 "$sddm_home"
+  printf '[Last]\nSession=hyprland.desktop\nUser=%s\n' "$USER" | sudo tee "$sddm_state" >/dev/null
+  sudo chown sddm:sddm "$sddm_state"
+  sudo chmod 644 "$sddm_state"
+  echo "SDDM: preselected hyprland.desktop for $USER"
+fi
+
 echo
 echo "OK. Theme: $DST"
 echo "Conf:  /etc/sddm.conf.d/10-adaptive-theme.conf"

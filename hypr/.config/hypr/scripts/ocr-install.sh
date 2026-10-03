@@ -6,7 +6,8 @@ ROOT="${HOME}/.local/share/screen-ocr"
 VENV="${ROOT}/.venv"
 PY="${VENV}/bin/python"
 SCRIPT="${HOME}/.config/hypr/scripts/ocr-daemon.py"
-UV="${HOME}/.local/bin/uv"
+# The uv package lands in /usr/bin. A user-local binary still wins via PATH.
+UV="$(command -v uv || true)"
 force=0
 [[ "${1:-}" == "--force" ]] && force=1
 
@@ -28,13 +29,15 @@ fi
 
 mkdir -p "$ROOT"
 
-if [[ -x "$UV" ]]; then
+if [[ -n "$UV" && -x "$UV" ]]; then
   "$UV" venv --python 3.12 "$VENV"
   "$UV" pip install --python "$PY" "rapidocr>=3.4.0" onnxruntime
-else
-  python3 -m venv "$VENV"
+elif python3 -m venv "$VENV" && "$PY" -m pip --version >/dev/null 2>&1; then
   "$PY" -m pip install -U pip
   "$PY" -m pip install "rapidocr>=3.4.0" onnxruntime
+else
+  echo "uv is not on PATH, and python3 -m pip is missing (install uv or python-pip)" >&2
+  exit 1
 fi
 
 echo "Warming PP-OCRv5 models (first download)…"
