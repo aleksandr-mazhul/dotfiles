@@ -1,48 +1,50 @@
 # Dotfiles — Hyprland rice (Arch Linux)
 
-Персональная среда на **Arch + Hyprland**: Mac-like ввод (Kanata), динамическая палитра с обоев (SSOT), Quickshell UI, Kitty/Fish/Tmux, Zen Browser и полный инвентарь пакетов для восстановления с нуля.
+**English** · [Русский](README.ru.md)
 
-Управляется через **[GNU Stow](https://www.gnu.org/software/stow/)**. Секреты в репозиторий не входят.
+Personal environment on **Arch + Hyprland**: Mac-like input (Kanata), a dynamic palette derived from the wallpaper (SSOT), Quickshell UI, Kitty/Fish/Tmux, Zen Browser, and a full package inventory for restoring from scratch.
 
-| Документ | Зачем открыть |
+Managed through **[GNU Stow](https://www.gnu.org/software/stow/)**. Secrets are not included in the repository.
+
+| Document | Why open it |
 | --- | --- |
-| **[KEYBINDS.md](KEYBINDS.md)** | Все хоткеи: Hyprland, kitty, nvim, kanata |
-| **[RESTORE.md](RESTORE.md)** | Что входит в bootstrap и что нет |
-| **[AGENTS.md](AGENTS.md)** | Чеклист для AI-агентов при новых приложениях |
-| **[packages/](packages/)** | Списки pacman / AUR |
-| **[theme/…/README.md](theme/.config/theme/README.md)** | Пайплайн цветов (SSOT) |
+| **[KEYBINDS.md](KEYBINDS.md)** | All hotkeys: Hyprland, kitty, nvim, kanata |
+| **[RESTORE.md](RESTORE.md)** | What bootstrap covers and what it doesn't |
+| **[AGENTS.md](AGENTS.md)** | Checklist for AI agents when adding new apps |
+| **[packages/](packages/)** | pacman / AUR package lists |
+| **[theme/…/README.md](theme/.config/theme/README.md)** | Color pipeline (SSOT) |
 
 ---
 
-## Быстрый старт
+## Quick start
 
 ```bash
-git clone https://github.com/aleksandr-mazhul/dotfiles.git ~/dotfiles   # HTTPS: SSH-ключи ещё не восстановлены
+git clone https://github.com/aleksandr-mazhul/dotfiles.git ~/dotfiles   # HTTPS: SSH keys aren't restored yet
 cd ~/dotfiles
 ./bootstrap.sh
 ```
 
-| Команда | Что делает |
+| Command | What it does |
 | --- | --- |
-| `./bootstrap.sh` | Пакеты (`repo` + `aur` + `required` + `hw-*` по железу) → restow → kanata-setup / группы → tpm → сервисы → fish → тема → SDDM |
-| `./bootstrap.sh --rice` | Урезанный rice-набор (`rice-*.txt`) |
-| `./bootstrap.sh --configs` | Только конфиги / сервисы / тема (пакеты уже стоят) |
-| `./restow.sh` | Stow-симлинки в `$HOME`; конфликтующие файлы → `~/.dotfiles-backup/<ts>/` |
-| `./restow.sh --check` / `--adopt` | Только проверить / забрать живые файлы в репо |
+| `./bootstrap.sh` | Packages (`repo` + `aur` + `required` + `hw-*` by hardware) → restow → kanata-setup / groups → tpm → services → fish → theme → SDDM |
+| `./bootstrap.sh --rice` | Trimmed rice set (`rice-*.txt`) |
+| `./bootstrap.sh --configs` | Configs / services / theme only (packages already installed) |
+| `./restow.sh` | Stow symlinks into `$HOME`; conflicting files → `~/.dotfiles-backup/<ts>/` |
+| `./restow.sh --check` / `--adopt` | Only check / adopt live files into the repo |
 
-После bootstrap — **перелогиниться** (группы `input`, `i2c`, `video` для kanata и ddcutil). Новые клавиатуры: добавить в `kanata.kbd` (`linux-dev`) и `hid-kbd-swallow.py` — см. [RESTORE.md](RESTORE.md).
+After bootstrap — **log out and back in** (`input`, `i2c`, `video` groups for kanata and ddcutil). New keyboards: add to `kanata.kbd` (`linux-dev`) and `hid-kbd-swallow.py` — see [RESTORE.md](RESTORE.md).
 
-Обои при bootstrap (опционально):
+Wallpaper during bootstrap (optional):
 
 ```bash
 BOOTSTRAP_WALLPAPER=~/pictures/wallpapers/old/nature-01.jpg ./bootstrap.sh
 ```
 
-После установки: скопировать обои и ключи, `gh auth login`, один раз открыть Zen через `zen-browser`, `exec fish`.
+After install: copy wallpapers and keys, `gh auth login`, open Zen once via `zen-browser`, `exec fish`.
 
 ---
 
-## Архитектура темы (SSOT)
+## Theme architecture (SSOT)
 
 ```text
 Wallpaper
@@ -58,152 +60,152 @@ theme-extract → theme-match → theme-build → palette.toml (SSOT)
   Zen/Vimium  lock      wofi/yazi   bat    btop     cava/glow/…
 ```
 
-Обои и анимации смены:
+Wallpapers and transition animations:
 
 ```bash
-wallpapers-fetch                 # скачать библиотеку (~500 обоев, dharmx/walls) в ~/pictures/wallpapers
-wallpaper-transition list        # ~40 пресетов: swipe / diag / wave / explode / implode / tear / slash
-wallpaper-transition set random  # random (по умолчанию) или имя пресета; в лаунчере: Ctrl+T
+wallpapers-fetch                 # download the library (~500 wallpapers, dharmx/walls) to ~/pictures/wallpapers
+wallpaper-transition list        # ~40 presets: swipe / diag / wave / explode / implode / tear / slash
+wallpaper-transition set random  # random (default) or a preset name; in the launcher: Ctrl+T
 ```
 
-После смены обоев:
+After changing the wallpaper:
 
 ```bash
 apply-wallpaper-theme ~/pictures/wallpapers/….jpg
-exec fish   # обновить fish-обёртки (cbonsai, pipes, gum, …)
+exec fish   # refresh fish wrappers (cbonsai, pipes, gum, …)
 ```
 
-Только перерисовать consumers из текущего `palette.toml`: `theme-render`.
+Just re-render consumers from the current `palette.toml`: `theme-render`.
 
 ---
 
-## Карта репозитория
+## Repository map
 
-Каждый каталог ниже (кроме служебных) — **Stow-пакет**:  
+Each directory below (except service ones) is a **Stow package**:
 `<pkg>/.config/...` → `~/.config/...`, `<pkg>/.local/...` → `~/.local/...`.
 
-### Ядро рабочего стола
+### Desktop core
 
-| Пакет | Назначение |
+| Package | Purpose |
 | --- | --- |
-| [`hypr/`](hypr/) | Hyprland **Lua**: окна, binds, rules, monitors, hyprlock, скрипты (screenshot, OCR, clipboard, Nautilus Mac-binds, Zoom tabs) |
+| [`hypr/`](hypr/) | Hyprland **Lua**: windows, binds, rules, monitors, hyprlock, scripts (screenshot, OCR, clipboard, Nautilus Mac binds, Zoom tabs) |
 | [`kanata/`](kanata/) | Home-row mods + remaps; user systemd unit |
-| [`quickshell/`](quickshell/) | Rice UI: бар, launcher, clipboard, wallpaper, VPN, calendar, notifications, design-system (`ds/`), vim-engine |
+| [`quickshell/`](quickshell/) | Rice UI: bar, launcher, clipboard, wallpaper, VPN, calendar, notifications, design system (`ds/`), vim-engine |
 | [`sddm/`](sddm/) | Adaptive login theme (`sddm/install.sh`) |
-| [`waybar/`](waybar/) | Legacy/fallback bar config (основной бар — Quickshell) |
-| [`vibepanel/`](vibepanel/) | Legacy panel config (исторический; UI ушёл в Quickshell) |
+| [`waybar/`](waybar/) | Legacy/fallback bar config (the main bar is Quickshell) |
+| [`vibepanel/`](vibepanel/) | Legacy panel config (historical; UI moved to Quickshell) |
 
-### Терминал и shell
+### Terminal and shell
 
-| Пакет | Назначение |
+| Package | Purpose |
 | --- | --- |
-| [`kitty/`](kitty/) | Основной терминал; SSOT colors/tabs; Mac-like clipboard (`Ctrl+C/V`, `Super+C` = interrupt) |
+| [`kitty/`](kitty/) | Main terminal; SSOT colors/tabs; Mac-like clipboard (`Ctrl+C/V`, `Super+C` = interrupt) |
 | [`fish/`](fish/) | Login shell, fzf/rice theme snippets |
-| [`tmux/`](tmux/) | Resurrect + continuum, status из SSOT |
-| [`zellij/`](zellij/) | Замена tmux в процессе миграции; `MUX=zellij` переключает, оба живут рядом |
-| [`starship/`](starship/) | Prompt из той же палитры |
+| [`tmux/`](tmux/) | Resurrect + continuum, status from SSOT |
+| [`zellij/`](zellij/) | Replacing tmux, migration in progress; `MUX=zellij` switches, both live side by side |
+| [`starship/`](starship/) | Prompt from the same palette |
 | [`nvim/`](nvim/) | LazyVim + `palette.lua` / SSOT colors |
-| [`yazi/`](yazi/) | Файловый TUI + theme + плагины |
-| [`fastfetch/`](fastfetch/) | Fetch при старте fish |
+| [`yazi/`](yazi/) | File-manager TUI + theme + plugins |
+| [`fastfetch/`](fastfetch/) | Fetch on fish startup |
 
-### Тема и внешний вид
+### Theme and appearance
 
-| Пакет | Назначение |
+| Package | Purpose |
 | --- | --- |
 | [`theme/`](theme/) | `harmonies.toml`, templates, SSOT docs |
 | [`bin/`](bin/) | `theme-*`, `apply-wallpaper-theme`, `zen-browser`, helpers |
-| [`matugen/`](matugen/) | Material/wallpaper color helpers (рядом с SSOT) |
-| [`gtk/`](gtk/) | GTK 3/4 CSS (consumers темы) |
+| [`matugen/`](matugen/) | Material/wallpaper color helpers (alongside SSOT) |
+| [`gtk/`](gtk/) | GTK 3/4 CSS (theme consumers) |
 | [`wofi/`](wofi/) | Fallback launcher styles |
-| [`waypaper/`](waypaper/) | Выбор обоев → theme pipeline |
+| [`waypaper/`](waypaper/) | Wallpaper picker → theme pipeline |
 | [`nwg-look/`](nwg-look/) | GTK settings / look |
-| [`xsettingsd/`](xsettingsd/) | XSettings для GTK/Qt под Wayland-стеком |
-| [`x11/`](x11/) | `.Xresources` и мелкий X11 glue |
+| [`xsettingsd/`](xsettingsd/) | XSettings for GTK/Qt under the Wayland stack |
+| [`x11/`](x11/) | `.Xresources` and small X11 glue |
 
-### Приложения и утилиты
+### Applications and utilities
 
-| Пакет | Назначение |
+| Package | Purpose |
 | --- | --- |
-| [`zen/`](zen/) | Shortcuts, `user.js`, Vimium mirror (полный профиль **не** в git) |
-| [`git/`](git/) | Глобальный `.gitconfig` (delta, aliases, `merge.ff=false`) |
-| [`obs/`](obs/) | Сцены/профили записи (без websocket password) |
-| [`herdr/`](herdr/) | Доп. theming consumer |
+| [`zen/`](zen/) | Shortcuts, `user.js`, Vimium mirror (full profile **not** in git) |
+| [`git/`](git/) | Global `.gitconfig` (delta, aliases, `merge.ff=false`) |
+| [`obs/`](obs/) | Recording scenes/profiles (without the websocket password) |
+| [`herdr/`](herdr/) | Additional theming consumer |
 | [`entropy/`](entropy/) | Entropy GUI settings (autostart off — hangs on Hypr; use `eh-layout-sync`) |
-| [`misc/`](misc/) | mimeapps, gromit-mpx (+ `gromit-mpx.ini` без intro), ergohaven notes |
+| [`misc/`](misc/) | mimeapps, gromit-mpx (+ `gromit-mpx.ini` without the intro), ergohaven notes |
 
-### Документация и мета
+### Documentation and meta
 
-| Путь | Назначение |
+| Path | Purpose |
 | --- | --- |
-| [`KEYBINDS.md`](KEYBINDS.md) | Cheatsheet хоткеев |
-| [`docs/`](docs/) | Доп. артефакты (в т.ч. Cursor canvas-зеркало cheatsheet) |
+| [`KEYBINDS.md`](KEYBINDS.md) | Hotkey cheatsheet |
+| [`docs/`](docs/) | Extra artifacts (incl. a Cursor canvas mirror of the cheatsheet) |
 | [`packages/`](packages/) | `repo.txt` / `aur.txt` / `rice-*.txt`, install & export |
-| [`AGENTS.md`](AGENTS.md) / [`.cursor/rules/`](.cursor/rules/) | Правила для агентов |
-| `bootstrap.sh` / `restow.sh` | Restore и Stow |
+| [`AGENTS.md`](AGENTS.md) / [`.cursor/rules/`](.cursor/rules/) | Rules for agents |
+| `bootstrap.sh` / `restow.sh` | Restore and Stow |
 
-Не в Stow / не для повседневного rice: `chromium-ffmpeg/` (игнорируется, отдельный nested tree).
+Not in Stow / not for everyday rice use: `chromium-ffmpeg/` (ignored, a separate nested tree).
 
 ---
 
-## Ключевые идеи
+## Key ideas
 
-### Модификаторы
+### Modifiers
 
-- **`Alt`** (`mainMod`) — окна и workspace (skhd-style с Mac)
-- **`Super`** (`secondMod`) — система, бар, утилиты, lock
-- В приложениях **Ctrl ≈ Cmd** (закрыть вкладку, quit app, Finder-like Nautilus)
-- Kanata: home-row mods; `Super+Shift+[ ]` → `Ctrl+PgUp/Dn` (вкладки / tmux/zellij)
+- **`Alt`** (`mainMod`) — windows and workspaces (skhd-style, Mac-oriented)
+- **`Super`** (`secondMod`) — system, bar, utilities, lock
+- In applications **Ctrl ≈ Cmd** (close tab, quit app, Finder-like Nautilus)
+- Kanata: home-row mods; `Super+Shift+[ ]` → `Ctrl+PgUp/Dn` (tabs / tmux/zellij)
 
-Полный список: **[KEYBINDS.md](KEYBINDS.md)**. Быстрые якоря:
+Full list: **[KEYBINDS.md](KEYBINDS.md)**. Quick anchors:
 
-| Клавиши | Действие |
+| Keys | Action |
 | --- | --- |
-| `Super+B` | Скрыть бар (autohide) / закрепить снова; наведение на верх — peek |
+| `Super+B` | Hide the bar (autohide) / pin it back; hover the top edge to peek |
 | `Alt+O` | Launcher |
 | `Super+Q` | Clipboard history |
 | `Super+W` | Wallpaper picker |
-| `Ctrl+C` / `Ctrl+V` | Copy / paste в kitty |
-| `Super+C` | Interrupt (SIGINT) в kitty |
+| `Ctrl+C` / `Ctrl+V` | Copy / paste in kitty |
+| `Super+C` | Interrupt (SIGINT) in kitty |
 
 ### Quickshell rice
 
-Бар (islands), launcher, clipboard, wallpaper, VPN panel, calendar, notifications, on-screen draw hooks. Цвета из `Colors.qml` (рендер SSOT). Design-system primitives в `quickshell/.../rice/ds/`.
+Bar (islands), launcher, clipboard, wallpaper, VPN panel, calendar, notifications, on-screen draw hooks. Colors come from `Colors.qml` (SSOT render). Design-system primitives live in `quickshell/.../rice/ds/`.
 
 ### Theme SSOT
 
-Единый источник: `~/.config/theme/palette.toml`.  
-Рендерится в Hypr, lock, Kitty, GTK3/4, Quickshell, Wofi, Starship, Tmux, Zellij, Yazi, fzf, bat, lazygit, nvim, Herdr, Vimium, btop, cava, peaclock, glow, bottom и fish-обёртки rice-утилит.
+Single source: `~/.config/theme/palette.toml`.
+Rendered into Hypr, lock, Kitty, GTK3/4, Quickshell, Wofi, Starship, Tmux, Zellij, Yazi, fzf, bat, lazygit, nvim, Herdr, Vimium, btop, cava, peaclock, glow, bottom, and fish wrappers for rice utilities.
 
 ### Zen Browser
 
-В git только shortcuts / `user.js` / Vimium mirror. Лаунчер `zen-browser` синкает их в профиль. Cookies и логины — локально.
+Only shortcuts / `user.js` / Vimium mirror are in git. The `zen-browser` launcher syncs them into the profile. Cookies and logins stay local.
 
 ### Git
 
-`merge.ff = false` и `pull.ff = false` — merge всегда с merge-коммитом (не fast-forward). Diff/pager через **delta**.
+`merge.ff = false` and `pull.ff = false` — merges always produce a merge commit (no fast-forward). Diff/pager via **delta**.
 
 ---
 
-## Пакеты и новые приложения
+## Packages and new applications
 
-| Файл | Содержимое |
+| File | Contents |
 | --- | --- |
 | `packages/repo.txt` | Official (pacman) |
-| `packages/aur.txt` | AUR (без `*-debug`) |
-| `packages/rice-*.txt` | Курируемый rice-минимум |
-| `packages/required.txt` | Runtime-зависимости скриптов репо (ставятся всегда, кроме `--aur`) |
-| `packages/hw-*.txt` | Драйверы/микрокод по вендору GPU/CPU (автодетект); `hw-boot.txt` — только с `--boot` |
-| `packages/install.sh` | Установка списков; несуществующие имена пропускает, сбои перечисляет в конце |
-| `packages/export.sh` | Обновить `repo.txt`/`aur.txt` с текущей машины (без `hw-*`/`required`) |
+| `packages/aur.txt` | AUR (without `*-debug`) |
+| `packages/rice-*.txt` | Curated rice minimum |
+| `packages/required.txt` | Runtime dependencies of the repo's scripts (always installed, except with `--aur`) |
+| `packages/hw-*.txt` | Drivers/microcode by GPU/CPU vendor (autodetected); `hw-boot.txt` — only with `--boot` |
+| `packages/install.sh` | Installs the lists; skips nonexistent names, lists failures at the end |
+| `packages/export.sh` | Update `repo.txt`/`aur.txt` from the current machine (without `hw-*`/`required`) |
 
-После установки чего-то нового:
+After installing something new:
 
 ```bash
 ./packages/export.sh
-# или
+# or
 dotfiles-register-app <pkg> [--aur] [--rice]
-./restow.sh          # если добавили конфиг в Stow-пакет
-# при необходимости — шаблон в theme/ + mapping в theme-render
+./restow.sh          # if a config was added to a Stow package
+# if needed — a template under theme/ + mapping in theme-render
 ```
 
 ---
@@ -211,51 +213,51 @@ dotfiles-register-app <pkg> [--aur] [--rice]
 ## Day-to-day
 
 ```bash
-# Сменить обои и перекрасить весь стек
+# Change the wallpaper and recolor the whole stack
 apply-wallpaper-theme ~/pictures/wallpapers/….jpg
 
-# Только перерисовать consumers из текущего palette.toml
+# Just re-render consumers from the current palette.toml
 theme-render
 
-# Только Vimium CSS (Zen лучше закрыть)
+# Only the Vimium CSS (better to close Zen first)
 theme-vimium
 
-# Переложить симлинки после правок в репо
+# Relink symlinks after editing the repo
 ./restow.sh
 ```
 
-Полезные rice-команды (после `exec fish`): `cava`, `btop`, `btm`, `peaclock`, `cbonsai -l`, `tty-clock`, `pipes.sh`, `glow README.md`.
+Useful rice commands (after `exec fish`): `cava`, `btop`, `btm`, `peaclock`, `cbonsai -l`, `tty-clock`, `pipes.sh`, `glow README.md`.
 
 ---
 
-## Что не восстанавливается из git
+## What isn't restored from git
 
-| Данные | Причина |
+| Data | Reason |
 | --- | --- |
-| Профиль Zen / пароли браузера | секреты и PII |
-| SSH / GPG / `gh` tokens | секреты |
-| Discord, Spotify, JetBrains, VS Code data | тяжёлые и machine-local |
-| Пароль OBS websocket | gitignored |
-| Библиотека обоев | `wallpapers-fetch` (или копировать в `~/pictures/wallpapers`) |
+| Zen profile / browser passwords | secrets and PII |
+| SSH / GPG / `gh` tokens | secrets |
+| Discord, Spotify, JetBrains, VS Code data | heavy and machine-local |
+| OBS websocket password | gitignored |
+| Wallpaper library | `wallpapers-fetch` (or copy into `~/pictures/wallpapers`) |
 | `chromium-ffmpeg/` | nested / ignored |
 
 ---
 
-## Требования
+## Requirements
 
-- Arch Linux (или совместимый pacman)
-- Сеть + `sudo` (пакеты и SDDM)
-- Реальный терминал для пароля (`yay` / `sudo`)
-- Для Kanata: группа `input`, затем re-login
+- Arch Linux (or a pacman-compatible distro)
+- Network + `sudo` (packages and SDDM)
+- A real terminal for password prompts (`yay` / `sudo`)
+- For Kanata: the `input` group, then re-login
 
 ---
 
-## Лицензия / использование
+## License / use
 
-Личный rice. Можно форкать и адаптировать.
+Personal rice. Feel free to fork and adapt.
 
-Большинство путей завязаны на `$HOME` / `~` / `Path.home()`. При переносе всё ещё проверьте:
+Most paths are tied to `$HOME` / `~` / `Path.home()`. When migrating, still check:
 
-- `ZEN_PROFILE` — id папки профиля Zen уникален на машине
-- `gtk` bookmarks и OBS `*.ini` — приложения пишут абсолютные `file://` / пути сами
-- `restow.sh` target (`$HOME`) и списки в `packages/`
+- `ZEN_PROFILE` — the Zen profile folder id is unique per machine
+- `gtk` bookmarks and OBS `*.ini` — apps write absolute `file://` paths/paths themselves
+- `restow.sh` target (`$HOME`) and the lists under `packages/`
