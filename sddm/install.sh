@@ -62,28 +62,39 @@ fi
 
 # The theme drop-in does nothing while sddm.service stays disabled.
 # enable only: --now would tear down the session this script is running in.
-sddm_was_enabled=0
-if systemctl is-enabled -q sddm.service 2>/dev/null; then
-  sddm_was_enabled=1
-fi
-if systemctl cat sddm.service >/dev/null 2>&1; then
+# --rice does not install the sddm package; skip the unit in that case.
+if systemctl cat sddm.service >/dev/null 2>&1 && id sddm >/dev/null 2>&1; then
+  sddm_was_enabled=0
+  if systemctl is-enabled -q sddm.service 2>/dev/null; then
+    sddm_was_enabled=1
+  fi
   sudo systemctl enable sddm.service
-fi
 
-# First boot has no remembered session, and two Hyprland entries exist.
-# Preselect the stock one (start-hyprland). It does not need uwsm, which
-# --rice does not install. Never overwrite a session the user already picked,
-# and do not invent one on a machine where SDDM was already the greeter —
-# a missing state file there is not the same as a fresh install.
-sddm_home="$(getent passwd sddm | cut -d: -f6)"
-sddm_home="${sddm_home:-/var/lib/sddm}"
-sddm_state="$sddm_home/state.conf"
-if [[ "$sddm_was_enabled" -eq 0 && ! -e "$sddm_state" ]]; then
-  sudo install -d -o sddm -g sddm -m 755 "$sddm_home"
-  printf '[Last]\nSession=hyprland.desktop\nUser=%s\n' "$USER" | sudo tee "$sddm_state" >/dev/null
-  sudo chown sddm:sddm "$sddm_state"
-  sudo chmod 644 "$sddm_state"
-  echo "SDDM: preselected hyprland.desktop for $USER"
+  # First boot has no remembered session, and two Hyprland entries exist.
+  # Preselect the stock one (start-hyprland). It does not need uwsm.
+  # Never overwrite a session the user already picked, and do not invent one
+  # on a machine where SDDM was already the greeter — a missing state file
+  # there is not the same as a fresh install.
+  # The greeter home is mode 0750, so this user cannot see state.conf.
+  # sudo test. Do not install -d over an existing directory: that chmods it.
+  if [[ "$sddm_was_enabled" -eq 0 ]]; then
+    sddm_home="$(getent passwd sddm | cut -d: -f6 || true)"
+    sddm_home="${sddm_home:-/var/lib/sddm}"
+    sddm_state="$sddm_home/state.conf"
+    if ! sudo test -e "$sddm_state"; then
+      if ! sudo test -d "$sddm_home"; then
+        sudo install -d -o sddm -g sddm -m 750 "$sddm_home"
+      fi
+      printf '[Last]\nSession=hyprland.desktop\nUser=%s\n' "$USER" | sudo tee "$sddm_state" >/dev/null
+      sudo chown sddm:sddm "$sddm_state"
+      sudo chmod 640 "$sddm_state"
+      echo "SDDM: preselected hyprland.desktop for $USER"
+    fi
+  fi
+elif ! systemctl cat sddm.service >/dev/null 2>&1; then
+  echo "SDDM is not installed; theme files are in place, greeter stays disabled" >&2
+else
+  echo "warn: user sddm does not exist; greeter service left unchanged" >&2
 fi
 
 echo

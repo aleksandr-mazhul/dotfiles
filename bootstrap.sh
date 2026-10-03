@@ -39,16 +39,24 @@ need_cmd() {
 }
 
 install_yay_if_needed() {
+  # Called as `if ! install_yay_if_needed`, which disables set -e for the
+  # whole function. Every failing step has to return on its own, or a
+  # failed makepkg falls through to rm and looks like success.
   if command -v yay >/dev/null 2>&1; then
     return 0
   fi
   log "Installing yay (AUR helper)"
-  sudo pacman -S --needed --noconfirm base-devel git
+  sudo pacman -S --needed --noconfirm base-devel git || return 1
   local tmp
   tmp="$(mktemp -d)"
-  # shellcheck disable=SC2164
-  git clone --depth 1 https://aur.archlinux.org/yay.git "$tmp/yay"
-  (cd "$tmp/yay" && makepkg -si --noconfirm)
+  if ! git clone --depth 1 https://aur.archlinux.org/yay.git "$tmp/yay"; then
+    rm -rf "$tmp"
+    return 1
+  fi
+  if ! (cd "$tmp/yay" && makepkg -si --noconfirm); then
+    rm -rf "$tmp"
+    return 1
+  fi
   rm -rf "$tmp"
 }
 
