@@ -66,6 +66,25 @@ packages=(
   zen
 )
 
+# True when ~/.path is the stowed node for this repo file.
+# readlink -f follows symlinks *inside* the package (vpn wrappers, zellij's
+# default.kdl) and then disagrees with the path Stow actually created.
+linked_into_repo() {
+  local rel="$1" repo="$2"
+  local live="$TARGET/$rel" dest
+  [[ -e "$live" || -L "$live" ]] || return 1
+  if [[ -L "$live" ]]; then
+    dest="$(readlink "$live")"
+    if [[ "$dest" != /* ]]; then
+      dest="$(realpath -m "$(dirname "$live")/$dest")"
+    else
+      dest="$(realpath -m "$dest")"
+    fi
+    [[ "$dest" == "$(realpath -m "$repo")" ]] && return 0
+  fi
+  [[ "$(readlink -f "$live" 2>/dev/null || true)" == "$repo" ]]
+}
+
 verify() {
   echo "==> Verify (every tracked file must resolve into the repo)"
   ok=0; bad=0
@@ -75,7 +94,7 @@ verify() {
       rel="${f#"$pkg"/}"
       [[ "$rel" == .config/mimeapps.list ]] && continue   # copied on purpose, see below
       [[ "$(basename "$rel")" == .stow-local-ignore ]] && continue
-      if [[ "$(readlink -f "$TARGET/$rel" 2>/dev/null)" == "$ROOT/$f" ]]; then
+      if linked_into_repo "$rel" "$ROOT/$f"; then
         ok=$((ok + 1))
       else
         bad=$((bad + 1))
