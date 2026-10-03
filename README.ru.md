@@ -6,6 +6,12 @@
 
 Управляется через **[GNU Stow](https://www.gnu.org/software/stow/)**. Секреты в репозиторий не входят.
 
+![Стол: бар Quickshell и Kitty](docs/screenshots/desktop.jpg)
+
+![Лаунчер](docs/screenshots/launcher.jpg)
+
+![Экран блокировки](docs/screenshots/lock.jpg)
+
 | Документ | Зачем открыть |
 | --- | --- |
 | **[KEYBINDS.md](KEYBINDS.md)** | Все хоткеи: Hyprland, kitty, nvim, kanata |

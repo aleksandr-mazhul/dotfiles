@@ -6,6 +6,12 @@ Personal environment on **Arch + Hyprland**: Mac-like input (Kanata), a dynamic 
 
 Managed through **[GNU Stow](https://www.gnu.org/software/stow/)**. Secrets are not included in the repository.
 
+![Desktop with the Quickshell bar and Kitty](docs/screenshots/desktop.jpg)
+
+![Launcher](docs/screenshots/launcher.jpg)
+
+![Lock screen](docs/screenshots/lock.jpg)
+
 | Document | Why open it |
 | --- | --- |
 | **[KEYBINDS.md](KEYBINDS.md)** | All hotkeys: Hyprland, kitty, nvim, kanata |
