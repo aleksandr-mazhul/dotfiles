@@ -203,32 +203,29 @@ local function unwrap_window(win)
     return win
 end
 
+-- Hyprland 0.56 ignores `silent`. A move follows the workspace unless
+-- `follow` is explicitly false.
 local function move_to_workspace(win, ws_id, follow)
     if not ws_id then
         return
     end
     local cur = win.workspace
     if cur and cur.id == ws_id then
+        if follow then
+            pcall(function()
+                hl.dispatch(hl.dsp.focus({ workspace = ws_id }))
+            end)
+        end
         return
     end
     local opts = {
         window = win,
         workspace = ws_id,
+        follow = follow and true or false,
     }
-    if not follow then
-        opts.silent = true
-    end
-    local ok = pcall(function()
+    pcall(function()
         hl.dispatch(hl.dsp.window.move(opts))
     end)
-    if not ok and not follow then
-        pcall(function()
-            hl.dispatch(hl.dsp.window.move({
-                window = win,
-                workspace = ws_id,
-            }))
-        end)
-    end
 end
 
 local function title_blob(win)
@@ -302,8 +299,9 @@ local function sibling_workspace_id(win, class)
 end
 
 -- During restore: snapshot target only, always silent.
--- After restore: same letter, and a real tiled window takes the workspace with it.
-local function place_catalog_window(win)
+-- After restore: same letter. Follow only on window.open, which Hyprland
+-- emits after a silent map has put focus back. open_early would be undone.
+local function place_catalog_window(win, follow_now)
     win = unwrap_window(win)
     if not win then
         return
@@ -337,7 +335,7 @@ local function place_catalog_window(win)
 
     -- Last session wins over the catalog "home" letter (otherwise Cursor jumps
     -- back to C after the restore freeze while Zen stays on V).
-    local follow = should_follow_window(win)
+    local follow = follow_now and should_follow_window(win)
     local target = workspaces[1]
     if target then
         move_to_workspace(win, target, follow)
@@ -357,8 +355,12 @@ local function place_catalog_window(win)
     move_to_workspace(win, app.workspace, follow)
 end
 
-hl.on("window.open_early", place_catalog_window)
-hl.on("window.open", place_catalog_window)
+hl.on("window.open_early", function(win)
+    place_catalog_window(win, false)
+end)
+hl.on("window.open", function(win)
+    place_catalog_window(win, true)
+end)
 
 -- =============================================================================
 -- Float / unmanaged (yabai manage=off + dialogs + Windscribe from aerospace)
