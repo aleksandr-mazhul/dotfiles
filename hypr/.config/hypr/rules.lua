@@ -111,52 +111,10 @@ for _, app in ipairs(apps.catalog) do
     })
 end
 
--- Link opened another catalog app: follow that window's workspace.
--- Last matching rule wins, so popup exceptions come after the catalog grant.
-for _, app in ipairs(apps.catalog) do
-    hl.window_rule({
-        name = app.id .. "-focus-on-activate",
-        match = { class = app.class_re },
-        focus_on_activate = true,
-    })
-end
-
-hl.window_rule({
-    name = "yandex-menu-no-focus-on-activate",
-    match = { class = "^[Yy]andex.?[Bb]rowser$" },
-    focus_on_activate = false,
-})
-
-hl.window_rule({
-    name = "yandex-browser-focus-on-activate",
-    match = {
-        class = "^[Yy]andex.?[Bb]rowser$",
-        title = ".*(Browser|Браузер).*",
-    },
-    focus_on_activate = true,
-})
-
-hl.window_rule({
-    name = "zoom-draw-no-focus-on-activate",
-    match = {
-        class = "^(zoom|Zoom)$",
-        title = ".*(Whiteboard|whiteboard|Annotat|annotat|Canvas|canvas|Drawing|drawing).*",
-    },
-    focus_on_activate = false,
-})
-
-hl.window_rule({
-    name = "pip-no-focus-on-activate",
-    match = { title = "^(Picture-in-Picture|Картинка в картинке)$" },
-    focus_on_activate = false,
-})
-
--- Float last: a floating child must not steal the workspace from a tiled rule.
-hl.window_rule({
-    name = "float-no-focus-on-activate",
-    match = { float = true },
-    focus_on_activate = false,
-})
+-- Do not set focus_on_activate. Telegram (and other apps) request activation
+-- for incoming notifications; that must not change the workspace. A link click
+-- switches workspace only when it runs the app launcher with a URL, or when
+-- it maps a new real window below.
 
 -- Telegram RMB menus / media viewer already have their own chrome — Hypr's
 -- active border shows up as a weird thick outline on fractional scale.
