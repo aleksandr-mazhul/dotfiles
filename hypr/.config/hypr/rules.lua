@@ -95,8 +95,8 @@ hl.window_rule({
 -- Labels/indices: W=1 C=2 V=3 D=4 G=5 X=6 Z=7 E=8 T=9 I=10 P=11 Q=12 U=13 Y=14 R=15 A=16
 --
 -- Do NOT pin tiled windows with a persistent workspace rule — that would undo
--- session restore. Floating children stay put (unset). Tiled placement is
--- sibling → restore snapshot (login only) → APP_HOME, in the handler below.
+-- session restore. Floating children stay put (unset). After login, a real
+-- tiled window follows its letter; menus and popups stay silent.
 -- =============================================================================
 
 local apps = require("apps")
@@ -110,6 +110,11 @@ for _, app in ipairs(apps.catalog) do
         workspace = "unset",
     })
 end
+
+-- Do not set focus_on_activate. Telegram (and other apps) request activation
+-- for incoming notifications; that must not change the workspace. A link click
+-- switches workspace only when it runs the app launcher with a URL, or when
+-- it maps a new real window below.
 
 -- Telegram RMB menus / media viewer already have their own chrome — Hypr's
 -- active border shows up as a weird thick outline on fractional scale.
@@ -156,29 +161,81 @@ local function unwrap_window(win)
     return win
 end
 
-local function move_to_workspace_silent(win, ws_id)
+-- Hyprland 0.56 ignores `silent`. A move follows the workspace unless
+-- `follow` is explicitly false.
+local function move_to_workspace(win, ws_id, follow)
     if not ws_id then
         return
     end
     local cur = win.workspace
     if cur and cur.id == ws_id then
+        if follow then
+            pcall(function()
+                hl.dispatch(hl.dsp.focus({ workspace = ws_id }))
+            end)
+        end
         return
     end
-    local ok = pcall(function()
-        hl.dispatch(hl.dsp.window.move({
-            window = win,
-            workspace = ws_id,
-            silent = true,
-        }))
+    local opts = {
+        window = win,
+        workspace = ws_id,
+        follow = follow and true or false,
+    }
+    pcall(function()
+        hl.dispatch(hl.dsp.window.move(opts))
     end)
-    if not ok then
-        pcall(function()
-            hl.dispatch(hl.dsp.window.move({
-                window = win,
-                workspace = ws_id,
-            }))
-        end)
+end
+
+local function title_blob(win)
+    return tostring(win.title or "") .. "\n" .. tostring(win.initial_title or "")
+end
+
+local function yandex_browser_title(win)
+    local blob = title_blob(win)
+    return blob:find("Browser", 1, true) ~= nil or blob:find("Браузер", 1, true) ~= nil
+end
+
+-- Tiled Yandex menus share the browser class. Follow only the real window.
+local function yandex_popup(win)
+    local class = string.lower(tostring(win.class or ""))
+    if not class:find("yandex", 1, true) then
+        return false
     end
+    if yandex_browser_title(win) then
+        return false
+    end
+    for _, other in ipairs(hl.get_windows() or {}) do
+        if other.address ~= win.address and yandex_browser_title(other) then
+            local other_class = string.lower(tostring(other.class or ""))
+            if other_class:find("yandex", 1, true) then
+                return true
+            end
+        end
+    end
+    return false
+end
+
+local function zoom_draw_popup(win)
+    local class = string.lower(tostring(win.class or ""))
+    if class ~= "zoom" and not class:find("zoom", 1, true) then
+        return false
+    end
+    local hay = title_blob(win)
+    return hay:find("[Ww]hiteboard") ~= nil
+        or hay:find("[Aa]nnotat") ~= nil
+        or hay:find("[Cc]anvas") ~= nil
+        or hay:find("[Dd]rawing") ~= nil
+end
+
+-- True only for the window a link should land on. Menus stay silent.
+local function should_follow_window(win)
+    if win.floating or pip.is_pip_window(win) then
+        return false
+    end
+    if yandex_popup(win) or zoom_draw_popup(win) then
+        return false
+    end
+    return true
 end
 
 local function sibling_workspace_id(win, class)
@@ -199,9 +256,10 @@ local function sibling_workspace_id(win, class)
     return best.workspace.id
 end
 
--- During restore: snapshot target only (never APP_HOME / splash siblings).
--- After restore: sibling (popups stay with the parent) else default home letter.
-local function place_catalog_window(win)
+-- During restore: snapshot target only, always silent.
+-- After restore: same letter. Follow only on window.open, which Hyprland
+-- emits after a silent map has put focus back. open_early would be undone.
+local function place_catalog_window(win, follow_now)
     win = unwrap_window(win)
     if not win then
         return
@@ -228,22 +286,23 @@ local function place_catalog_window(win)
             end
         end
         if workspaces[1] then
-            move_to_workspace_silent(win, workspaces[1])
+            move_to_workspace(win, workspaces[1], false)
         end
         return
     end
 
     -- Last session wins over the catalog "home" letter (otherwise Cursor jumps
     -- back to C after the restore freeze while Zen stays on V).
+    local follow = follow_now and should_follow_window(win)
     local target = workspaces[1]
     if target then
-        move_to_workspace_silent(win, target)
+        move_to_workspace(win, target, follow)
         return
     end
 
     local sibling = sibling_workspace_id(win, class)
     if sibling then
-        move_to_workspace_silent(win, sibling)
+        move_to_workspace(win, sibling, follow)
         return
     end
 
@@ -251,11 +310,15 @@ local function place_catalog_window(win)
         return
     end
 
-    move_to_workspace_silent(win, app.workspace)
+    move_to_workspace(win, app.workspace, follow)
 end
 
-hl.on("window.open_early", place_catalog_window)
-hl.on("window.open", place_catalog_window)
+hl.on("window.open_early", function(win)
+    place_catalog_window(win, false)
+end)
+hl.on("window.open", function(win)
+    place_catalog_window(win, true)
+end)
 
 -- =============================================================================
 -- Float / unmanaged (yabai manage=off + dialogs + Windscribe from aerospace)

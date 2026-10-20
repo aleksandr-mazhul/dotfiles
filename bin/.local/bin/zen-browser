@@ -58,6 +58,36 @@ sync_vimium() {
 sync_tracked
 sync_vimium "pre-launch"
 
+# A second Zen process usually only adds a tab and never asks Hyprland to focus
+# the existing window. Switch to that workspace before handing it the URL.
+# No-op without a URL so session autostart does not jump to Zen.
+focus_open_zen() {
+  local arg has_url=0 addr=""
+  for arg in "$@"; do
+    case "$arg" in
+      *://*) has_url=1 ;;
+    esac
+  done
+  [[ "$has_url" -eq 1 ]] || return 0
+  command -v hyprctl >/dev/null 2>&1 || return 0
+  command -v jq >/dev/null 2>&1 || return 0
+  addr="$(
+    hyprctl -j clients 2>/dev/null | jq -r '
+      [ .[]
+        | select(.class == "zen" or .class == "zen-browser" or .class == "Zen" or .class == "Zen-browser")
+        | select(.title != "Picture-in-Picture" and .title != "Картинка в картинке")
+        | select(.mapped != false and .floating != true)
+      ]
+      | sort_by(.focusHistoryID // 999999)
+      | .[0].address // empty
+    ' || true
+  )"
+  [[ -n "$addr" && "$addr" != "null" ]] || return 0
+  hyprctl eval "hl.dispatch(hl.dsp.focus({ window = \"address:${addr}\" }))" >/dev/null 2>&1 || true
+}
+
+focus_open_zen "$@"
+
 # Don't use exec — we need a post-exit sync after Zen overwrites storage.js
 set +e
 /opt/zen-browser-bin/zen-bin --profile "$profile" "$@"
