@@ -6,6 +6,16 @@ local home = os.getenv("HOME") or ""
 -- the .so files are missing; gloview.lua would then index a nil
 -- hl.plugin.gloview and abort the require chain before binds.lua loads,
 -- leaving a session with no keybinds. Load what exists, skip the rest.
+local function loaded_plugins()
+    local ok, list = pcall(hl.get_loaded_plugins)
+    if ok and type(list) == "table" then
+        return list
+    end
+end
+
+-- pcall(hl.plugin.load) is true even when Hyprland rejects the .so (ABI
+-- mismatch after a Hyprland upgrade), so ask the compositor what really loaded.
+-- Match by name too: a reload finds the plugin already loaded (count unchanged).
 local function load_plugin(name)
     local path = home .. "/.local/lib/hypr/" .. name .. ".so"
     local f = io.open(path, "r")
@@ -13,7 +23,24 @@ local function load_plugin(name)
         return false
     end
     f:close()
-    return (pcall(hl.plugin.load, path))
+    local before = loaded_plugins()
+    if not pcall(hl.plugin.load, path) then
+        return false
+    end
+    local after = loaded_plugins()
+    if not before or not after then
+        return true -- cannot tell: keep the optimistic behaviour
+    end
+    if #after > #before then
+        return true
+    end
+    local want = name:lower():gsub("%W", "")
+    for _, p in ipairs(after) do
+        if p.name and p.name:lower():gsub("%W", ""):find(want, 1, true) then
+            return true
+        end
+    end
+    return false
 end
 local has_gloview = load_plugin("gloview")
 local has_dynamic_cursors = load_plugin("dynamic-cursors")
