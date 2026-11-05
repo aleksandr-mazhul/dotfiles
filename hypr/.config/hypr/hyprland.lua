@@ -124,6 +124,12 @@ hl.config({
         allow_session_lock_restore = true,
     },
 
+    render = {
+        -- NVIDIA + DP (M27Q): auto-HDR flips the HDR/colorspace infoframes when a
+        -- browser goes fullscreen — full modeset, ~1s black screen, dimmer picture.
+        cm_auto_hdr = 0,
+    },
+
     cursor = {
         no_hardware_cursors = 1,
         enable_hyprcursor = true,
