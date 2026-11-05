@@ -22,7 +22,9 @@ if status is-interactive
         end
         # keychain picks the --eval syntax from $SHELL; fish started from a
         # bash-parented process (IDE, agent, script) would get sh syntax.
-        SHELL=(status fish-path) keychain --quiet add --eval --quick --ignore-missing --systemd id_ed25519 \
+        # --immediate: ask for the passphrase right away instead of keychain 3's
+        # "Press Enter to run ssh-add in this terminal" prompt in every terminal.
+        SHELL=(status fish-path) keychain --quiet add --eval --immediate --quick --ignore-missing --systemd id_ed25519 \
             | string replace -a -- ' -U ' ' -g ' \
             | source
     end
