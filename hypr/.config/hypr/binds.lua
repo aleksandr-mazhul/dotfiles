@@ -392,7 +392,8 @@ end)
 
 -- Float: was Alt+V (taken by skhd workspace V) → Super+Shift+V; also service-mode `f`
 hl.bind(secondMod .. " + SHIFT + V", hl.dsp.window.float({ action = "toggle" }))
-hl.bind(mainMod .. " + F", hl.dsp.window.fullscreen())
+-- dont_inhibit: also toggles a VM console window that grabs the keyboard
+hl.bind(mainMod .. " + F", hl.dsp.window.fullscreen(), { dont_inhibit = true })
 -- Zoom-fullscreen (skhd Alt+Shift+F); bar hide/show → Super+W (не Super+B)
 hl.bind(mainMod .. " + SHIFT + F", hl.dsp.window.fullscreen())
 -- Pin: was Alt+Shift+P (taken by move→P) → Super+Shift+P
@@ -575,8 +576,9 @@ hl.bind(secondMod .. " + SHIFT + W", hl.dsp.exec_cmd("~/.local/bin/wallpaper-ran
 hl.bind(secondMod .. " + ALT + W", hl.dsp.exec_cmd("~/.local/bin/waypaper"))
 -- Super+V free for apps (nvim visual-block; Mac Ctrl+V → Super). VPN: launcher / QuickSettings.
 
-hl.bind(secondMod .. " + SHIFT + CTRL + 3", hl.dsp.exec_cmd("~/.config/hypr/scripts/screenshot-output.sh"))
-hl.bind(secondMod .. " + SHIFT + CTRL + 4", hl.dsp.exec_cmd("~/.config/hypr/scripts/screenshot-region.sh"))
+-- dont_inhibit: screenshots must also fire while a VM console grabs the keyboard
+hl.bind(secondMod .. " + SHIFT + CTRL + 3", hl.dsp.exec_cmd("~/.config/hypr/scripts/screenshot-output.sh"), { dont_inhibit = true })
+hl.bind(secondMod .. " + SHIFT + CTRL + 4", hl.dsp.exec_cmd("~/.config/hypr/scripts/screenshot-region.sh"), { dont_inhibit = true })
 hl.bind(secondMod .. " + T", hl.dsp.exec_cmd("~/.config/hypr/scripts/ocr-region.sh"))
 
 -- Screen record (OBS) + on-screen draw (Gromit-MPX)
@@ -592,11 +594,11 @@ hl.bind(secondMod .. " + SHIFT + ALT + V", hl.dsp.exec_cmd("~/.config/hypr/scrip
 -- Dictation (voxtype daemon, user service): press to start, press again to type at the cursor
 hl.bind("CTRL + ALT + D", hl.dsp.exec_cmd("voxtype record toggle"))
 
--- Focus windows (skhd alt - hjkl)
-hl.bind(mainMod .. " + H", hl.dsp.focus({ direction = "left" }))
-hl.bind(mainMod .. " + L", hl.dsp.focus({ direction = "right" }))
-hl.bind(mainMod .. " + K", hl.dsp.focus({ direction = "up" }))
-hl.bind(mainMod .. " + J", hl.dsp.focus({ direction = "down" }))
+-- Focus windows (skhd alt - hjkl); dont_inhibit so focus can leave a VM console
+hl.bind(mainMod .. " + H", hl.dsp.focus({ direction = "left" }), { dont_inhibit = true })
+hl.bind(mainMod .. " + L", hl.dsp.focus({ direction = "right" }), { dont_inhibit = true })
+hl.bind(mainMod .. " + K", hl.dsp.focus({ direction = "up" }), { dont_inhibit = true })
+hl.bind(mainMod .. " + J", hl.dsp.focus({ direction = "down" }), { dont_inhibit = true })
 
 -- Warp/move windows (skhd alt + shift - hjkl)
 hl.bind(mainMod .. " + SHIFT + H", hl.dsp.window.move({ direction = "left" }))
@@ -631,14 +633,15 @@ local workspaceKeys = {
     T = 9, I = 10, P = 11, Q = 12, U = 13, Y = 14, R = 15, A = 16,
 }
 
+-- dont_inhibit: switching must work even while a VM console grabs the keyboard
 for key, ws in pairs(workspaceKeys) do
-    hl.bind(mainMod .. " + " .. key, hl.dsp.focus({ workspace = ws }))
+    hl.bind(mainMod .. " + " .. key, hl.dsp.focus({ workspace = ws }), { dont_inhibit = true })
     -- skhd moves window and follows to that space
     hl.bind(mainMod .. " + SHIFT + " .. key, hl.dsp.window.move({ workspace = ws }))
 end
 
 -- Recent workspace (skhd alt - tab)
-hl.bind(mainMod .. " + TAB", hl.dsp.focus({ workspace = "previous" }))
+hl.bind(mainMod .. " + TAB", hl.dsp.focus({ workspace = "previous" }), { dont_inhibit = true })
 
 hl.bind(mainMod .. " + S", hl.dsp.workspace.toggle_special("magic"))
 hl.bind(mainMod .. " + SHIFT + S", hl.dsp.window.move({ workspace = "special:magic" }))
