@@ -45,6 +45,17 @@ end
 local has_gloview = load_plugin("gloview")
 local has_dynamic_cursors = load_plugin("dynamic-cursors")
 
+-- Since 0.57 hl.plugin.load is deferred until after the config runs, so
+-- has_gloview is false on the first pass and gloview.lua (Super+arrows) is
+-- skipped. Load it via hyprctl once the compositor is up, then re-run the
+-- config: a reload keeps the plugin, and hyprland.start does not fire again.
+if not has_gloview then
+    hl.on("hyprland.start", function()
+        hl.exec_cmd("hyprctl plugin load " .. home .. "/.local/lib/hypr/gloview.so >/dev/null;"
+            .. " hyprctl plugin list | grep -q GloView && hyprctl reload")
+    end)
+end
+
 require("monitors")
 require("workspaces")
 
