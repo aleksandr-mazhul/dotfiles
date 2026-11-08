@@ -29,8 +29,8 @@ open panel
   └─ watch 20: on "changed" → month <cur> → diff
 ```
 
-↻ in the header spins while any fetch or sync runs. Data never disappears
-while revalidating.
+Revalidation is silent: no spinner, no "Syncing…" status. Changed rows and dots
+just fade in or out. Data never disappears while revalidating.
 
 ## Cache owner: the script
 
@@ -132,7 +132,6 @@ was deleted elsewhere, so the server wins.
 - Selecting a day reads from `monthCache`: no process.
 - Dots: `eventDays` is reassigned only when `!dotsEqual(old, new)`. Each dot
   fades in/out (`Behavior on opacity`).
-- ↻ spins (`RotationAnimation`, loops) while `fetching || syncProc.running`.
 - `colorsProc` is replaced by reading `calendars.json` first, then the live call.
 
 ## Tests

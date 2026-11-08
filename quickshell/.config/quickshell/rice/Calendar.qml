@@ -373,7 +373,6 @@ PanelWindow {
 
     function syncAndRefresh() {
         busy = true
-        statusText = "Syncing…"
         syncProc.running = false
         syncProc.running = true
     }
@@ -721,41 +720,6 @@ PanelWindow {
                                 font.family: DS.Tokens.fontUi
                                 font.pixelSize: DS.Tokens.fontSize
                                 fontBold: true
-
-                                // Spin while anything is (re)fetching; settle to 0 on stop.
-                                readonly property bool spinning: hdrBtn.modelData.action === "sync"
-                                    && (root.fetching || syncProc.running || root.busy)
-                                onSpinningChanged: {
-                                    if (spinning) {
-                                        settleAnim.stop()
-                                        spinAnim.start()
-                                    } else if (spinAnim.running) {
-                                        spinAnim.stop()
-                                        const from = glyph.rotation % 360
-                                        settleAnim.from = from
-                                        settleAnim.to = 360
-                                        settleAnim.duration = Math.max(1, Math.round((360 - from) / 360 * 900))
-                                        settleAnim.start()
-                                    }
-                                }
-                                Component.onCompleted: if (spinning) spinAnim.start()
-
-                                NumberAnimation {
-                                    id: spinAnim
-                                    target: glyph
-                                    property: "rotation"
-                                    from: 0
-                                    to: 360
-                                    duration: 900
-                                    loops: Animation.Infinite
-                                }
-                                NumberAnimation {
-                                    id: settleAnim
-                                    target: glyph
-                                    property: "rotation"
-                                    easing.type: Easing.OutCubic
-                                    onFinished: glyph.rotation = 0
-                                }
                             }
 
                             RiceIcon {
