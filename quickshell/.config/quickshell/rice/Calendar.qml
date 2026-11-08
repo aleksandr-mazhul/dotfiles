@@ -6,6 +6,7 @@ import Quickshell.Io
 import Quickshell.Wayland
 import Quickshell.Hyprland
 import "ds" as DS
+import "calendarCache.js" as CC
 
 PanelWindow {
     id: root
@@ -16,7 +17,17 @@ PanelWindow {
     property int selectedDay: new Date().getDate()
     property var eventDays: ({}) // { "1": ["Рабочий","Домашний"], ... } (khal calendar names)
     property int eventDaysRev: 0
-    property var events: []
+    // Stale-while-revalidate state. monthCache: { "YYYY-MM": {fetchedAt, events} }.
+    property var monthCache: ({})
+    property bool monthLoaded: false // visible month has a cache entry
+    property var shownRows: []       // raw rows mirrored in eventsModel
+    property var pendingMutations: []
+    property int mutSeq: 0
+    property var curMut: null
+    property var fetchQueue: []
+    property string curKey: ""
+    property string openFlowKey: ""
+    readonly property bool fetching: fetchQueue.length > 0 || curKey !== ""
     // Filled from `qs-calendar.sh calendars`: every calendar khal knows, so
     // calendars added in Apple/Google show up without touching this file.
     property var calColors: ({})
@@ -69,8 +80,6 @@ PanelWindow {
     }
 
     function monthCells() {
-        // Depend on eventDaysRev so the grid rebuilds when markers arrive.
-        void root.eventDaysRev
         const first = new Date(viewYear, viewMonth, 1)
         const start = (first.getDay() + 6) % 7
         const daysInMonth = new Date(viewYear, viewMonth + 1, 0).getDate()
@@ -80,16 +89,10 @@ PanelWindow {
         for (let i = 0; i < start; i++)
             cells.push({ day: 0, today: false, cals: [] })
         for (let d = 1; d <= daysInMonth; d++) {
-            const key = String(d)
-            const raw = root.eventDays ? root.eventDays[key] : null
-            // Cap at the number of calendars we actually have, so a busy day
-            // never silently drops a marker (Уник used to fall off at 3).
-            const cap = Object.keys(root.calColors || {}).length || 7
-            const cals = Array.isArray(raw) ? raw.slice(0, cap) : []
             cells.push({
                 day: d,
                 today: isCurrentMonth && d === today.getDate(),
-                cals: cals
+                cals: []
             })
         }
         return cells
@@ -106,7 +109,7 @@ PanelWindow {
         if (selectedDay > maxDay)
             selectedDay = maxDay
         formOpen = false
-        refreshMonth()
+        viewChanged()
     }
 
     function goToday() {
@@ -115,7 +118,15 @@ PanelWindow {
         viewMonth = now.getMonth()
         selectedDay = now.getDate()
         formOpen = false
-        refreshMonth()
+        viewChanged()
+    }
+
+    // Visible month changed: paint from cache now, revalidate in the background.
+    function viewChanged() {
+        root.render()
+        const key = root.monthKey()
+        root.fetchMonth(key, true)
+        root.prefetchNeighbors(key)
     }
 
     function calAccent(name) {
@@ -182,7 +193,12 @@ PanelWindow {
     function dayCals(day) {
         void root.eventDaysRev
         const v = root.eventDays ? root.eventDays[String(day)] : null
-        return Array.isArray(v) ? v : []
+        if (!Array.isArray(v))
+            return []
+        // Cap at the number of calendars we actually have, so a busy day
+        // never silently drops a marker.
+        const cap = Object.keys(root.calColors || {}).length || 7
+        return v.slice(0, cap)
     }
 
     function refreshColors() {
@@ -190,22 +206,173 @@ PanelWindow {
         colorsProc.running = true
     }
 
-    function refreshMonth() {
-        daysProc.running = false
-        daysProc.command = ["bash", root.script, "days", root.monthKey()]
-        daysProc.running = true
-        refreshEvents()
+    readonly property string cacheDir: (Quickshell.env("XDG_CACHE_HOME") || (Quickshell.env("HOME") + "/.cache")) + "/qs-calendar"
+
+    function readDiskMonth(key) {
+        try {
+            monthFile.path = root.cacheDir + "/months/" + key + ".json"
+            return CC.parseMonth(monthFile.text())
+        } catch (e) {
+            return null
+        }
     }
 
-    function refreshEvents() {
-        eventsProc.running = false
-        eventsProc.command = ["bash", root.script, "events", root.selectedIso()]
-        eventsProc.running = true
+    function cacheEntry(key) {
+        let ent = root.monthCache[key]
+        if (!ent) {
+            const parsed = root.readDiskMonth(key)
+            if (parsed) {
+                ent = { fetchedAt: parsed.fetchedAt, events: parsed.events }
+                root.monthCache[key] = ent
+            }
+        }
+        return ent || null
+    }
+
+    function loadCalendarsDisk() {
+        try {
+            calFile.path = root.cacheDir + "/calendars.json"
+            root.applyCalendars(calFile.text())
+        } catch (e) {}
+    }
+
+    function applyCalendars(raw) {
+        try {
+            const obj = JSON.parse(String(raw).trim())
+            if (!obj || typeof obj !== "object" || Array.isArray(obj))
+                return
+            const colors = {}
+            const list = []
+            let def = ""
+            for (const id of Object.keys(obj)) {
+                const c = obj[id]
+                if (c.color)
+                    colors[id] = c.color
+                if (c.default && !c.readonly)
+                    def = id
+                list.push({ id: id, label: c.label || id, readOnly: c.readonly === true })
+            }
+            // Writable calendars first; read-only mirrors trail.
+            list.sort((x, y) => Number(x.readOnly) - Number(y.readOnly))
+            if (!def) {
+                const w = list.find(c => !c.readOnly)
+                def = w ? w.id : ""
+            }
+            root.calColors = colors
+            root.calendarList = list
+            root.defaultCalendar = def
+            if (!root.formOpen || !root.draftCalendar)
+                root.draftCalendar = def
+        } catch (e) {}
+    }
+
+    // ---- serial fetch queue (one Process; khal's sqlite is single-writer) ----
+    function fetchMonth(key, urgent) {
+        if (root.curKey === key)
+            return
+        const q = root.fetchQueue.filter(k => k !== key)
+        if (urgent)
+            q.unshift(key)
+        else
+            q.push(key)
+        root.fetchQueue = q
+        root.pumpFetch()
+    }
+
+    function prefetchNeighbors(key) {
+        const nowS = Date.now() / 1000
+        for (const k of CC.neighborMonths(key)) {
+            const ent = root.cacheEntry(k)
+            if (ent && nowS - (ent.fetchedAt || 0) < 60)
+                continue
+            root.fetchMonth(k, false)
+        }
+    }
+
+    function pumpFetch() {
+        if (fetchProc.running)
+            return
+        root.curKey = ""
+        if (root.fetchQueue.length === 0)
+            return
+        const q = root.fetchQueue.slice()
+        const key = q.shift()
+        root.fetchQueue = q
+        root.curKey = key
+        fetchProc.command = ["bash", root.script, "month", key]
+        fetchProc.running = true
+    }
+
+    function fetchFinished(key, text) {
+        const parsed = CC.parseMonth(text)
+        if (parsed)
+            root.monthCache[key] = { fetchedAt: parsed.fetchedAt, events: parsed.events }
+        // Mutations the server has now acknowledged are covered by this fetch.
+        const left = root.pendingMutations.filter(m => !(m.done && m.month === key))
+        if (left.length !== root.pendingMutations.length)
+            root.pendingMutations = left
+        if (key === root.monthKey())
+            root.render()
+        if (key === root.openFlowKey) {
+            root.openFlowKey = ""
+            if (root.open && !syncProc.running)
+                root.syncAndRefresh()
+        }
+    }
+
+    // ---- rendering: patch eventsModel / dots instead of rebuilding ----
+    function flatRow(r) {
+        return {
+            key: CC.eventKey(r),
+            title: r.title || "",
+            startDate: r["start-date"] || "",
+            startTime: r["start-time"] || "",
+            endTime: r["end-time"] || "",
+            location: r.location || "",
+            calendar: r.calendar || "",
+            uid: r.uid || "",
+            pending: !!r.pending
+        }
+    }
+
+    function render() {
+        const key = root.monthKey()
+        const ent = root.cacheEntry(key)
+        root.monthLoaded = !!ent
+        let merged = CC.reconcilePending(ent ? ent.events : [], root.pendingMutations)
+        merged = merged.filter(r => String(r["start-date"]).slice(0, 7) === key)
+
+        const dots = CC.dayDots(merged)
+        if (!CC.dotsEqual(root.eventDays || {}, dots)) {
+            root.eventDays = dots
+            root.eventDaysRev++
+        }
+
+        const rows = CC.eventsForDay(merged, root.selectedIso())
+            .map((r, i) => ({ r: r, i: i }))
+            .sort((a, b) => {
+                const x = a.r["start-time"] || ""
+                const y = b.r["start-time"] || ""
+                return x < y ? -1 : (x > y ? 1 : a.i - b.i)
+            })
+            .map(o => o.r)
+
+        const ops = CC.diffList(root.shownRows, rows)
+        for (const o of ops) {
+            if (o.op === "remove")
+                eventsModel.remove(o.index)
+            else if (o.op === "insert")
+                eventsModel.insert(o.index, root.flatRow(o.item))
+            else if (o.op === "move")
+                eventsModel.move(o.from, o.to, 1)
+            else if (o.op === "set")
+                eventsModel.set(o.index, root.flatRow(o.item))
+        }
+        root.shownRows = rows
     }
 
     function syncAndRefresh() {
         busy = true
-        statusText = "Syncing…"
         syncProc.running = false
         syncProc.running = true
     }
@@ -278,19 +445,38 @@ PanelWindow {
         const cal = draftCalendar || root.defaultCalendar
         const start = draftAllDay ? "allday" : timeStr(draftStartH, draftStartM)
         const end = draftAllDay ? "allday" : timeStr(draftEndH, draftEndM)
-        busy = true
-        statusText = "Saving…"
-        if (formEditing && editUid) {
-            mutProc.command = [
-                "bash", root.script, "edit",
-                editUid, root.selectedIso(), start, end, title, loc, cal
-            ]
-        } else {
-            mutProc.command = [
-                "bash", root.script, "add",
-                root.selectedIso(), start, end, title, loc, cal
-            ]
+        const ev = {
+            "title": title,
+            "start-date": root.selectedIso(),
+            "start-time": draftAllDay ? "" : start,
+            "end-time": draftAllDay ? "" : end,
+            "location": loc,
+            "calendar": cal
         }
+        let cmd
+        let mut
+        if (formEditing && editUid) {
+            ev.uid = editUid
+            mut = { kind: "edit", uid: editUid, event: ev }
+            cmd = ["bash", root.script, "edit", editUid, root.selectedIso(), start, end, title, loc, cal]
+        } else {
+            mut = { kind: "add", event: ev }
+            cmd = ["bash", root.script, "add", root.selectedIso(), start, end, title, loc, cal]
+        }
+        root.startMutation(mut, cmd, "Saving…")
+        root.closeForm()
+    }
+
+    function startMutation(mut, cmd, label) {
+        mut.id = ++root.mutSeq
+        mut.month = root.monthKey()
+        mut.done = false
+        busy = true
+        statusText = label
+        root.pendingMutations = root.pendingMutations.concat([mut])
+        root.curMut = mut
+        root.render()
+        mutProc.command = cmd
         mutProc.running = true
     }
 
@@ -303,10 +489,9 @@ PanelWindow {
     function deleteEvent(uid) {
         if (!uid)
             return
-        busy = true
-        statusText = "Deleting…"
-        mutProc.command = ["bash", root.script, "delete", uid]
-        mutProc.running = true
+        root.startMutation({ kind: "delete", uid: uid },
+                           ["bash", root.script, "delete", uid], "Deleting…")
+        root.closeForm()
     }
 
     function toggle() {
@@ -329,13 +514,16 @@ PanelWindow {
         if (open) {
             closeAnim.stop()
             OverlayHub.closeAll()
+            // Calendars/colors from disk first, then the live call.
+            loadCalendarsDisk()
             refreshColors()
             // Re-anchor on today rather than reusing viewYear/viewMonth: those are
             // initialised once and survive config reloads, so a panel opened after
             // a long uptime (or with a wrong clock at first start) stays parked on
             // a stale month forever. Also refreshes markers before the sync lands.
             goToday()
-            syncAndRefresh()
+            // Network sync starts once the visible month's fetch has landed.
+            openFlowKey = monthKey()
             watchProc.running = true
             openAnim.play()
             Qt.callLater(() => panel.forceActiveFocus())
@@ -350,7 +538,7 @@ PanelWindow {
 
     onSelectedDayChanged: {
         if (open && !formOpen)
-            refreshEvents()
+            render()
     }
 
     // Stay visible through the close animation so it doesn't vanish mid-fade.
@@ -519,12 +707,12 @@ PanelWindow {
                             Layout.preferredHeight: 28
                             radius: 14
                             color: hdrBtn.hovered ? DS.Tokens.raised : "transparent"
-                            opacity: hdrBtn.modelData.action === "sync" && root.busy ? 0.4 : 1
                             Behavior on color {
                                 ColorAnimation { duration: DS.Tokens.stateMs; easing.type: Easing.OutCubic }
                             }
 
                             DS.QuietText {
+                                id: glyph
                                 anchors.centerIn: parent
                                 visible: hdrBtn.modelData.action !== "close"
                                 text: hdrBtn.modelData.glyph
@@ -600,15 +788,7 @@ PanelWindow {
                         readonly property bool isPad: modelData.day <= 0
                         readonly property bool selected: !isPad && modelData.day === root.selectedDay
                         readonly property bool hovered: !isPad && dayMouse.containsMouse
-                        readonly property var cals: {
-                            if (cell.isPad)
-                                return []
-                            // Prefer baked-in model data; fall back to live map.
-                            const baked = modelData.cals
-                            if (Array.isArray(baked) && baked.length)
-                                return baked
-                            return root.dayCals(modelData.day)
-                        }
+                        readonly property var cals: cell.isPad ? [] : root.dayCals(modelData.day)
 
                         Rectangle {
                             anchors.horizontalCenter: parent.horizontalCenter
@@ -662,6 +842,11 @@ PanelWindow {
                                     height: 5
                                     radius: height / 2
                                     color: root.calAccent(String(modelData))
+                                    opacity: 0
+                                    Behavior on opacity {
+                                        NumberAnimation { duration: 160; easing.type: Easing.OutCubic }
+                                    }
+                                    Component.onCompleted: opacity = 1
                                 }
                             }
                         }
@@ -675,7 +860,7 @@ PanelWindow {
                             onClicked: {
                                 root.selectedDay = cell.modelData.day
                                 root.closeForm()
-                                root.refreshEvents()
+                                root.render()
                             }
                         }
                     }
@@ -1091,22 +1276,58 @@ PanelWindow {
                 Layout.fillHeight: true
                 clip: true
                 spacing: 8
-                model: root.events
+                model: eventsModel
 
-                delegate: Rectangle {
+                add: Transition {
+                    NumberAnimation { property: "opacity"; from: 0; to: 1; duration: 180; easing.type: Easing.OutCubic }
+                }
+                remove: Transition {
+                    NumberAnimation { property: "opacity"; to: 0; duration: 180; easing.type: Easing.OutCubic }
+                }
+                displaced: Transition {
+                    NumberAnimation { property: "y"; duration: 180; easing.type: Easing.OutCubic }
+                }
+
+                delegate: Item {
+                    id: row
+                    required property string key
+                    required property string title
+                    required property string startDate
+                    required property string startTime
+                    required property string endTime
+                    required property string location
+                    required property string calendar
+                    required property string uid
+                    required property bool pending
+                    // Original hyphenated shape for the helpers.
+                    readonly property var rowObj: ({
+                        "uid": row.uid,
+                        "title": row.title,
+                        "start-date": row.startDate,
+                        "start-time": row.startTime,
+                        "end-time": row.endTime,
+                        "location": row.location,
+                        "calendar": row.calendar
+                    })
+                    width: ListView.view ? ListView.view.width : 0
+                    height: ev.height
+
+                    Rectangle {
                     id: ev
-                    required property var modelData
-                    readonly property bool past: root.isEventPast(modelData)
+                    readonly property bool past: root.isEventPast(row.rowObj)
                     readonly property bool hovered: evMouse.containsMouse
-                    width: ListView.view.width
+                    width: parent.width
                     height: Math.max(evCol.implicitHeight + 14, 44)
                     radius: DS.Tokens.innerRadius(DS.Tokens.radiusSurface, DS.Tokens.paddingSurface)
-                    color: ev.hovered ? DS.Tokens.raised : "transparent"
-                    border.width: ev.hovered ? 1 : 0
+                    color: ev.hovered && !row.pending ? DS.Tokens.raised : "transparent"
+                    border.width: ev.hovered && !row.pending ? 1 : 0
                     border.color: DS.Tokens.raisedRim
-                    opacity: past ? 0.42 : 1.0
+                    opacity: row.pending ? 0.6 : (past ? 0.42 : 1.0)
                     Behavior on color {
                         ColorAnimation { duration: DS.Tokens.stateMs; easing.type: Easing.OutCubic }
+                    }
+                    Behavior on opacity {
+                        NumberAnimation { duration: DS.Tokens.stateMs; easing.type: Easing.OutCubic }
                     }
 
                     Rectangle {
@@ -1116,7 +1337,7 @@ PanelWindow {
                         anchors.margins: 8
                         width: 3
                         radius: 1.5
-                        color: root.calAccent(ev.modelData.calendar || "")
+                        color: root.calAccent(row.calendar)
                         opacity: ev.past ? 0.55 : 1.0
                     }
 
@@ -1134,7 +1355,7 @@ PanelWindow {
                             Layout.fillWidth: true
 
                             DS.QuietText {
-                                text: ev.modelData.title || "Event"
+                                text: row.title || "Event"
                                 color: DS.Tokens.textPrimary
                                 font.family: DS.Tokens.fontUi
                                 font.pixelSize: DS.Tokens.fontSize
@@ -1145,8 +1366,8 @@ PanelWindow {
 
                             DS.QuietText {
                                 text: {
-                                    const s = ev.modelData["start-time"] || ""
-                                    const e = ev.modelData["end-time"] || ""
+                                    const s = row.startTime
+                                    const e = row.endTime
                                     if (!s && !e)
                                         return "all-day"
                                     if (s && e)
@@ -1161,7 +1382,7 @@ PanelWindow {
                         }
 
                         RowLayout {
-                            visible: !!(ev.modelData.location && ev.modelData.location.length)
+                            visible: !!row.location
                             Layout.fillWidth: true
                             spacing: 4
                             opacity: ev.past ? 0.85 : 1.0
@@ -1176,7 +1397,7 @@ PanelWindow {
                             }
 
                             DS.QuietText {
-                                text: ev.modelData.location || ""
+                                text: row.location
                                 color: DS.Tokens.textSecondary
                                 font.family: DS.Tokens.fontUi
                                 font.pixelSize: DS.Tokens.fontSizeSm
@@ -1193,7 +1414,7 @@ PanelWindow {
                         implicitSize: 14
                         width: 14
                         height: 14
-                        visible: !root.isReadOnlyCal(ev.modelData.calendar)
+                        visible: !root.isReadOnlyCal(row.calendar)
                         anchors.right: parent.right
                         anchors.rightMargin: 10
                         anchors.verticalCenter: parent.verticalCenter
@@ -1212,8 +1433,8 @@ PanelWindow {
                             anchors.margins: -8
                             hoverEnabled: true
                             cursorShape: Qt.PointingHandCursor
-                            enabled: !root.busy && trashBtn.visible
-                            onClicked: root.deleteEvent(ev.modelData.uid || "")
+                            enabled: !root.busy && trashBtn.visible && !row.pending
+                            onClicked: root.deleteEvent(row.uid)
                         }
                     }
 
@@ -1222,14 +1443,16 @@ PanelWindow {
                         anchors.fill: parent
                         anchors.rightMargin: 36
                         hoverEnabled: true
+                        enabled: !row.pending
                         cursorShape: Qt.PointingHandCursor
-                        onClicked: root.openEdit(ev.modelData)
+                        onClicked: root.openEdit(row.rowObj)
+                    }
                     }
                 }
 
                 DS.QuietText {
                     anchors.centerIn: parent
-                    visible: root.events.length === 0 && !root.busy
+                    visible: root.monthLoaded && eventsModel.count === 0
                     text: "No events"
                     color: DS.Tokens.textSecondary
                     font.family: DS.Tokens.fontUi
@@ -1249,75 +1472,41 @@ PanelWindow {
         }
     }
 
+    ListModel { id: eventsModel }
+
+    // Blocking readers: first frame after opening already has data.
+    FileView {
+        id: monthFile
+        blockLoading: true
+        printErrors: false
+    }
+
+    FileView {
+        id: calFile
+        blockLoading: true
+        printErrors: false
+    }
+
     Process {
         id: colorsProc
         command: ["bash", root.script, "calendars"]
         stdout: StdioCollector {
-            onStreamFinished: {
-                try {
-                    const obj = JSON.parse(text.trim())
-                    if (!obj || typeof obj !== "object" || Array.isArray(obj))
-                        return
-                    const colors = {}
-                    const list = []
-                    let def = ""
-                    for (const id of Object.keys(obj)) {
-                        const c = obj[id]
-                        if (c.color)
-                            colors[id] = c.color
-                        if (c.default && !c.readonly)
-                            def = id
-                        list.push({ id: id, label: c.label || id, readOnly: c.readonly === true })
-                    }
-                    // Writable calendars first; read-only mirrors trail.
-                    list.sort((x, y) => Number(x.readOnly) - Number(y.readOnly))
-                    if (!def) {
-                        const w = list.find(c => !c.readOnly)
-                        def = w ? w.id : ""
-                    }
-                    root.calColors = colors
-                    root.calendarList = list
-                    root.defaultCalendar = def
-                    if (!root.formOpen || !root.draftCalendar)
-                        root.draftCalendar = def
-                } catch (e) {}
-            }
+            onStreamFinished: root.applyCalendars(text)
         }
     }
 
     Process {
-        id: daysProc
+        id: fetchProc
         stdout: StdioCollector {
             onStreamFinished: {
-                try {
-                    const raw = text.trim()
-                    // Tolerate any noise before/after the JSON object.
-                    const start = raw.indexOf("{")
-                    const end = raw.lastIndexOf("}")
-                    const slice = (start >= 0 && end > start) ? raw.slice(start, end + 1) : "{}"
-                    const obj = JSON.parse(slice)
-                    root.eventDays = obj && typeof obj === "object" ? obj : {}
-                } catch (e) {
-                    root.eventDays = {}
-                }
-                root.eventDaysRev++
+                const key = root.curKey
+                root.curKey = ""
+                if (key)
+                    root.fetchFinished(key, text)
+                Qt.callLater(root.pumpFetch)
             }
         }
-    }
-
-    Process {
-        id: eventsProc
-        stdout: StdioCollector {
-            onStreamFinished: {
-                const rows = []
-                text.trim().split("\n").forEach(line => {
-                    if (!line)
-                        return
-                    try { rows.push(JSON.parse(line)) } catch (e) {}
-                })
-                root.events = rows
-            }
-        }
+        onRunningChanged: if (!running) Qt.callLater(root.pumpFetch)
     }
 
     Process {
@@ -1328,7 +1517,7 @@ PanelWindow {
                 root.statusText = ""
                 // The sync may have discovered/removed calendars.
                 root.refreshColors()
-                root.refreshMonth()
+                root.fetchMonth(root.monthKey(), true)
             }
         }
         onRunningChanged: if (!running) root.busy = false
@@ -1339,13 +1528,25 @@ PanelWindow {
         stdout: StdioCollector {
             onStreamFinished: {
                 const ok = text.trim().indexOf("ok") >= 0
+                const m = root.curMut
+                root.curMut = null
                 if (ok) {
-                    root.closeForm()
                     root.statusText = "Synced"
-                    root.refreshMonth()
+                    if (m) {
+                        // Keep the optimistic row until the refetch lands, so it
+                        // doesn't blink out and back in.
+                        m.done = true
+                        root.fetchMonth(m.month, true)
+                        const em = m.event ? String(m.event["start-date"]).slice(0, 7) : ""
+                        if (em && em !== m.month)
+                            root.fetchMonth(em, false)
+                    }
                     statusClear.start()
                 } else {
                     root.statusText = "Failed"
+                    if (m)
+                        root.pendingMutations = root.pendingMutations.filter(x => x.id !== m.id)
+                    root.render()
                 }
             }
         }
@@ -1360,7 +1561,7 @@ PanelWindow {
             onRead: chunk => {
                 if (String(chunk).indexOf("changed") >= 0) {
                     root.refreshColors()
-                    root.refreshMonth()
+                    root.fetchMonth(root.monthKey(), true)
                 }
             }
         }

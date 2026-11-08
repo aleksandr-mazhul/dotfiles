@@ -28,9 +28,10 @@ GAMP_DIR="gamp"
 # Use khal's uv env so icalendar is available for edit/delete.
 PY="${HOME}/.local/share/uv/tools/khal/bin/python"
 [[ -x "$PY" ]] || PY="python3"
+CACHE_DIR="${QS_CAL_CACHE:-${XDG_CACHE_HOME:-${HOME}/.cache}/qs-calendar}"
 
 usage() {
-  echo "usage: $0 days|events|colors|add|edit|delete|sync|calendars|watch ..." >&2
+  echo "usage: $0 days|events|month|colors|add|edit|delete|sync|calendars|watch ..." >&2
   exit 2
 }
 
@@ -112,17 +113,15 @@ sync_now() {
   return "$rc"
 }
 
-# khal keeps a sqlite cache that can lag behind direct .ics edits
-invalidate_khal() {
-  rm -f "${HOME}/.local/share/khal/khal.db" \
-        "${HOME}/.cache/khal/khal.db" 2>/dev/null || true
-}
-
 # Every calendar khal knows (iCloud is `type = discover`, so new Apple calendars
 # appear here on their own) as JSON:
 #   {"Домашний": {"path": ..., "color": "#34AADC", "readonly": false, "label": ..., "default": true}}
 # Color: vdir `color` file (Apple/Google metadata) > khal config > fallback.
 calmap() {
+  if [[ -n "${QS_CAL_CALMAP_JSON:-}" ]]; then
+    printf '%s\n' "$QS_CAL_CALMAP_JSON"
+    return 0
+  fi
   "$PY" - <<'PY' 2>/dev/null
 import json
 from pathlib import Path
@@ -221,16 +220,67 @@ else:
     print(json.dumps(dict(days), ensure_ascii=False))
 '
 
+# write_atomic FILE CONTENT: replace FILE only when its bytes would change.
+write_atomic() {
+  local file="$1" content="$2"
+  mkdir -p "$(dirname "$file")"
+  if [[ -f "$file" && "$(cat "$file")" == "$content" ]]; then
+    return 0
+  fi
+  printf '%s\n' "$content" > "${file}.tmp.$$"
+  mv -f "${file}.tmp.$$" "$file"
+}
+
+# write_month YYYY-MM: refresh ${CACHE_DIR}/months/YYYY-MM.json from khal and
+# print the object. The file is left untouched when the events are unchanged.
+write_month() {
+  local month="$1" start end file events
+  start="${month}-01"
+  end="$(date -d "${start} +1 month -1 day" +%Y-%m-%d)"
+  file="${CACHE_DIR}/months/${month}.json"
+  mkdir -p "${CACHE_DIR}/months"
+  events="$("$KHAL" list "$start" "$end" \
+    --json title --json start-date --json start-time --json end-time \
+    --json location --json calendar --json uid 2>/dev/null \
+    | CALMAP="$(calmap)" "$PY" -c "$KHAL_EVENTS_PY" events)" || return 1
+  MONTH="$month" FILE="$file" EVENTS="$events" "$PY" -c '
+import json, os, time
+rows = [json.loads(l) for l in os.environ["EVENTS"].splitlines() if l.strip()]
+dump = lambda o: json.dumps(o, ensure_ascii=False, separators=(",", ":"))
+path = os.environ["FILE"]
+try:
+    old = open(path, encoding="utf-8").read()
+    if dump(json.loads(old)["events"]) == dump(rows):
+        print(old.strip())
+        raise SystemExit(0)
+except (OSError, ValueError, KeyError, TypeError):
+    pass
+text = dump({"month": os.environ["MONTH"], "fetchedAt": int(time.time()), "events": rows})
+tmp = f"{path}.tmp.{os.getpid()}"
+with open(tmp, "w", encoding="utf-8") as f:
+    f.write(text + "\n")
+os.replace(tmp, path)
+print(text)
+'
+}
+
 case "$cmd" in
   sync)
     FORCE_DISCOVER=1 sync_now
-    invalidate_khal
+    cur="$(date +%Y-%m)"
+    for m in "$(date -d "${cur}-01 -1 month" +%Y-%m)" "$cur" \
+             "$(date -d "${cur}-01 +1 month" +%Y-%m)"; do
+      write_month "$m" >/dev/null || true
+    done
+    write_atomic "${CACHE_DIR}/calendars.json" "$(calmap)" || true
     echo ok
     ;;
 
   calendars)
     # JSON: {"Домашний": {"path":..., "color":"#34AADC", "readonly":false, "label":"Домашний"}, ...}
-    calmap
+    cals="$(calmap)"
+    [[ -z "$cals" ]] || write_atomic "${CACHE_DIR}/calendars.json" "$cals"
+    printf '%s\n' "$cals"
     ;;
 
   colors)
@@ -248,6 +298,12 @@ print(json.dumps({k: v["color"] for k, v in json.load(sys.stdin).items() if v["c
     "$KHAL" list "$start" "$end" \
       --json start-date --json start-time --json uid --json calendar 2>/dev/null \
       | CALMAP="$(calmap)" "$PY" -c "$KHAL_EVENTS_PY" days
+    ;;
+
+  month)
+    month="${1:-}"
+    [[ "$month" =~ ^[0-9]{4}-(0[1-9]|1[0-2])$ ]] || usage
+    write_month "$month"
     ;;
 
   events)
@@ -280,7 +336,6 @@ print(json.dumps({k: v["color"] for k, v in json.load(sys.stdin).items() if v["c
     fi
     [[ -n "$loc" ]] && args+=(-l "$loc")
     "${args[@]}" >/dev/null
-    invalidate_khal
     sync_now
     echo ok
     ;;
@@ -382,7 +437,6 @@ else:
     src.write_bytes(data)
 print("ok")
 PY
-    invalidate_khal
     sync_now
     echo ok
     ;;
@@ -418,7 +472,6 @@ if any(r in src.parents for r in readonly_roots):
 src.unlink()
 print("ok")
 PY
-    invalidate_khal
     sync_now
     echo ok
     ;;
@@ -432,8 +485,7 @@ PY
       sync_now || true
       after="$(find "$CAL_ROOT" "$CAL_ROOT_GMAP" "$CAL_ROOT_GAPM" "$CAL_ROOT_GAMP" \( -name '*.ics' -o -name color -o -name displayname \) -printf '%T@ %p\n' 2>/dev/null | md5sum | awk '{print $1}')"
       if [[ "$before" != "$after" ]]; then
-        invalidate_khal
-        echo changed
+            echo changed
       fi
       sleep "$interval"
     done
