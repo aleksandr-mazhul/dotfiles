@@ -58,6 +58,9 @@ dirs = [
     Path("/usr/local/share/applications"),
     Path("/usr/share/applications"),
 ]
+for extra in os.environ.get("XDG_DATA_DIRS", "").split(":"):
+    if extra:
+        dirs.append(Path(extra) / "applications")
 
 def parse(path: Path):
     data = {}
@@ -107,8 +110,9 @@ if [[ -n "${desktop:-}" ]]; then
   if command -v gtk-launch >/dev/null; then
     id="$(basename "$desktop" .desktop)"
     exec gtk-launch "$id"
+  elif command -v gio >/dev/null; then
+    exec gio launch "$desktop"
   fi
-  exec gio launch "$desktop"
 fi
 
 # Last resort: re-exec the focused process binary (no args).
