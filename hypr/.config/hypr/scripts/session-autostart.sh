@@ -21,7 +21,7 @@ LOG="${STATE_DIR}/session-autostart.log"
 launch_cmd() {
   local id="$1"
   case "$id" in
-    kitty) printf '%s\n' /usr/bin/kitty ;;
+    kitty) printf '%s\n' kitty ;;
     zen) printf '%s\n' zen-browser ;;
     firefox) printf '%s\n' firefox ;;
     yandex) printf '%s\n' "$HOME/.local/bin/yandex-browser-stable" ;;

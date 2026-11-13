@@ -16,4 +16,4 @@ export QT_QPA_PLATFORM=xcb
 export QT_AUTO_SCREEN_SCALE_FACTOR=0
 export QT_SCALE_FACTOR="${ZOOM_QT_SCALE:-1.25}"
 unset QT_WAYLAND_SHELL_INTEGRATION
-exec /usr/bin/zoom "$@"
+exec zoom "$@"

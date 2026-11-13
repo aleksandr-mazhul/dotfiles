@@ -1,6 +1,17 @@
 { config, lib, pkgs, ... }:
 let
   mapped = import ./package-map.nix { inherit lib pkgs; };
+  sddmAdaptive = pkgs.runCommand "sddm-adaptive-theme" { } ''
+    mkdir -p "$out/share/sddm/themes/adaptive"
+    cp -a ${../sddm/themes/adaptive}/. "$out/share/sddm/themes/adaptive/"
+  '';
+  # Arch renamed swww to awww. The rice still execs swww / swww-daemon
+  # (bootstrap.sh only symlinks those on the Arch install).
+  swwwCompat = pkgs.runCommand "swww-compat" { } ''
+    mkdir -p "$out/bin"
+    ln -s ${pkgs.awww}/bin/awww "$out/bin/swww"
+    ln -s ${pkgs.awww}/bin/awww-daemon "$out/bin/swww-daemon"
+  '';
 in
 {
   networking.hostName = "stranger";
@@ -24,6 +35,7 @@ in
 
   hardware.i2c.enable = true;
   hardware.bluetooth.enable = true;
+  hardware.uinput.enable = true;
 
   programs.hyprland.enable = true;
   programs.hyprland.withUWSM = true;
@@ -31,6 +43,11 @@ in
 
   services.displayManager.sddm.enable = true;
   services.displayManager.sddm.wayland.enable = true;
+  services.displayManager.sddm.theme = "${sddmAdaptive}/share/sddm/themes/adaptive";
+  services.displayManager.sddm.settings.Theme = {
+    CursorTheme = "Adwaita";
+    Font = "Adwaita Sans";
+  };
   services.displayManager.defaultSession = "hyprland-uwsm";
 
   security.rtkit.enable = true;
@@ -46,11 +63,12 @@ in
   services.printing.enable = true;
   virtualisation.docker.enable = true;
   services.openssh.enable = true;
+  services.openssh.settings.PasswordAuthentication = false;
   zramSwap.enable = true;
 
   users.users.stranger = {
     isNormalUser = true;
-    extraGroups = [ "wheel" "input" "i2c" "video" "docker" "networkmanager" ];
+    extraGroups = [ "wheel" "input" "i2c" "video" "docker" "networkmanager" "uinput" ];
     shell = pkgs.fish;
     openssh.authorizedKeys.keys = [
       "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIBFscRM67/+flMNYhje5HXSGbNdiQ3m5bKA4vvEc2fm9 map07102007@gmail.com"
@@ -59,7 +77,13 @@ in
 
   environment.systemPackages = mapped.packages ++ [
     (pkgs.tesseract.override { enableLanguages = [ "eng" "rus" ]; })
+    pkgs.python3
+    sddmAdaptive
+    swwwCompat
   ];
+  # The default profile does not link /share/sddm, so the greeter theme would
+  # stay invisible outside the SDDM unit.
+  environment.pathsToLink = [ "/share/sddm" ];
 
   fonts.packages = with pkgs; [
     dejavu_fonts

@@ -1,8 +1,9 @@
-# Kingston SNV2S500G only. This is the Windows nvme. It is not imported by the
-# test VM. Do not point nixos-anywhere at the running Arch system: that kexecs
-# this machine and formats the disk named here.
+# Default device is the Kingston SNV2S500G (the Windows nvme), named "main" so
+# a new machine can override it: install-machine /dev/disk/by-id/...
+# This module is not imported by the test VM. Do not point it at the running
+# Arch disk. install-machine refuses to format the disk that holds /.
 {
-  disko.devices.disk.nvme = {
+  disko.devices.disk.main = {
     type = "disk";
     device = "/dev/disk/by-id/nvme-KINGSTON_SNV2S500G_50026B76866AEA46";
     content = {
