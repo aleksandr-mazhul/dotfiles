@@ -1,0 +1,6 @@
+postgres:17
+postgres:16.15
+mcr.microsoft.com/mssql/server:2022-latest
+adminer:latest
+hello-world:latest
+mcp/git:latest

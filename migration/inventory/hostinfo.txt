@@ -1,0 +1,8 @@
+7.2.11-arch1-1
+stranger
+Timezone=Europe/Minsk
+System Locale: LANG=en_US.UTF-8
+    VC Keymap: us
+   X11 Layout: us
+    X11 Model: pc105+inet
+  X11 Options: terminate:ctrl_alt_bksp

@@ -1,0 +1,1 @@
+uid=1000(stranger) gid=1000(stranger) groups=1000(stranger),947(libvirt),957(i2c),961(docker),983(video),987(render),992(input),998(wheel)

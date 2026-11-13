@@ -1,0 +1,13 @@
+ansible-language-server
+ansible-lint
+clangd
+clang-format
+clang-format-diff.py
+cmakelint
+codelldb
+git-clang-format
+lua-language-server
+shfmt
+stylua
+tree-sitter
+yaml-language-server

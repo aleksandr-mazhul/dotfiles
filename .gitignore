@@ -32,3 +32,6 @@ obs/.config/obs-studio/profiler_data/
 
 # fish rewrites this (universal vars); per-machine state
 fish/.config/fish/fish_variables
+
+# OBS plugins installed by packages (droidcam-obs) - binaries, reinstall via package
+obs/.config/obs-studio/plugins/

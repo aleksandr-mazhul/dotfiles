@@ -1,0 +1,9 @@
+aider-chat v0.86.2
+- aider
+khal v0.14.0
+- ikhal
+- khal
+vdirsyncer v0.20.0
+- vdirsyncer
+waypaper v2.8
+- waypaper

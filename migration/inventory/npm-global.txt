@@ -1,0 +1,3 @@
+/home/stranger/.npm-global/lib
+/home/stranger/.npm-global/lib/node_modules/@anthropic-ai/claude-code
+/home/stranger/.npm-global/lib/node_modules/@openai/codex

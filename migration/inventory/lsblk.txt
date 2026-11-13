@@ -1,0 +1,15 @@
+NAME          SIZE TYPE FSTYPE  LABEL                      MODEL               MOUNTPOINTS
+sda         476.9G disk                                    KINGSTON SKC600512G 
+├─sda1          1G part vfat                                                   /boot
+├─sda2         47G part ext4                                                   /
+└─sda3      428.9G part ext4                                                   /home
+sdb         230.9G disk iso9660 nixos-minimal-26.11-x86_64 DataTraveler 3.0    
+├─sdb1        1.6G part iso9660 nixos-minimal-26.11-x86_64                     
+├─sdb2          3M part vfat    EFIBOOT                                        
+└─sdb3      229.3G part ext4    MIGRATION                                      
+zram0         7.7G disk swap    zram0                                          [SWAP]
+nvme0n1     465.8G disk                                    KINGSTON SNV2S500G  
+├─nvme0n1p1   100M part vfat                                                   
+├─nvme0n1p2    16M part                                                        
+├─nvme0n1p3 464.9G part ntfs                                                   
+└─nvme0n1p4   747M part ntfs                                                   

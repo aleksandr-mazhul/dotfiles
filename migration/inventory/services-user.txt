@@ -1,0 +1,16 @@
+vscode-cursor-sync.path       enabled enabled
+hid-kbd-swallow.service       enabled enabled
+hyprpolkitagent.service       enabled enabled
+kanata.service                enabled enabled
+tailscaled.service            enabled enabled
+tmux-save.service             enabled enabled
+windscribe.service            enabled enabled
+wireplumber.service           enabled enabled
+xdg-user-dirs.service         enabled enabled
+gnome-keyring-daemon.socket   enabled enabled
+p11-kit-server.socket         enabled enabled
+pipewire-pulse.socket         enabled enabled
+pipewire.socket               enabled enabled
+cursor-update.timer           enabled enabled
+icloud-calendar-sync.timer    enabled enabled
+vscode-cursor-sync-idle.timer enabled enabled
