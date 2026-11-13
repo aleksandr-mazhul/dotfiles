@@ -14,6 +14,13 @@ let
     ln -s ${pkgs.awww}/bin/awww "$out/bin/swww"
     ln -s ${pkgs.awww}/bin/awww-daemon "$out/bin/swww-daemon"
   '';
+  # Unwrapped openrgb only scans OPENRGB_SYSTEM_PLUGIN_DIRECTORY, which
+  # withPlugins sets. Bare plugin packages on the profile are invisible.
+  openrgbWithPlugins = pkgs.openrgb.withPlugins [
+    pkgs.openrgb-plugin-effects
+    clients.openrgbHardwareSync
+    clients.openrgbVisualMap
+  ];
 in
 {
   networking.hostName = "stranger";
@@ -90,6 +97,7 @@ in
     themes.appleHyprcursor
     clients.zen
     clients.hyprliquid
+    openrgbWithPlugins
   ];
   # The default profile does not link /share/sddm, so the greeter theme would
   # stay invisible outside the SDDM unit.

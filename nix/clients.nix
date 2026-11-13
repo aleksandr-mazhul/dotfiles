@@ -79,6 +79,61 @@
     ] ++ pkgs.hyprland.buildInputs;
   };
 
+  # Same shape as nixpkgs openrgb-plugin-effects: qmake plugin, .so in
+  # lib/openrgb/plugins. Public release_1.0 tags.
+  openrgbHardwareSync = pkgs.stdenv.mkDerivation (finalAttrs: {
+    pname = "openrgb-plugin-hardware-sync";
+    version = "1.0";
+    src = pkgs.fetchFromGitLab {
+      owner = "OpenRGBDevelopers";
+      repo = "OpenRGBHardwareSyncPlugin";
+      tag = "release_${finalAttrs.version}";
+      hash = "sha256-aqcx3E3t7WEvOPtS7nfvn9jUURE5MhRcL6+HrkZIY6o=";
+      fetchSubmodules = true;
+    };
+    qmakeFlags = [
+      "CONFIG+=link_pkgconfig"
+      "QT_TOOL.lrelease.binary=${pkgs.lib.getDev pkgs.qt6Packages.qttools}/bin/lrelease"
+    ];
+    nativeBuildInputs = [
+      pkgs.pkg-config
+      pkgs.qt6Packages.wrapQtAppsHook
+      pkgs.qt6Packages.qmake
+    ];
+    buildInputs = [
+      pkgs.qt6Packages.qtbase
+      pkgs.qt6Packages.qt5compat
+      pkgs.glib
+      pkgs.libgtop
+      pkgs.lm_sensors
+    ];
+  });
+
+  openrgbVisualMap = pkgs.stdenv.mkDerivation (finalAttrs: {
+    pname = "openrgb-plugin-visual-map";
+    version = "1.0";
+    src = pkgs.fetchFromGitLab {
+      owner = "OpenRGBDevelopers";
+      repo = "OpenRGBVisualMapPlugin";
+      tag = "release_${finalAttrs.version}";
+      hash = "sha256-3gkshCvoOfneLO8IlXRGAxie+r6BYH+Tmrz6A5vkZgo=";
+      fetchSubmodules = true;
+    };
+    qmakeFlags = [
+      "CONFIG+=link_pkgconfig"
+      "QT_TOOL.lrelease.binary=${pkgs.lib.getDev pkgs.qt6Packages.qttools}/bin/lrelease"
+    ];
+    nativeBuildInputs = [
+      pkgs.pkg-config
+      pkgs.qt6Packages.wrapQtAppsHook
+      pkgs.qt6Packages.qmake
+    ];
+    buildInputs = [
+      pkgs.qt6Packages.qtbase
+      pkgs.qt6Packages.qt5compat
+    ];
+  });
+
   atkinsonMonoNerd = pkgs.runCommand "atkinson-hyperlegible-mono-nerd-3.5.1" {
     src = pkgs.fetchurl {
       url = "https://github.com/ryanoasis/nerd-fonts/releases/download/v3.5.1/AtkinsonHyperlegibleMono.tar.xz";
