@@ -222,8 +222,8 @@ let
     wl-clipboard = "wl-clipboard";
 
     # --- AUR ---
-    apple_cursor = "gap:no nixpkgs package";
-    apple_hyprcursor = "gap:no nixpkgs package";
+    apple_cursor = "module:nix/themes.nix appleCursor (ful1e5/apple_cursor)";
+    apple_hyprcursor = "module:nix/themes.nix appleHyprcursor (6ooker/apple_hyprcursor)";
     cbonsai = "cbonsai";
     claude-desktop = "gap:unpackaged desktop client";
     devin-desktop = "gap:unpackaged desktop client";

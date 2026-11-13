@@ -65,6 +65,11 @@ pkgs.testers.runNixOSTest {
     machine.succeed("test -f /home/stranger/.config/herdr/config.toml")
     machine.succeed("fc-list : family | grep -q 'Adwaita Sans'")
     machine.succeed("test -d /run/current-system/sw/share/icons/Papirus-Dark")
+    machine.succeed("test -f /run/current-system/sw/share/themes/Graphite-Dark/gtk-3.0/gtk.css")
+    machine.succeed("test -f /run/current-system/sw/share/themes/Graphite-Dark/gtk-4.0/gtk.css")
+    machine.succeed("grep -q '^Name=macOS$' /run/current-system/sw/share/icons/macOS/index.theme")
+    machine.succeed("test -d /run/current-system/sw/share/icons/macOS/cursors")
+    machine.succeed("test -f /run/current-system/sw/share/icons/macOS-hypr/manifest.hl")
     # Nix's binary wrapper execs .Hyprland-wrapped, so the comm is
     # ".Hyprland-wrap", not the exact name "Hyprland".
     machine.wait_until_succeeds("pgrep -u stranger Hyprland", timeout=180)
