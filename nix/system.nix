@@ -73,6 +73,9 @@ in
     pkgs.python3
     sddmAdaptive
   ];
+  # The default profile does not link /share/sddm, so the greeter theme would
+  # stay invisible outside the SDDM unit.
+  environment.pathsToLink = [ "/share/sddm" ];
 
   fonts.packages = with pkgs; [
     dejavu_fonts
