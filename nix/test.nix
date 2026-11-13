@@ -70,6 +70,14 @@ pkgs.testers.runNixOSTest {
     machine.succeed("grep -q '^Name=macOS$' /run/current-system/sw/share/icons/macOS/index.theme")
     machine.succeed("test -d /run/current-system/sw/share/icons/macOS/cursors")
     machine.succeed("test -f /run/current-system/sw/share/icons/macOS-hypr/manifest.hl")
+    machine.succeed("command -v codex")
+    machine.succeed("command -v opencode")
+    machine.succeed("command -v qwen")
+    machine.succeed("command -v devin-desktop")
+    machine.succeed("command -v jetbrains-toolbox")
+    machine.succeed("command -v spicetify")
+    machine.succeed("command -v voxtype")
+    machine.succeed("test -f /run/current-system/sw/lib/openrgb/plugins/libOpenRGBEffectsPlugin.so")
     # Nix's binary wrapper execs .Hyprland-wrapped, so the comm is
     # ".Hyprland-wrap", not the exact name "Hyprland".
     machine.wait_until_succeeds("pgrep -u stranger Hyprland", timeout=180)
