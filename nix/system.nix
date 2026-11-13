@@ -68,10 +68,19 @@ in
     ];
   };
 
+  # Arch renamed swww to awww. The rice still execs swww / swww-daemon
+  # (bootstrap.sh only symlinks those on the Arch install).
+  swwwCompat = pkgs.runCommand "swww-compat" { } ''
+    mkdir -p "$out/bin"
+    ln -s ${pkgs.awww}/bin/awww "$out/bin/swww"
+    ln -s ${pkgs.awww}/bin/awww-daemon "$out/bin/swww-daemon"
+  '';
+
   environment.systemPackages = mapped.packages ++ [
     (pkgs.tesseract.override { enableLanguages = [ "eng" "rus" ]; })
     pkgs.python3
     sddmAdaptive
+    swwwCompat
   ];
   # The default profile does not link /share/sddm, so the greeter theme would
   # stay invisible outside the SDDM unit.

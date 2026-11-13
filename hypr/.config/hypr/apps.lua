@@ -97,7 +97,7 @@ M.catalog = {
         class_re = "^kitty$",
         workspace = 7,
         classes = { "kitty" },
-        cmd = "/usr/bin/kitty",
+        cmd = "kitty",
     },
     {
         id = "nautilus",
