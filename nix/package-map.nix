@@ -105,7 +105,7 @@ let
     mpv = "mpv";
     nano = "nano";
     nautilus = "nautilus";
-    nautilus-image-converter = "nautilus-image-converter";
+    nautilus-image-converter = "gap:removed from nixpkgs; Nautilus resize/rotate extension is gone";
     neovim = "neovim";
     networkmanager = "module:networking.networkmanager";
     network-manager-applet = "networkmanagerapplet";
@@ -168,7 +168,7 @@ let
     tesseract = "module:overridden in system.nix with eng and rus";
     tesseract-data-eng = "module:overridden in system.nix with eng and rus";
     tesseract-data-rus = "module:overridden in system.nix with eng and rus";
-    thunar = "xfce.thunar";
+    thunar = "thunar";
     thunderbird = "thunderbird";
     tmux = "tmux";
     toilet = "toilet";
@@ -195,8 +195,8 @@ let
     xdg-desktop-portal-hyprland = "module:programs.hyprland";
     xdg-utils = "xdg-utils";
     xh = "xh";
-    xorg-server = "xorg.xorgserver";
-    xorg-xinit = "xorg.xinit";
+    xorg-server = "xorg-server";
+    xorg-xinit = "xinit";
     yazi = "yazi";
     zellij = "zellij";
     zip = "zip";
@@ -248,7 +248,7 @@ let
     windscribe-cli-v2-bin = "gap:unpackaged VPN client";
     yandex-browser = "gap:unpackaged";
     yay = "gap:AUR helper, unused on NixOS";
-    zen-browser-bin = "zen-browser";
+    zen-browser-bin = "gap:no top-level nixpkgs attribute (left unstable)";
     zoom = "zoom-us";
 
     # --- this machine's hardware ---
@@ -256,7 +256,7 @@ let
     egl-wayland = "module:hardware.nvidia";
     libva-nvidia-driver = "module:hardware.nvidia";
     nvidia-open = "module:hardware.nvidia.open";
-    nvidia-settings = "nvidia-settings";
+    nvidia-settings = "module:hardware.nvidia.nvidiaSettings";
     nvidia-utils = "module:hardware.nvidia";
     vulkan-nouveau = "gap:conflicts with the NVIDIA driver";
     xf86-video-nouveau = "gap:conflicts with the NVIDIA driver";
