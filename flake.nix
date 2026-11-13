@@ -8,9 +8,11 @@
     nixos-hardware.url = "github:NixOS/nixos-hardware";
     disko.url = "github:nix-community/disko";
     disko.inputs.nixpkgs.follows = "nixpkgs";
+    vibepanel.url = "github:prankstr/vibepanel/v0.17.2";
+    vibepanel.inputs.nixpkgs.follows = "nixpkgs";
   };
 
-  outputs = { self, nixpkgs, home-manager, nixos-hardware, disko, ... }:
+  outputs = { self, nixpkgs, home-manager, nixos-hardware, disko, vibepanel, ... }:
     let
       system = "x86_64-linux";
       pkgs = import nixpkgs {
@@ -35,6 +37,11 @@
           home-manager.useGlobalPkgs = true;
           home-manager.useUserPackages = true;
           home-manager.users.stranger = ./nix/home.nix;
+        }
+        {
+          environment.systemPackages = [
+            vibepanel.packages.${system}.default
+          ];
         }
       ];
     in

@@ -88,9 +88,19 @@ focus_open_zen() {
 
 focus_open_zen "$@"
 
-# Don't use exec — we need a post-exit sync after Zen overwrites storage.js
+# Don't use exec — we need a post-exit sync after Zen overwrites storage.js.
+# Arch installs the binary under /opt. NixOS puts zen-bin on PATH.
 set +e
-/opt/zen-browser-bin/zen-bin --profile "$profile" "$@"
+if [[ -x /opt/zen-browser-bin/zen-bin ]]; then
+  zen_bin=/opt/zen-browser-bin/zen-bin
+else
+  zen_bin=$(command -v zen-bin || true)
+fi
+if [[ -z "$zen_bin" ]]; then
+  echo "zen-bin not found" >&2
+  exit 127
+fi
+"$zen_bin" --profile "$profile" "$@"
 status=$?
 set -e
 

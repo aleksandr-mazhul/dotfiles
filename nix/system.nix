@@ -2,6 +2,7 @@
 let
   mapped = import ./package-map.nix { inherit lib pkgs; };
   themes = import ./themes.nix { inherit pkgs; };
+  clients = import ./clients.nix { inherit pkgs; };
   sddmAdaptive = pkgs.runCommand "sddm-adaptive-theme" { } ''
     mkdir -p "$out/share/sddm/themes/adaptive"
     cp -a ${../sddm/themes/adaptive}/. "$out/share/sddm/themes/adaptive/"
@@ -87,6 +88,8 @@ in
     themes.graphite
     themes.appleCursor
     themes.appleHyprcursor
+    clients.zen
+    clients.hyprliquid
   ];
   # The default profile does not link /share/sddm, so the greeter theme would
   # stay invisible outside the SDDM unit.
@@ -97,6 +100,7 @@ in
     dejavu_fonts
     jetbrains-mono
     font-awesome
+    clients.atkinsonMonoNerd
     powerline-fonts
   ];
 

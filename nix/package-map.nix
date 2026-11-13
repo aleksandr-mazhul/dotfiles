@@ -210,7 +210,7 @@ let
     khal = "khal";
     libnotify = "libnotify";
     matugen = "matugen";
-    "otf-atkinson hyperlegiblemono-nerd" = "gap:package list line is two names jammed together; pick a nerd-font later";
+    "otf-atkinson hyperlegiblemono-nerd" = "module:nix/clients.nix atkinsonMonoNerd (nerd-fonts v3.5.1)";
     playerctl = "playerctl";
     python-pillow = "python3Packages.pillow";
     ripgrep = "ripgrep";
@@ -230,7 +230,7 @@ let
     docker-desktop = "module:virtualisation.docker (engine, not Docker Desktop)";
     google-chrome = "google-chrome";
     gromit-mpx = "gromit-mpx";
-    hyprliquid = "gap:local Hyprland plugin, built by install-gloview.sh";
+    hyprliquid = "module:nix/clients.nix hyprliquid (zaregototsukai/hyprliquid)";
     jetbrains-toolbox = "jetbrains-toolbox";
     kanata-bin = "kanata";
     kontur-talk = "gap:unpackaged vendor client";
@@ -242,13 +242,13 @@ let
     spicetify-bin = "spicetify-cli";
     spokenly = "gap:unpackaged";
     tty-clock = "tty-clock";
-    vibepanel-bin = "gap:local package";
+    vibepanel-bin = "module:flake input prankstr/vibepanel v0.17.2";
     visual-studio-code-bin = "vscode";
     voxtype-bin = "voxtype";
     windscribe-cli-v2-bin = "gap:unpackaged VPN client";
     yandex-browser = "gap:unpackaged";
     yay = "gap:AUR helper, unused on NixOS";
-    zen-browser-bin = "gap:no top-level nixpkgs attribute (left unstable)";
+    zen-browser-bin = "module:nix/clients.nix zen (zen-browser/desktop 1.24.2b)";
     zoom = "zoom-us";
 
     # --- this machine's hardware ---
