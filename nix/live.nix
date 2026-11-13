@@ -12,6 +12,9 @@
   isoImage.edition = "stranger";
   isoImage.volumeID = "STRANGER";
   isoImage.squashfsCompression = "zstd -Xcompression-level 1";
+  # iso-image.nix leaves both off. A new PC is UEFI and the image is written to USB.
+  isoImage.makeEfiBootable = true;
+  isoImage.makeUsbBootable = true;
 
   services.displayManager.autoLogin.enable = true;
   services.displayManager.autoLogin.user = "stranger";
