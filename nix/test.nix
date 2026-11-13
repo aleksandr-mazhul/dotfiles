@@ -78,6 +78,10 @@ pkgs.testers.runNixOSTest {
     machine.succeed("command -v spicetify")
     machine.succeed("command -v voxtype")
     machine.succeed("test -f /run/current-system/sw/lib/openrgb/plugins/libOpenRGBEffectsPlugin.so")
+    machine.succeed("command -v zen-bin")
+    machine.succeed("test -f /run/current-system/sw/lib/libhyprliquid.so")
+    machine.succeed("fc-list : family | grep -q AtkynsonMono")
+    machine.succeed("command -v vibepanel")
     # Nix's binary wrapper execs .Hyprland-wrapped, so the comm is
     # ".Hyprland-wrap", not the exact name "Hyprland".
     machine.wait_until_succeeds("pgrep -u stranger Hyprland", timeout=180)
