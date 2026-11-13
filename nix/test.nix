@@ -11,11 +11,16 @@ pkgs.testers.runNixOSTest {
     hardware.nvidia.open = lib.mkForce false;
     services.getty.autologinUser = "stranger";
     users.users.stranger.initialPassword = "test";
-    programs.bash.loginShellInit = ''
-      if [ "$(tty)" = "/dev/tty1" ]; then
+    # The account's login shell is fish, so the tty1 handoff has to live there.
+    programs.fish.loginShellInit = ''
+      if test (tty) = "/dev/tty1"
         exec Hyprland
-      fi
+      end
     '';
+    # BlueZ refuses to start unless /sys/class/bluetooth exists. This VM has
+    # no adapter, so load the virtual HCI and pull the unit into multi-user.
+    boot.kernelModules = [ "hci_vhci" ];
+    systemd.services.bluetooth.wantedBy = [ "multi-user.target" ];
     virtualisation.memorySize = 4096;
     virtualisation.cores = 2;
     virtualisation.qemu.options = [
@@ -42,6 +47,8 @@ pkgs.testers.runNixOSTest {
     machine.succeed("test -d /home/stranger/.config/kitty")
     machine.succeed("test -d /home/stranger/.config/nvim")
     machine.succeed("test -f /home/stranger/.config/kanata/kanata.kbd")
-    machine.wait_until_succeeds("pgrep -u stranger -x Hyprland", timeout=180)
+    # Nix's binary wrapper execs .Hyprland-wrapped, so the comm is
+    # ".Hyprland-wrap", not the exact name "Hyprland".
+    machine.wait_until_succeeds("pgrep -u stranger Hyprland", timeout=180)
   '';
 }
