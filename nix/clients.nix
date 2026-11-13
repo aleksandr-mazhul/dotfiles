@@ -4,7 +4,7 @@
 # package-list line.
 { pkgs }:
 {
-  zen = pkgs.stdenv.mkDerivation {
+  zen = pkgs.stdenv.mkDerivation rec {
     pname = "zen-browser";
     version = "1.24.2b";
     src = pkgs.fetchurl {
@@ -33,11 +33,27 @@
     # Firefox relocates itself from a fixed offset. A normal patchelf
     # rewrite corrupts that.
     patchelfFlags = [ "--no-clobber-old-sections" ];
+    desktopFile = pkgs.fetchurl {
+      url = "https://github.com/zen-browser/desktop/raw/refs/tags/1.24.2b/build/AppDir/zen.desktop";
+      hash = "sha256-P61k0RwfvAFcAkxbNRf9v6svVYW9KtCxw5qAWuD/eRo=";
+    };
     installPhase = ''
       runHook preInstall
-      mkdir -p "$out/lib/zen-browser" "$out/bin"
+      mkdir -p "$out/lib/zen-browser" "$out/bin" "$out/share/applications"
       cp -a . "$out/lib/zen-browser"
+      # The upstream entry runs `zen`. The tarball ships that name and zen-bin
+      # as the same executable. The rice launcher looks up zen-bin.
+      ln -s "$out/lib/zen-browser/zen" "$out/bin/zen"
       ln -s "$out/lib/zen-browser/zen-bin" "$out/bin/zen-bin"
+      cp ${desktopFile} "$out/share/applications/zen.desktop"
+      for size in 16 32 48 64 128; do
+        mkdir -p "$out/share/icons/hicolor/''${size}x''${size}/apps"
+        cp "browser/chrome/icons/default/default''${size}.png" \
+          "$out/share/icons/hicolor/''${size}x''${size}/apps/zen.png"
+      done
+      test -f "$out/share/applications/zen.desktop"
+      grep -q '^Exec=zen %u$' "$out/share/applications/zen.desktop"
+      test -f "$out/share/icons/hicolor/128x128/apps/zen.png"
       runHook postInstall
     '';
     meta.mainProgram = "zen-bin";
