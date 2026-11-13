@@ -5,6 +5,13 @@ let
     mkdir -p "$out/share/sddm/themes/adaptive"
     cp -a ${../sddm/themes/adaptive}/. "$out/share/sddm/themes/adaptive/"
   '';
+  # Arch renamed swww to awww. The rice still execs swww / swww-daemon
+  # (bootstrap.sh only symlinks those on the Arch install).
+  swwwCompat = pkgs.runCommand "swww-compat" { } ''
+    mkdir -p "$out/bin"
+    ln -s ${pkgs.awww}/bin/awww "$out/bin/swww"
+    ln -s ${pkgs.awww}/bin/awww-daemon "$out/bin/swww-daemon"
+  '';
 in
 {
   networking.hostName = "stranger";
@@ -67,14 +74,6 @@ in
       "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIBFscRM67/+flMNYhje5HXSGbNdiQ3m5bKA4vvEc2fm9 map07102007@gmail.com"
     ];
   };
-
-  # Arch renamed swww to awww. The rice still execs swww / swww-daemon
-  # (bootstrap.sh only symlinks those on the Arch install).
-  swwwCompat = pkgs.runCommand "swww-compat" { } ''
-    mkdir -p "$out/bin"
-    ln -s ${pkgs.awww}/bin/awww "$out/bin/swww"
-    ln -s ${pkgs.awww}/bin/awww-daemon "$out/bin/swww-daemon"
-  '';
 
   environment.systemPackages = mapped.packages ++ [
     (pkgs.tesseract.override { enableLanguages = [ "eng" "rus" ]; })
