@@ -90,6 +90,8 @@ in
     themes.appleHyprcursor
     clients.zen
     clients.hyprliquid
+    clients.openrgbHardwareSync
+    clients.openrgbVisualMap
   ];
   # The default profile does not link /share/sddm, so the greeter theme would
   # stay invisible outside the SDDM unit.

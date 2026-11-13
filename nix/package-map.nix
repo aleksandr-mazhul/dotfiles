@@ -235,8 +235,8 @@ let
     kanata-bin = "kanata";
     kontur-talk = "gap:unpackaged vendor client";
     openrgb-plugin-effects = "openrgb-plugin-effects";
-    openrgb-plugin-hardware-sync = "gap:OpenRGB plugins are not packaged";
-    openrgb-plugin-visual-map = "gap:OpenRGB plugins are not packaged";
+    openrgb-plugin-hardware-sync = "module:nix/clients.nix openrgbHardwareSync (release_1.0)";
+    openrgb-plugin-visual-map = "module:nix/clients.nix openrgbVisualMap (release_1.0)";
     peaclock = "peaclock";
     "pipes.sh" = "pipes";
     spicetify-bin = "spicetify-cli";

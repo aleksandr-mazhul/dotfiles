@@ -78,6 +78,8 @@ pkgs.testers.runNixOSTest {
     machine.succeed("command -v spicetify")
     machine.succeed("command -v voxtype")
     machine.succeed("test -f /run/current-system/sw/lib/openrgb/plugins/libOpenRGBEffectsPlugin.so")
+    machine.succeed("test -f /run/current-system/sw/lib/openrgb/plugins/libOpenRGBHardwareSyncPlugin.so")
+    machine.succeed("test -f /run/current-system/sw/lib/openrgb/plugins/libOpenRGBVisualMapPlugin.so")
     machine.succeed("command -v zen-bin")
     machine.succeed("command -v zen")
     machine.succeed("test -f /run/current-system/sw/share/applications/zen.desktop")
