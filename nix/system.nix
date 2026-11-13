@@ -40,6 +40,7 @@ in
   programs.hyprland.enable = true;
   programs.hyprland.withUWSM = true;
   programs.fish.enable = true;
+  programs.dconf.enable = true;
 
   services.displayManager.sddm.enable = true;
   services.displayManager.sddm.wayland.enable = true;
@@ -86,6 +87,7 @@ in
   environment.pathsToLink = [ "/share/sddm" ];
 
   fonts.packages = with pkgs; [
+    adwaita-fonts
     dejavu_fonts
     jetbrains-mono
     font-awesome

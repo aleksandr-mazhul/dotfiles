@@ -56,6 +56,13 @@ pkgs.testers.runNixOSTest {
     machine.succeed("test -f /run/current-system/sw/share/sddm/themes/adaptive/Main.qml")
     machine.succeed("grep -q 'qs -c rice' /home/stranger/.config/hypr/hyprland.lua")
     machine.succeed("grep -q 'local mainMod' /home/stranger/.config/hypr/binds.lua")
+    machine.succeed("test -f /home/stranger/.config/mimeapps.list")
+    machine.succeed("grep -q Graphite-Dark /home/stranger/.config/gtk-3.0/settings.ini")
+    machine.succeed("grep -q Papirus-Dark /home/stranger/.config/gtk-3.0/settings.ini")
+    machine.succeed("test -f /home/stranger/.config/dconf/user.ini")
+    machine.succeed("test -f /home/stranger/.config/herdr/config.toml")
+    machine.succeed("fc-list : family | grep -q 'Adwaita Sans'")
+    machine.succeed("test -d /run/current-system/sw/share/icons/Papirus-Dark")
     # Nix's binary wrapper execs .Hyprland-wrapped, so the comm is
     # ".Hyprland-wrap", not the exact name "Hyprland".
     machine.wait_until_succeeds("pgrep -u stranger Hyprland", timeout=180)

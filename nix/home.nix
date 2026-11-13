@@ -12,9 +12,26 @@ in
   home.file = lib.mapAttrs (_: e: {
     source = e.source;
     recursive = true;
-  }) files;
+  }) files // {
+    ".config/dconf/user.ini".source = ../migration/inventory/dconf.ini;
+  };
 
   programs.fish.enable = true;
+
+  # Preferences dumped from the Arch session. Loaded once the user bus exists.
+  systemd.user.services.dconf-load = {
+    Unit = {
+      Description = "Load dconf preferences";
+      After = [ "graphical-session.target" ];
+      PartOf = [ "graphical-session.target" ];
+    };
+    Service = {
+      Type = "oneshot";
+      ExecStart = "${pkgs.dconf}/bin/dconf load /";
+      StandardInput = "file:%h/.config/dconf/user.ini";
+    };
+    Install.WantedBy = [ "graphical-session.target" ];
+  };
 
   systemd.user.services.kanata = {
     Unit = {

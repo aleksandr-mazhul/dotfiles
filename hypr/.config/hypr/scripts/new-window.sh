@@ -58,6 +58,9 @@ dirs = [
     Path("/usr/local/share/applications"),
     Path("/usr/share/applications"),
 ]
+for extra in os.environ.get("XDG_DATA_DIRS", "").split(":"):
+    if extra:
+        dirs.append(Path(extra) / "applications")
 
 def parse(path: Path):
     data = {}
