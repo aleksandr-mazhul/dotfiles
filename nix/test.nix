@@ -47,8 +47,15 @@ pkgs.testers.runNixOSTest {
     machine.succeed("test -d /home/stranger/.config/kitty")
     machine.succeed("test -d /home/stranger/.config/nvim")
     machine.succeed("test -f /home/stranger/.config/kanata/kanata.kbd")
+    machine.succeed("id stranger | grep -q '(uinput)'")
+    machine.succeed("command -v python3")
+    machine.succeed("command -v qs")
+    machine.succeed("test -f /run/current-system/sw/share/sddm/themes/adaptive/Main.qml")
+    machine.succeed("grep -q 'qs -c rice' /home/stranger/.config/hypr/hyprland.lua")
+    machine.succeed("grep -q 'local mainMod' /home/stranger/.config/hypr/binds.lua")
     # Nix's binary wrapper execs .Hyprland-wrapped, so the comm is
     # ".Hyprland-wrap", not the exact name "Hyprland".
     machine.wait_until_succeeds("pgrep -u stranger Hyprland", timeout=180)
+    machine.wait_until_succeeds("pgrep -u stranger quickshell", timeout=90)
   '';
 }
