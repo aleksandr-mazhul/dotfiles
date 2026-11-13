@@ -1,6 +1,7 @@
 { config, lib, pkgs, ... }:
 let
   mapped = import ./package-map.nix { inherit lib pkgs; };
+  themes = import ./themes.nix { inherit pkgs; };
   sddmAdaptive = pkgs.runCommand "sddm-adaptive-theme" { } ''
     mkdir -p "$out/share/sddm/themes/adaptive"
     cp -a ${../sddm/themes/adaptive}/. "$out/share/sddm/themes/adaptive/"
@@ -83,6 +84,9 @@ in
     pkgs.glib
     sddmAdaptive
     swwwCompat
+    themes.graphite
+    themes.appleCursor
+    themes.appleHyprcursor
   ];
   # The default profile does not link /share/sddm, so the greeter theme would
   # stay invisible outside the SDDM unit.
