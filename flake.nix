@@ -35,6 +35,7 @@
         modules = shared ++ [
           disko.nixosModules.disko
           ./nix/disko.nix
+          { nixpkgs.config.allowUnfree = true; }
         ];
       };
 

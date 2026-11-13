@@ -8,7 +8,6 @@ in
   i18n.defaultLocale = "en_US.UTF-8";
   console.keyMap = "us";
 
-  nixpkgs.config.allowUnfree = true;
   nix.settings.experimental-features = [ "nix-command" "flakes" ];
 
   boot.loader.systemd-boot.enable = true;
@@ -27,10 +26,11 @@ in
   hardware.bluetooth.enable = true;
 
   programs.hyprland.enable = true;
-  programs.hyprland.withUWSM.enable = true;
+  programs.hyprland.withUWSM = true;
   programs.fish.enable = true;
 
   services.displayManager.sddm.enable = true;
+  services.displayManager.sddm.wayland.enable = true;
   services.displayManager.defaultSession = "hyprland-uwsm";
 
   security.rtkit.enable = true;
