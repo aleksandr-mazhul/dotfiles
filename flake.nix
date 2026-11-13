@@ -77,6 +77,8 @@
           fi
           ${installScript}/bin/install-machine --dry-run /dev/nvme0n1 > "$out"
           grep -q 'disko-install --disk main /dev/nvme0n1' "$out"
+          ${pkgs.bash}/bin/sh ${./nix/install-guard.sh} ${./nix/install-machine.sh}
+          echo "unit-refusals ok" >> "$out"
         '';
         desktop = import ./nix/test.nix {
           inherit pkgs;

@@ -1,7 +1,9 @@
 #!/bin/sh
 # Install this flake onto one whole disk. The disk is never implied: pass it.
-# Refuses the disk that currently holds /. Does not partition anything in
-# --dry-run. Example: install-machine --dry-run /dev/nvme0n1
+# Refuses the disk that holds /, the live image at /iso, or any other disk
+# the running system is booted from. by-id, by-path, by-uuid, and /dev/sdX
+# are the same disk when lsblk says so. --dry-run only prints the command.
+# Example: install-machine --dry-run /dev/nvme0n1
 set -eu
 
 dry=0
@@ -41,19 +43,49 @@ case "$disk" in
     ;;
 esac
 
-if command -v findmnt >/dev/null 2>&1 && command -v lsblk >/dev/null 2>&1; then
-  root_src=$(findmnt -nr -o SOURCE / || true)
-  if [ -n "$root_src" ]; then
-    pk=$(lsblk -no PKNAME "$root_src" 2>/dev/null || true)
-    if [ -n "$pk" ] && [ "/dev/$pk" = "$disk" ]; then
-      echo "Refusing: $disk holds the running root filesystem ($root_src)." >&2
-      exit 1
-    fi
-    if [ "$root_src" = "$disk" ]; then
-      echo "Refusing: $disk is the running root filesystem." >&2
-      exit 1
-    fi
+# Kernel name of the whole disk behind a path (nvme0n1, sda). Empty if the
+# path is not a block device lsblk can see. A partition and its by-id alias
+# both resolve to the parent disk.
+whole_disk() {
+  dev=$1
+  dev=${dev%%\[*}
+  case "$dev" in
+    LABEL=*) dev="/dev/disk/by-label/${dev#LABEL=}" ;;
+    UUID=*) dev="/dev/disk/by-uuid/${dev#UUID=}" ;;
+    PARTUUID=*) dev="/dev/disk/by-partuuid/${dev#PARTUUID=}" ;;
+  esac
+  case "$dev" in
+    /dev/*) ;;
+    *) return 0 ;;
+  esac
+  pk=$(lsblk -n -o PKNAME -- "$dev" 2>/dev/null || true)
+  set -- $pk
+  if [ -n "${1:-}" ]; then
+    printf '%s\n' "$1"
+    return 0
   fi
+  name=$(lsblk -n -o NAME -- "$dev" 2>/dev/null || true)
+  set -- $name
+  if [ -n "${1:-}" ]; then
+    printf '%s\n' "$1"
+  fi
+}
+
+if command -v findmnt >/dev/null 2>&1 && command -v lsblk >/dev/null 2>&1; then
+  target_disk=$(whole_disk "$disk")
+  sources=$(
+    findmnt -nr -o SOURCE --target / 2>/dev/null || true
+    findmnt -nr -o SOURCE --target /iso 2>/dev/null || true
+    findmnt -nr -o SOURCE --target /nix/.ro-store 2>/dev/null || true
+    findmnt -nr -o SOURCE -t iso9660 2>/dev/null || true
+  )
+  for src in $sources; do
+    src_disk=$(whole_disk "$src")
+    if [ -n "$target_disk" ] && [ "$target_disk" = "$src_disk" ]; then
+      echo "Refusing: $disk is the disk the running system is using ($src -> $src_disk)." >&2
+      exit 1
+    fi
+  done
 fi
 
 root="${FLAKE_ROOT:-}"
