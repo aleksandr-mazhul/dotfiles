@@ -53,6 +53,8 @@ pkgs.testers.runNixOSTest {
     machine.succeed("command -v kitty")
     machine.succeed("command -v swww-daemon")
     machine.succeed("command -v waypaper")
+    machine.succeed("command -v gtk-launch")
+    machine.succeed("command -v gio")
     machine.succeed("test -f /run/current-system/sw/share/sddm/themes/adaptive/Main.qml")
     machine.succeed("grep -q 'qs -c rice' /home/stranger/.config/hypr/hyprland.lua")
     machine.succeed("grep -q 'local mainMod' /home/stranger/.config/hypr/binds.lua")

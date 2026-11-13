@@ -79,6 +79,8 @@ in
   environment.systemPackages = mapped.packages ++ [
     (pkgs.tesseract.override { enableLanguages = [ "eng" "rus" ]; })
     pkgs.python3
+    pkgs.gtk3
+    pkgs.glib
     sddmAdaptive
     swwwCompat
   ];

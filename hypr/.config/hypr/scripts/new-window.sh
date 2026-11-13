@@ -110,8 +110,9 @@ if [[ -n "${desktop:-}" ]]; then
   if command -v gtk-launch >/dev/null; then
     id="$(basename "$desktop" .desktop)"
     exec gtk-launch "$id"
+  elif command -v gio >/dev/null; then
+    exec gio launch "$desktop"
   fi
-  exec gio launch "$desktop"
 fi
 
 # Last resort: re-exec the focused process binary (no args).
