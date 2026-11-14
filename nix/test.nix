@@ -78,6 +78,8 @@ pkgs.testers.runNixOSTest {
     machine.succeed("command -v spicetify")
     machine.succeed("command -v voxtype")
     machine.succeed('plugin_dir=$(grep -a -o "OPENRGB_SYSTEM_PLUGIN_DIRECTORY=/nix/store/[0-9a-z]*-openrgb-with-plugins-[0-9.]*/lib/openrgb/plugins" "$(command -v openrgb)" | head -1 | cut -d= -f2-); test -n "$plugin_dir"; test -f "$plugin_dir/libOpenRGBEffectsPlugin.so"; test -f "$plugin_dir/libOpenRGBHardwareSyncPlugin.so"; test -f "$plugin_dir/libOpenRGBVisualMapPlugin.so"')
+    machine.succeed("test -f /run/current-system/sw/share/backgrounds/archlinux/archlinux.stw")
+    machine.succeed('ext_dir=$(grep -a -o "NAUTILUS_4_EXTENSION_DIR=/nix/store/[0-9a-z]*-nautilus-with-extensions/lib/nautilus/extensions-4" "$(command -v nautilus)" | head -1 | cut -d= -f2-); test -n "$ext_dir"; test -f "$ext_dir/libnautilus-image-converter.so"; test -f "$ext_dir/libnautilus-image-properties.so"')
     machine.succeed("command -v zen-bin")
     machine.succeed("command -v zen")
     machine.succeed("test -f /run/current-system/sw/share/applications/zen.desktop")

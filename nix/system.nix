@@ -21,6 +21,22 @@ let
     clients.openrgbHardwareSync
     clients.openrgbVisualMap
   ];
+  # Nixpkgs Nautilus loads one directory: NAUTILUS_4_EXTENSION_DIR, or its
+  # own extensions-4. Join the stock modules with the public converter.
+  nautilusWithExtensions = pkgs.symlinkJoin {
+    name = "nautilus-with-extensions";
+    paths = [
+      pkgs.nautilus
+      clients.nautilusImageConverter
+    ];
+    nativeBuildInputs = [ pkgs.makeBinaryWrapper ];
+    postBuild = ''
+      wrapProgram "$out/bin/nautilus" \
+        --set NAUTILUS_4_EXTENSION_DIR "$out/lib/nautilus/extensions-4"
+      test -f "$out/lib/nautilus/extensions-4/libnautilus-image-converter.so"
+      test -f "$out/lib/nautilus/extensions-4/libnautilus-image-properties.so"
+    '';
+  };
 in
 {
   networking.hostName = "stranger";
@@ -98,10 +114,15 @@ in
     clients.zen
     clients.hyprliquid
     openrgbWithPlugins
+    nautilusWithExtensions
+    clients.archlinuxWallpaper
   ];
   # The default profile does not link /share/sddm, so the greeter theme would
   # stay invisible outside the SDDM unit.
-  environment.pathsToLink = [ "/share/sddm" ];
+  environment.pathsToLink = [
+    "/share/sddm"
+    "/share/backgrounds"
+  ];
 
   fonts.packages = with pkgs; [
     adwaita-fonts

@@ -134,6 +134,60 @@
     ];
   });
 
+  # Public release of the Arch wallpaper set. The rice does not theme these;
+  # they are the upstream files the Arch package installs.
+  archlinuxWallpaper = pkgs.stdenv.mkDerivation {
+    pname = "archlinux-wallpaper";
+    version = "1.6.1";
+    src = pkgs.fetchurl {
+      url = "https://github.com/xyproto/archlinux-wallpaper/releases/download/1.6.1/archlinux-wallpaper-1.6.1.tar.gz";
+      hash = "sha256-61D1/5ckoAtL0PBNFBJ6YhvkJE1fYGUJcoMkZoTAhMA=";
+    };
+    installPhase = ''
+      runHook preInstall
+      mkdir -p "$out/share/backgrounds/archlinux" "$out/share/gnome-background-properties"
+      cp -a archlinux.stw img/. "$out/share/backgrounds/archlinux/"
+      cp arch-backgrounds.xml "$out/share/gnome-background-properties/"
+      test -f "$out/share/backgrounds/archlinux/archlinux.stw"
+      runHook postInstall
+    '';
+  };
+
+  # Corey Berla's public 0.4.0 port of the archived Nautilus extension.
+  nautilusImageConverter = pkgs.stdenv.mkDerivation {
+    pname = "nautilus-image-converter";
+    version = "0.4.0";
+    src = pkgs.fetchFromGitLab {
+      domain = "gitlab.gnome.org";
+      owner = "coreyberla";
+      repo = "nautilus-image-converter";
+      tag = "0.4.0";
+      hash = "sha256-o3/l/juQ3wl2JRj606+z/hsprPqt5iz/0I5BrpKrK5s=";
+    };
+    postPatch = ''
+      substituteInPlace meson.build \
+        --replace-fail \
+          "nautilus_extension_dir = libnautilus_extension.get_pkgconfig_variable('extensiondir')" \
+          "nautilus_extension_dir = get_option('prefix') / get_option('libdir') / 'nautilus' / 'extensions-4'"
+      # Upstream fr.po has an empty charset. msgfmt in gettext 1.0 rejects it.
+      # Same two-line fix as Debian 0.4.0-3.
+      substituteInPlace po/fr.po \
+        --replace-fail 'Content-Type: text/plain; charset=' 'Content-Type: text/plain; charset=UTF-8' \
+        --replace-fail 'Content-Transfer-Encoding: ' 'Content-Transfer-Encoding: 8bit'
+    '';
+    nativeBuildInputs = [
+      pkgs.meson
+      pkgs.ninja
+      pkgs.pkg-config
+      pkgs.glib
+    ];
+    buildInputs = [
+      pkgs.gtk4
+      pkgs.glib
+      pkgs.nautilus
+    ];
+  };
+
   atkinsonMonoNerd = pkgs.runCommand "atkinson-hyperlegible-mono-nerd-3.5.1" {
     src = pkgs.fetchurl {
       url = "https://github.com/ryanoasis/nerd-fonts/releases/download/v3.5.1/AtkinsonHyperlegibleMono.tar.xz";
