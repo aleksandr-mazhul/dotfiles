@@ -119,7 +119,7 @@ let
     onefetch = "onefetch";
     openai-codex = "codex";
     opencode = "opencode";
-    openrgb = "openrgb";
+    openrgb = "module:nix/system.nix openrgb.withPlugins";
     otf-font-awesome = "font-awesome";
     ouch = "ouch";
     packer = "packer";
@@ -234,9 +234,9 @@ let
     jetbrains-toolbox = "jetbrains-toolbox";
     kanata-bin = "kanata";
     kontur-talk = "gap:unpackaged vendor client";
-    openrgb-plugin-effects = "openrgb-plugin-effects";
-    openrgb-plugin-hardware-sync = "gap:OpenRGB plugins are not packaged";
-    openrgb-plugin-visual-map = "gap:OpenRGB plugins are not packaged";
+    openrgb-plugin-effects = "module:nix/system.nix openrgb.withPlugins";
+    openrgb-plugin-hardware-sync = "module:nix/system.nix openrgb.withPlugins (release_1.0)";
+    openrgb-plugin-visual-map = "module:nix/system.nix openrgb.withPlugins (release_1.0)";
     peaclock = "peaclock";
     "pipes.sh" = "pipes";
     spicetify-bin = "spicetify-cli";
