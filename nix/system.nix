@@ -94,6 +94,8 @@ in
 
   users.users.stranger = {
     isNormalUser = true;
+    # SDDM is the login screen. Same password as the live ISO. No autologin.
+    initialPassword = "live";
     extraGroups = [ "wheel" "input" "i2c" "video" "docker" "networkmanager" "uinput" ];
     shell = pkgs.fish;
     openssh.authorizedKeys.keys = [

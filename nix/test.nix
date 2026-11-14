@@ -9,8 +9,9 @@ pkgs.testers.runNixOSTest {
     services.displayManager.sddm.enable = lib.mkForce false;
     services.xserver.videoDrivers = lib.mkForce [ "virtio" ];
     hardware.nvidia.open = lib.mkForce false;
+    # SDDM is off in this VM. Getty hands tty1 to Hyprland and does not
+    # type the installed password ("live").
     services.getty.autologinUser = "stranger";
-    users.users.stranger.initialPassword = "test";
     # The account's login shell is fish, so the tty1 handoff has to live there.
     programs.fish.loginShellInit = ''
       if test (tty) = "/dev/tty1"
