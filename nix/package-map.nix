@@ -8,7 +8,7 @@ let
     "7zip" = "p7zip";
     age = "age";
     ansible = "ansible";
-    archlinux-wallpaper = "gap:Arch wallpaper set, no nixpkgs equivalent";
+    archlinux-wallpaper = "module:nix/clients.nix archlinuxWallpaper (xyproto 1.6.1)";
     asciiquarium = "asciiquarium";
     aws-cli-v2 = "awscli2";
     bandwhich = "bandwhich";
@@ -104,8 +104,8 @@ let
     miller = "miller";
     mpv = "mpv";
     nano = "nano";
-    nautilus = "nautilus";
-    nautilus-image-converter = "gap:removed from nixpkgs; Nautilus resize/rotate extension is gone";
+    nautilus = "module:nix/system.nix nautilus wrapped with nautilus-image-converter";
+    nautilus-image-converter = "module:nix/clients.nix nautilusImageConverter (0.4.0)";
     neovim = "neovim";
     networkmanager = "module:networking.networkmanager";
     network-manager-applet = "networkmanagerapplet";
